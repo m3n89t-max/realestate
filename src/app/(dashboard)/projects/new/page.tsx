@@ -1,0 +1,389 @@
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { StepperHeader, StepperNav } from '@/components/ui/StepperForm'
+import AssetUploader from '@/components/ui/AssetUploader'
+import { MapPin, Home, DollarSign, FileText } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import toast from 'react-hot-toast'
+import type { PropertyType } from '@/lib/types'
+
+const STEPS = [
+  { id: 'basic', title: '기본 정보', description: '주소 및 매물 유형' },
+  { id: 'photos', title: '사진 업로드', description: '매물 사진 추가' },
+  { id: 'analysis', title: '입지 분석', description: 'AI 입지 분석 실행' },
+]
+
+const PROPERTY_TYPES: { value: PropertyType; label: string; icon: string }[] = [
+  { value: 'apartment', label: '아파트', icon: '🏢' },
+  { value: 'officetel', label: '오피스텔', icon: '🏨' },
+  { value: 'villa', label: '빌라/다세대', icon: '🏘️' },
+  { value: 'commercial', label: '상가/사무실', icon: '🏪' },
+  { value: 'land', label: '토지', icon: '🗾' },
+  { value: 'house', label: '단독주택', icon: '🏠' },
+]
+
+const DIRECTIONS = ['남향', '남동향', '남서향', '동향', '서향', '북향', '북동향', '북서향']
+
+const COMMON_FEATURES = [
+  '역세권', '학군우수', '신축', '주차가능', '남향', '조용한', '뷰좋음',
+  '풀옵션', '관리비저렴', '대단지', '커뮤니티시설', '공원인접', '상권인접', '즉시입주',
+]
+
+interface FormData {
+  address: string
+  property_type: PropertyType | ''
+  price: string
+  monthly_rent: string
+  area: string
+  floor: string
+  total_floors: string
+  direction: string
+  features: string[]
+  note: string
+}
+
+export default function NewProjectPage() {
+  const router = useRouter()
+  const supabase = createClient()
+  const [currentStep, setCurrentStep] = useState(0)
+  const [submitting, setSubmitting] = useState(false)
+  const [projectId, setProjectId] = useState<string | null>(null)
+
+  const [form, setForm] = useState<FormData>({
+    address: '',
+    property_type: '',
+    price: '',
+    monthly_rent: '',
+    area: '',
+    floor: '',
+    total_floors: '',
+    direction: '',
+    features: [],
+    note: '',
+  })
+
+  const handleChange = (field: keyof FormData, value: string | string[]) => {
+    setForm(prev => ({ ...prev, [field]: value }))
+  }
+
+  const toggleFeature = (feature: string) => {
+    setForm(prev => ({
+      ...prev,
+      features: prev.features.includes(feature)
+        ? prev.features.filter(f => f !== feature)
+        : [...prev.features, feature],
+    }))
+  }
+
+  const canNext = (): boolean => {
+    if (currentStep === 0) return form.address.length > 0 && form.property_type !== ''
+    return true
+  }
+
+  const handleNext = async () => {
+    if (currentStep === 0 && !projectId) {
+      // 1단계 완료 시 프로젝트 생성
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        const { data: membership } = await supabase
+          .from('memberships')
+          .select('org_id')
+          .eq('user_id', user!.id)
+          .not('joined_at', 'is', null)
+          .limit(1)
+          .single()
+
+        const { data, error } = await supabase
+          .from('projects')
+          .insert({
+            org_id: membership!.org_id,
+            address: form.address,
+            property_type: form.property_type || null,
+            price: form.price ? parseInt(form.price.replace(/,/g, '')) : null,
+            monthly_rent: form.monthly_rent ? parseInt(form.monthly_rent.replace(/,/g, '')) : null,
+            area: form.area ? parseFloat(form.area) : null,
+            floor: form.floor ? parseInt(form.floor) : null,
+            total_floors: form.total_floors ? parseInt(form.total_floors) : null,
+            direction: form.direction || null,
+            features: form.features,
+            note: form.note || null,
+            status: 'draft',
+          })
+          .select()
+          .single()
+
+        if (error) throw error
+        setProjectId(data.id)
+        toast.success('기본 정보가 저장되었습니다')
+      } catch (err) {
+        toast.error('저장에 실패했습니다')
+        console.error(err)
+        return
+      }
+    }
+    setCurrentStep(prev => prev + 1)
+  }
+
+  const handleSubmit = async () => {
+    if (!projectId) return
+    setSubmitting(true)
+    try {
+      // 입지 분석 Edge Function 호출
+      const { error } = await supabase.functions.invoke('analyze-location', {
+        body: { project_id: projectId },
+      })
+      if (error) console.warn('입지 분석 실패 (비필수):', error)
+
+      // 상태를 active로 업데이트
+      await supabase
+        .from('projects')
+        .update({ status: 'active' })
+        .eq('id', projectId)
+
+      toast.success('매물이 등록되었습니다!')
+      router.push(`/projects/${projectId}`)
+    } catch (err) {
+      toast.error('완료 처리에 실패했습니다')
+      console.error(err)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto animate-fade-in">
+      <div className="mb-8">
+        <h1 className="text-xl font-bold text-gray-900">새 매물 등록</h1>
+        <p className="text-sm text-gray-500 mt-1">매물 정보를 입력하면 AI가 자동으로 마케팅 콘텐츠를 생성합니다</p>
+      </div>
+
+      {/* 스텝 인디케이터 */}
+      <div className="card p-6 mb-6">
+        <StepperHeader steps={STEPS} currentStep={currentStep} />
+      </div>
+
+      {/* 스텝 콘텐츠 */}
+      <div className="card p-6">
+        {/* Step 1: 기본 정보 */}
+        {currentStep === 0 && (
+          <div className="space-y-5">
+            <div className="flex items-center gap-2 text-brand-600 mb-4">
+              <MapPin size={18} />
+              <h2 className="font-semibold">기본 정보 입력</h2>
+            </div>
+
+            {/* 주소 */}
+            <div>
+              <label className="label">주소 *</label>
+              <input
+                value={form.address}
+                onChange={e => handleChange('address', e.target.value)}
+                placeholder="서울시 강남구 역삼동 123 역삼 래미안 101동 1503호"
+                className="input"
+              />
+            </div>
+
+            {/* 매물 유형 */}
+            <div>
+              <label className="label">매물 유형 *</label>
+              <div className="grid grid-cols-3 gap-2">
+                {PROPERTY_TYPES.map(type => (
+                  <button
+                    key={type.value}
+                    type="button"
+                    onClick={() => handleChange('property_type', type.value)}
+                    className={`p-3 rounded-lg border-2 text-sm font-medium transition-colors flex flex-col items-center gap-1 ${
+                      form.property_type === type.value
+                        ? 'border-brand-500 bg-brand-50 text-brand-700'
+                        : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                    }`}
+                  >
+                    <span className="text-xl">{type.icon}</span>
+                    {type.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 가격 */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="label">매매가 (만원)</label>
+                <input
+                  value={form.price}
+                  onChange={e => handleChange('price', e.target.value)}
+                  placeholder="85000"
+                  className="input"
+                  type="number"
+                />
+              </div>
+              <div>
+                <label className="label">월세 (만원, 해당시)</label>
+                <input
+                  value={form.monthly_rent}
+                  onChange={e => handleChange('monthly_rent', e.target.value)}
+                  placeholder="150"
+                  className="input"
+                  type="number"
+                />
+              </div>
+            </div>
+
+            {/* 면적 및 층수 */}
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="label">전용면적 (㎡)</label>
+                <input
+                  value={form.area}
+                  onChange={e => handleChange('area', e.target.value)}
+                  placeholder="84.92"
+                  className="input"
+                  type="number"
+                  step="0.01"
+                />
+              </div>
+              <div>
+                <label className="label">해당 층</label>
+                <input
+                  value={form.floor}
+                  onChange={e => handleChange('floor', e.target.value)}
+                  placeholder="15"
+                  className="input"
+                  type="number"
+                />
+              </div>
+              <div>
+                <label className="label">전체 층수</label>
+                <input
+                  value={form.total_floors}
+                  onChange={e => handleChange('total_floors', e.target.value)}
+                  placeholder="25"
+                  className="input"
+                  type="number"
+                />
+              </div>
+            </div>
+
+            {/* 방향 */}
+            <div>
+              <label className="label">방향</label>
+              <div className="flex flex-wrap gap-2">
+                {DIRECTIONS.map(dir => (
+                  <button
+                    key={dir}
+                    type="button"
+                    onClick={() => handleChange('direction', form.direction === dir ? '' : dir)}
+                    className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                      form.direction === dir
+                        ? 'bg-brand-600 text-white border-brand-600'
+                        : 'border-gray-200 text-gray-600 hover:border-brand-300'
+                    }`}
+                  >
+                    {dir}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 특징 */}
+            <div>
+              <label className="label">매물 특징 (복수 선택)</label>
+              <div className="flex flex-wrap gap-2">
+                {COMMON_FEATURES.map(feature => (
+                  <button
+                    key={feature}
+                    type="button"
+                    onClick={() => toggleFeature(feature)}
+                    className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                      form.features.includes(feature)
+                        ? 'bg-brand-600 text-white border-brand-600'
+                        : 'border-gray-200 text-gray-600 hover:border-brand-300'
+                    }`}
+                  >
+                    {feature}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 메모 */}
+            <div>
+              <label className="label">내부 메모 (선택)</label>
+              <textarea
+                value={form.note}
+                onChange={e => handleChange('note', e.target.value)}
+                placeholder="추가 정보나 특이사항을 입력하세요"
+                rows={3}
+                className="input resize-none"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: 사진 업로드 */}
+        {currentStep === 1 && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-brand-600 mb-4">
+              <Home size={18} />
+              <h2 className="font-semibold">사진 업로드</h2>
+            </div>
+            <p className="text-sm text-gray-500">
+              사진을 업로드하면 카테고리별로 자동 분류됩니다. 카드뉴스 및 영상 제작에 활용됩니다.
+            </p>
+            <AssetUploader maxFiles={30} maxSize={20 * 1024 * 1024} />
+          </div>
+        )}
+
+        {/* Step 3: 입지 분석 */}
+        {currentStep === 2 && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-brand-600 mb-4">
+              <MapPin size={18} />
+              <h2 className="font-semibold">입지 분석</h2>
+            </div>
+            <div className="bg-brand-50 rounded-xl p-5">
+              <p className="text-sm font-medium text-brand-800">AI 입지 분석 준비됨</p>
+              <p className="text-sm text-brand-600 mt-1">
+                &quot;완료&quot; 버튼을 누르면 아래 항목이 자동 분석됩니다:
+              </p>
+              <ul className="mt-3 space-y-1.5">
+                {[
+                  '교통 (도보/차량 시간 기반)',
+                  '학군 (학교 위치 및 거리)',
+                  '상권 (마트/병원/공원 등)',
+                  '입지 장점 7가지 자동 생성',
+                  '추천 타겟 3종 분석',
+                ].map((item, i) => (
+                  <li key={i} className="flex items-center gap-2 text-sm text-brand-700">
+                    <span className="w-5 h-5 bg-brand-200 rounded-full flex items-center justify-center text-xs font-bold text-brand-700">
+                      {i + 1}
+                    </span>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <p className="text-xs text-gray-400">
+              * 분석에는 약 10~30초가 소요됩니다. 등록 후 프로젝트 상세 페이지에서 확인하세요.
+            </p>
+          </div>
+        )}
+
+        {/* 네비게이션 */}
+        <StepperNav
+          currentStep={currentStep}
+          totalSteps={STEPS.length}
+          onPrev={() => setCurrentStep(prev => prev - 1)}
+          onNext={handleNext}
+          onSubmit={handleSubmit}
+          isSubmitting={submitting}
+          nextLabel="다음 단계"
+          submitLabel="매물 등록 완료"
+          canNext={canNext()}
+        />
+      </div>
+    </div>
+  )
+}

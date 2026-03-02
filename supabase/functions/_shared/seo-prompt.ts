@@ -1,0 +1,105 @@
+// SEO 최적화 부동산 블로그 생성 프롬프트 템플릿
+
+export interface BlogPromptContext {
+  address: string
+  property_type: string
+  price?: number
+  area?: number
+  floor?: number
+  total_floors?: number
+  direction?: string
+  features?: string[]
+  location_advantages?: string[]
+  nearby_facilities?: Record<string, unknown>
+  style: 'informative' | 'investment' | 'lifestyle'
+}
+
+export function buildBlogSystemPrompt(): string {
+  return `당신은 대한민국 부동산 SEO 전문가이자 공인중개사 마케팅 전문가입니다.
+네이버 블로그 검색 상위 노출을 목표로, 실제 잠재 구매자/임차인이 검색하는 방식의 키워드를 반영한 블로그 글을 작성하세요.
+
+[필수 SEO 규칙 - 반드시 준수]
+1. 제목(H1): 지역명 + 매물유형 + 핵심강점을 앞쪽에 배치
+   예) "강남구 역삼동 아파트 매매 - 역세권·학군우수·남향 84㎡ 완벽 분석"
+
+2. 본문 최소 1,800자 이상 작성
+
+3. H2 섹션 7개 이상 필수:
+   - ## 매물 개요 및 기본 정보
+   - ## 입지 장점 분석 (7가지)
+   - ## 주변 인프라 상세 (교통/학교/상권/의료)
+   - ## 실내 구조 및 특징
+   - ## 시장 전망 및 투자 포인트
+   - ## 이런 분께 추천드립니다
+   - ## 자주 묻는 질문 (FAQ)
+   - ## 문의 및 방문 안내
+
+4. 롱테일 키워드 자연 삽입:
+   - "{지역} {매물유형} {조건} 매매" 패턴
+   - 예) "역삼동 남향 아파트 매매", "강남구 학군좋은 아파트 추천"
+
+5. FAQ 5개 필수 포함 (실제 검색자의 궁금증 반영):
+   - 가격 관련, 입지 관련, 학군 관련, 관리비 관련, 주변환경 관련
+
+6. 이미지 ALT 태그 제안: 각 섹션에 어울리는 이미지 ALT 텍스트 3개 이상 제안
+
+7. CTA(Call to Action) 필수: 마지막에 문의 유도 문단 포함
+
+8. 사실 기반 작성: 과장/허위 표현 금지. "최고", "최저", "보장" 등 단정 표현 지양
+
+[출력 형식: JSON]
+{
+  "titles": ["제목1", "제목2", "제목3", "제목4", "제목5"],
+  "meta_description": "150자 이내 메타 설명 (검색결과 클릭률 최적화)",
+  "content": "마크다운 본문 (H1~H3 구조 포함)",
+  "tags": ["해시태그1", "해시태그2", ...],
+  "faq": [{"q": "질문", "a": "답변"}, ...],
+  "alt_tags": ["ALT태그1", "ALT태그2", "ALT태그3"],
+  "seo_score": {
+    "keyword_in_title": true/false,
+    "min_length": true/false,
+    "has_h2": true/false,
+    "has_faq": true/false,
+    "has_alt": true/false,
+    "longtail_keywords": true/false,
+    "total_score": 0-100
+  }
+}`
+}
+
+export function buildBlogUserPrompt(ctx: BlogPromptContext): string {
+  const styleGuide = {
+    informative: '실거주자를 위한 정보 중심 글. 입지/인프라/생활환경을 상세히 설명.',
+    investment: '투자자를 위한 시세분석 및 수익률 관점의 글. 시장 동향/가치 상승 요인 강조.',
+    lifestyle: '라이프스타일 중심의 감성적 글. 동네 분위기/생활 편의/커뮤니티 강조.',
+  }[ctx.style]
+
+  const priceText = ctx.price
+    ? `${Math.floor(ctx.price / 100000000)}억 ${Math.floor((ctx.price % 100000000) / 10000) > 0 ? Math.floor((ctx.price % 100000000) / 10000) + '만원' : ''}`
+    : '가격 협의'
+
+  return `다음 매물 정보로 SEO 최적화 부동산 블로그 글을 작성하세요.
+
+[매물 기본 정보]
+- 주소: ${ctx.address}
+- 매물 유형: ${ctx.property_type}
+- 가격: ${priceText}
+- 전용면적: ${ctx.area ? `${ctx.area}㎡ (약 ${(ctx.area / 3.3058).toFixed(1)}평)` : '정보 없음'}
+- 층수: ${ctx.floor && ctx.total_floors ? `${ctx.floor}층 / 전체 ${ctx.total_floors}층` : '정보 없음'}
+- 방향: ${ctx.direction ?? '정보 없음'}
+- 특징: ${ctx.features?.join(', ') ?? '없음'}
+
+[입지 분석 결과]
+${ctx.location_advantages?.map((a, i) => `${i + 1}. ${a}`).join('\n') ?? '입지 분석 결과 없음 (주소 기반으로 추론하여 작성)'}
+
+[글 스타일]
+${styleGuide}
+
+[지역 분석 지침]
+- 지역명에서 자치구, 행정동, 아파트명을 파악하여 해당 지역의 특성을 반영
+- 교통: 가장 가까운 지하철역과 도보 시간 추론
+- 학군: 해당 지역의 학군 특성 반영
+- 상권: 주변 대형마트, 백화점, 재래시장 등 언급
+
+위 정보를 바탕으로 검색 상위 노출이 가능한 완성도 높은 블로그 글을 JSON 형식으로 작성하세요.`
+}
