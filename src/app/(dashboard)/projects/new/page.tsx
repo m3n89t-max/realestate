@@ -87,18 +87,46 @@ export default function NewProjectPage() {
       // 1단계 완료 시 프로젝트 생성
       try {
         const { data: { user } } = await supabase.auth.getUser()
-        const { data: membership } = await supabase
+        if (!user) {
+          toast.error('로그인이 필요합니다')
+          return
+        }
+
+        let { data: membership } = await supabase
           .from('memberships')
           .select('org_id')
-          .eq('user_id', user!.id)
+          .eq('user_id', user.id)
           .not('joined_at', 'is', null)
           .limit(1)
           .single()
 
+        // 조직이 없으면 자동 생성
+        if (!membership) {
+          const displayName = user.email?.split('@')[0] ?? '사용자'
+          const { data: newOrg, error: orgErr } = await supabase
+            .from('organizations')
+            .insert({ name: `${displayName}의 중개사무소`, plan_type: 'free' })
+            .select('id')
+            .single()
+          if (orgErr || !newOrg) {
+            toast.error(`조직 생성 실패: ${orgErr?.message ?? '알 수 없는 오류'}`)
+            return
+          }
+          const { error: memErr } = await supabase
+            .from('memberships')
+            .insert({ org_id: newOrg.id, user_id: user.id, role: 'owner', joined_at: new Date().toISOString() })
+          if (memErr) {
+            toast.error(`멤버십 생성 실패: ${memErr.message}`)
+            return
+          }
+          membership = { org_id: newOrg.id }
+        }
+
         const { data, error } = await supabase
           .from('projects')
           .insert({
-            org_id: membership!.org_id,
+            org_id: membership.org_id,
+            created_by: user.id,
             address: form.address,
             property_type: form.property_type || null,
             price: form.price ? parseInt(form.price.replace(/,/g, '')) : null,
@@ -117,8 +145,9 @@ export default function NewProjectPage() {
         if (error) throw error
         setProjectId(data.id)
         toast.success('기본 정보가 저장되었습니다')
-      } catch (err) {
-        toast.error('저장에 실패했습니다')
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        toast.error(`저장 실패: ${msg}`)
         console.error(err)
         return
       }
@@ -194,11 +223,10 @@ export default function NewProjectPage() {
                     key={type.value}
                     type="button"
                     onClick={() => handleChange('property_type', type.value)}
-                    className={`p-3 rounded-lg border-2 text-sm font-medium transition-colors flex flex-col items-center gap-1 ${
-                      form.property_type === type.value
+                    className={`p-3 rounded-lg border-2 text-sm font-medium transition-colors flex flex-col items-center gap-1 ${form.property_type === type.value
                         ? 'border-brand-500 bg-brand-50 text-brand-700'
                         : 'border-gray-200 hover:border-gray-300 text-gray-600'
-                    }`}
+                      }`}
                   >
                     <span className="text-xl">{type.icon}</span>
                     {type.label}
@@ -275,11 +303,10 @@ export default function NewProjectPage() {
                     key={dir}
                     type="button"
                     onClick={() => handleChange('direction', form.direction === dir ? '' : dir)}
-                    className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
-                      form.direction === dir
+                    className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${form.direction === dir
                         ? 'bg-brand-600 text-white border-brand-600'
                         : 'border-gray-200 text-gray-600 hover:border-brand-300'
-                    }`}
+                      }`}
                   >
                     {dir}
                   </button>
@@ -296,11 +323,10 @@ export default function NewProjectPage() {
                     key={feature}
                     type="button"
                     onClick={() => toggleFeature(feature)}
-                    className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
-                      form.features.includes(feature)
+                    className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${form.features.includes(feature)
                         ? 'bg-brand-600 text-white border-brand-600'
                         : 'border-gray-200 text-gray-600 hover:border-brand-300'
-                    }`}
+                      }`}
                   >
                     {feature}
                   </button>
