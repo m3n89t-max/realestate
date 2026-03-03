@@ -103,3 +103,66 @@ ${styleGuide}
 
 위 정보를 바탕으로 검색 상위 노출이 가능한 완성도 높은 블로그 글을 JSON 형식으로 작성하세요.`
 }
+
+// ── 서버사이드 SEO 점수 계산 ────────────────────────────────────────────────
+
+export interface SeoScoreDetailed {
+  total: number
+  breakdown: {
+    has_h1: boolean
+    h2_count: number
+    char_count: number
+    keyword_density: number
+    has_faq: boolean
+    faq_count: number
+    has_alt_tags: boolean
+    has_cta: boolean
+    has_hashtags: boolean
+  }
+}
+
+export function calculateSeoScore(content: string, keywords: string[]): SeoScoreDetailed {
+  const hasH1 = content.includes('# ') || /<h1/i.test(content)
+  const h2Matches = content.match(/## |<h2/gi) || []
+  const charCount = content.replace(/[#<>*\[\]]/g, '').length
+
+  const totalWords = content.split(/\s+/).length
+  const keywordOccurrences = keywords.reduce((count, kw) => {
+    const regex = new RegExp(kw, 'gi')
+    return count + (content.match(regex) || []).length
+  }, 0)
+  const density = totalWords > 0 ? (keywordOccurrences / totalWords) * 100 : 0
+
+  const hasFaq = content.toLowerCase().includes('faq') || content.includes('자주 묻는')
+  const faqMatches = content.match(/\?/g) || []
+  const hasAltTags = content.includes('alt=') || content.includes('[사진')
+  const hasCta = content.includes('문의') || content.includes('연락') || content.includes('상담')
+  const hasHashtags = content.includes('#')
+
+  let total = 0
+  if (hasH1) total += 10
+  if (h2Matches.length >= 7) total += 15
+  else if (h2Matches.length >= 5) total += 10
+  if (charCount >= 1500) total += 20
+  else if (charCount >= 1000) total += 10
+  if (density >= 1 && density <= 3) total += 15
+  if (hasFaq) total += 15
+  if (hasAltTags) total += 10
+  if (hasCta) total += 10
+  if (hasHashtags) total += 5
+
+  return {
+    total,
+    breakdown: {
+      has_h1: hasH1,
+      h2_count: h2Matches.length,
+      char_count: charCount,
+      keyword_density: Math.round(density * 100) / 100,
+      has_faq: hasFaq,
+      faq_count: faqMatches.length,
+      has_alt_tags: hasAltTags,
+      has_cta: hasCta,
+      has_hashtags: hasHashtags,
+    },
+  }
+}

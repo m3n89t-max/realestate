@@ -11,6 +11,8 @@ import { formatPrice, formatArea, getPropertyTypeLabel } from '@/lib/utils'
 import BlogTab from './components/BlogTab'
 import CardNewsTab from './components/CardNewsTab'
 import DocsTab from './components/DocsTab'
+import ShortsTab from './components/ShortsTab'
+import TasksTab from './components/TasksTab'
 
 interface Params {
   id: string
@@ -20,8 +22,9 @@ const TABS = [
   { id: 'overview', label: '개요' },
   { id: 'blog', label: '블로그 글' },
   { id: 'card_news', label: '카드뉴스' },
-  { id: 'video', label: '영상' },
+  { id: 'shorts', label: '쇼츠' },
   { id: 'docs', label: '서류' },
+  { id: 'tasks', label: '작업 현황' },
   { id: 'package', label: '패키지' },
 ]
 
@@ -247,10 +250,12 @@ export default async function ProjectDetailPage({
         <DocsTab projectId={id} documents={documents ?? []} />
       )}
 
-      {tab === 'video' && (
-        <div className="card p-8 text-center">
-          <p className="text-gray-400">영상 생성 기능은 Phase 3에서 제공됩니다</p>
-        </div>
+      {tab === 'shorts' && (
+        <ShortsTab projectId={id} />
+      )}
+
+      {tab === 'tasks' && (
+        <TasksTab projectId={id} />
       )}
 
       {tab === 'package' && (
