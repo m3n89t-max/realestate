@@ -150,7 +150,17 @@ queued ──► pending ──► running ──► success
                                     failed (final)
 ```
 
-**Note:** The task `type` ENUM in the current DB schema uses: `naver_upload`, `youtube_upload`, `building_register`, `seumteo_api`, `video_render`, `pdf_merge`. The development definition document lists additional types (`normalize_parcel`, `location_analyze`, `download_building_register`, `download_cadastral_map`, `summarize_documents`, `generate_blog`, `generate_cards_instagram`, `generate_cards_kakao`, `generate_shorts_script`, `render_shorts_video`, `upload_naver_blog`, `upload_youtube`). The DB schema must be extended to include these before the agent handles them. See migration task in `team-assignments.md`.
+**Note:** The supported task types (V3 Workflow) include: 
+`normalize_parcel`, `location_analyze`, `download_building_register`, `download_cadastral_map`, `summarize_documents`, `generate_blog`, `generate_cards_instagram`, `generate_cards_kakao`, `generate_shorts_script`, `render_shorts_video`, `upload_naver_blog`, `upload_youtube`.
+(Legacy DB types: `naver_upload`, `youtube_upload`, `building_register`, `seumteo_api`, `video_render`, `pdf_merge`).
+
+**Agent Responsibility**: The Local Agent ONLY claims tasks that require a local windows environment or playwright browser automation: 
+- `download_building_register`
+- `download_cadastral_map`
+- `upload_naver_blog`
+- `upload_youtube`
+
+Other tasks are handled by the Supabase Edge Functions / Content Engine.
 
 ### Execution Flow Per Task Type
 

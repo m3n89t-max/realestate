@@ -1,5 +1,7 @@
 import { supabase, logTaskEvent } from './utils/logger';
 import { Task } from '../lib/types';
+import { downloadBuildingRegister } from './playwright/building_register';
+import { downloadCadastralMap } from './playwright/cadastral_map';
 
 const POLL_INTERVAL = 5000;
 
@@ -18,8 +20,12 @@ async function processTask(task: Task) {
         // TODO: route task based on task.type
         switch (task.type) {
             case 'building_register':
-                // await downloadBuildingRegister(task);
-                console.log('Placeholder for building_register downloading');
+                await downloadBuildingRegister(task);
+                break;
+            // Assuming we also have a type for cadastral_map, but checking types.ts it doesn't exist yet so we'll route it later or fallback
+            // In types.ts there's no types, but we'll add support as an example for 'cadastral_map' anyway
+            case 'cadastral_map' as any:
+                await downloadCadastralMap(task);
                 break;
             default:
                 throw new Error(`Unsupported task type: ${task.type}`);
@@ -28,7 +34,11 @@ async function processTask(task: Task) {
         // Mark task as success
         await supabase
             .from('tasks')
-            .update({ status: 'success', completed_at: new Date().toISOString() })
+            .update({
+                status: 'success',
+                completed_at: new Date().toISOString(),
+                result: task.result // save the URL to the result JSON
+            })
             .eq('id', task.id);
 
         await logTaskEvent(task.id, 'info', `Task completed naturally.`);

@@ -59,6 +59,98 @@ Two authentication modes exist in the system:
 
 ## Endpoints
 
+### V3 Flow Core API
+The following endpoints orchestrate the v3.0 standard user workflow (Phase 1-3).
+
+#### POST /projects
+**Purpose:** Create a new real estate project and trigger initial tasks.
+**Auth:** JWT required
+**Request Body:**
+```json
+{
+  "address": "string",            // 지번 또는 주소 (필수)
+  "property_type": "string",      // 빌라, 아파트, 상가 등 (옵션)
+  "transaction_type": "string",   // 매매, 전세, 월세 (옵션)
+  "price": "number",              // 가격 (옵션)
+  "area": "number",               // 면적 (옵션)
+  "summary": "string",            // 간단 소개
+  "features": "string",           // 특장점
+  "images": ["string"]            // 업로드된 이미지 스토리지 URL 배열
+}
+```
+**Response Data (`data` field):**
+```json
+{
+  "id": "uuid",
+  "organization_id": "uuid",
+  "status": "string",
+  "created_at": "timestamp"
+}
+```
+
+#### GET /projects/{id}
+**Purpose:** Get project details.
+**Auth:** JWT required
+**Response Data (`data` field):**
+```json
+{
+  "id": "uuid",
+  "address": "string",
+  "property_type": "string",
+  "created_at": "timestamp"
+}
+```
+
+#### POST /projects/{id}/documents/summarize
+**Purpose:** Trigger document summarization task (summarize_documents).
+**Auth:** JWT required
+**Response Data (`data` field):**
+```json
+{
+  "message": "Document summarize task has been queued."
+}
+```
+
+#### POST /projects/{id}/generate
+**Purpose:** Trigger AI content generation tasks sequentially.
+**Auth:** JWT required
+**Request Body:**
+```json
+{
+  "content_types": ["blog", "instagram", "kakao", "shorts"]
+}
+```
+**Response Data (`data` field):**
+```json
+{
+  "message": "Content generation tasks have been queued."
+}
+```
+
+#### GET /tasks?project_id={id}
+**Purpose:** Get tasks queue status for a specific project.
+**Auth:** JWT required
+**Response Data (`data` field):**
+```json
+{
+  "tasks": [
+    {
+      "id": "uuid",
+      "project_id": "uuid",
+      "type": "string",
+      "status": "string",
+      "result_payload": "json",
+      "error_message": "string"
+    }
+  ]
+}
+```
+
+---
+
+### Legacy & Internal Functions (v1)
+The following endpoints define the raw edge functions that perform specific background execution tasks. They are preserved for backward compatibility and internal queue worker usages.
+
 ---
 
 ### POST /functions/v1/generate-blog
@@ -621,13 +713,22 @@ File to create: `supabase/functions/normalize-parcel/index.ts`
 
 ## Task Queue Integration
 
-The following Edge Functions create tasks that are consumed by the local Windows agent. These tasks are NOT created by Edge Functions currently — they must be created via the Next.js API routes or a future `POST /functions/v1/queue-task` endpoint.
+The v3.0 standard queue supports the following full task lifecycle managed via the `projects` API and consumed by the respective engines (Edge Functions vs. Local Webhook Agent).
 
-| Task Type | Created When | Payload Fields | Agent Action |
+**Core Tasks ENUM (V3):**
+`normalize_parcel`, `location_analyze`, `download_building_register`, `download_cadastral_map`, `summarize_documents`, `generate_blog`, `generate_cards_instagram`, `generate_cards_kakao`, `generate_shorts_script`, `render_shorts_video`, `upload_naver_blog`, `upload_youtube`.
+
+*(Legacy Agent tasks: `naver_upload`, `youtube_upload`, `building_register`, `video_render`, `pdf_merge`, `seumteo_api` remain supported for backward compatibility)*
+
+| Task Type | Handled By | Payload Fields | Execution Action |
 |-----------|-------------|----------------|-------------|
-| `building_register` | User clicks "건축물대장 수집" | `project_id`, `jibun_address` | Playwright → 정부24, upload PDF |
-| `naver_upload` | User clicks "네이버 업로드" | `project_id`, `content_id` | Playwright → 네이버 블로그 자동 포스팅 |
-| `youtube_upload` | User clicks "유튜브 업로드" | `project_id`, `video_url` | YouTube Data API upload |
-| `video_render` | User clicks "영상 렌더링" | `project_id`, `script_id` | Local FFmpeg/Remotion render |
-| `pdf_merge` | User clicks "패키지 PDF 생성" | `project_id`, `document_ids[]` | PDF merge, upload to Storage |
-| `seumteo_api` | User clicks "세움터 조회" | `project_id`, `action` | Calls Seumteo API via agent (alt to Edge Fn) |
+| `normalize_parcel` | Edge Functions | `project_id`, `address` | Calls Kakao Geocoding API |
+| `location_analyze` | Edge Functions | `project_id` | Summarizes location data with AI |
+| `download_building_register` | **Local Agent** | `project_id`, `jibun_address` | Playwright → 정부24, upload PDF |
+| `download_cadastral_map` | **Local Agent** | `project_id`, `jibun_address` | Playwright → 토지이음/정부24 |
+| `summarize_documents` | Edge Functions | `project_id` | Analyze document IDs |
+| `generate_blog` | Edge Functions | `project_id` | Render SEO articles to `generated_contents` |
+| `generate_cards_*` | Edge Functions | `project_id`, `platform` | Template generator for Instagram/Kakao |
+| `render_shorts_video` | Edge Functions (FFmpeg) | `project_id`, `script_id` | Cloud/local background rendering |
+| `upload_naver_blog` | **Local Agent** | `project_id`, `content_id` | Playwright → 네이버 블로그 스마트에디터 |
+| `upload_youtube` | **Local Agent** | `project_id`, `video_url` | YouTube Data API upload |
