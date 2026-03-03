@@ -28,41 +28,36 @@
 }
 
 @layer components {
-  .sidebar-link {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600
-           hover:bg-gray-100 hover:text-gray-900 transition-colors duration-150;
-  }
-
-  .sidebar-link.active {
-    @apply bg-brand-50 text-brand-700;
-  }
-
   .card {
-    @apply bg-white rounded-xl border border-gray-200 shadow-sm;
+    @apply bg-white rounded-2xl border border-gray-100 shadow-sm;
   }
 
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 px-4 py-2.5
-           bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium
-           rounded-lg transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
+           bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-700 hover:to-brand-800
+           text-white text-sm font-semibold
+           rounded-xl transition-all duration-200
+           shadow-sm shadow-brand-200 hover:shadow-md hover:shadow-brand-200
+           disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .btn-secondary {
     @apply inline-flex items-center justify-center gap-2 px-4 py-2.5
            bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium
-           border border-gray-200 rounded-lg transition-colors duration-150;
+           border border-gray-200 hover:border-gray-300
+           rounded-xl transition-all duration-200;
   }
 
   .btn-danger {
     @apply inline-flex items-center justify-center gap-2 px-4 py-2.5
            bg-red-600 hover:bg-red-700 text-white text-sm font-medium
-           rounded-lg transition-colors duration-150;
+           rounded-xl transition-all duration-200;
   }
 
   .input {
-    @apply w-full px-3 py-2.5 text-sm bg-white border border-gray-200 rounded-lg
-           placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500
-           focus:border-transparent transition-all duration-150;
+    @apply w-full px-3.5 py-2.5 text-sm bg-white border border-gray-200 rounded-xl
+           placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-400
+           focus:border-transparent transition-all duration-200;
   }
 
   .label {
@@ -79,6 +74,16 @@
 
   .page-header {
     @apply flex items-center justify-between mb-6;
+  }
+
+  /* 사이드바 링크 (모바일 메뉴용 보존) */
+  .sidebar-link {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-600
+           hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200;
+  }
+
+  .sidebar-link.active {
+    @apply bg-brand-50 text-brand-700;
   }
 }
 

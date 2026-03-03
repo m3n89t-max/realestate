@@ -1,0 +1,13 @@
+{
+    "name": "@realestate/shared",
+    "version": "1.0.0",
+    "private": true,
+    "main": "./index.ts",
+    "types": "./index.ts",
+    "exports": {
+        ".": "./index.ts",
+        "./types/enums": "./types/enums.ts",
+        "./types/database": "./types/database.ts",
+        "./types/api": "./types/api.ts"
+    }
+}

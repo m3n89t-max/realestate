@@ -1,83 +1,415 @@
-import { supabase, logTaskEvent } from './utils/logger';
-import { Task } from '../lib/types';
+import { createClient, RealtimeChannel } from '@supabase/supabase-js';
+import { getConfig, AgentConfig } from './config';
+import {
+    sendHeartbeat,
+    sendTaskStarted,
+    sendTaskProgress,
+    sendTaskCompleted,
+    sendTaskFailed,
+} from './webhook-client';
 import { downloadBuildingRegister } from './playwright/building_register';
 import { downloadCadastralMap } from './playwright/cadastral_map';
+import { uploadNaverBlog } from './playwright/naver_upload';
+import { uploadYoutube } from './playwright/youtube_upload';
 
-const POLL_INTERVAL = 5000;
+// ============================================================
+// 에이전트가 처리하는 작업 유형 (agent-protocol.md)
+// ============================================================
+const AGENT_TASK_TYPES = [
+    'building_register',
+    'download_building_register',
+    'download_cadastral_map',
+    'naver_upload',
+    'upload_naver_blog',
+    'youtube_upload',
+    'upload_youtube',
+];
 
-async function processTask(task: Task) {
-    try {
-        await logTaskEvent(task.id, 'info', `Starting task: ${task.type}`);
+const HEARTBEAT_INTERVAL = 30_000; // 30초
+const POLL_INTERVAL = 30_000;      // Realtime 실패 시 폴백 폴링 30초
 
-        // Update task status to running
-        const { error: updateError } = await supabase
-            .from('tasks')
-            .update({ status: 'running', started_at: new Date().toISOString() })
-            .eq('id', task.id);
+// ============================================================
+// Main Agent Class
+// ============================================================
+class LocalAgent {
+    private config: AgentConfig;
+    private supabase;
+    private orgId: string = '';
+    private agentConnectionId: string = '';
+    private channel: RealtimeChannel | null = null;
+    private heartbeatTimer: NodeJS.Timeout | null = null;
+    private pollTimer: NodeJS.Timeout | null = null;
+    private isProcessing = false;
+    private isShuttingDown = false;
 
-        if (updateError) throw new Error(`Failed to update task status: ${updateError.message}`);
+    constructor() {
+        this.config = getConfig();
+        this.supabase = createClient(
+            this.config.supabase_url,
+            this.config.supabase_anon_key
+        );
+    }
 
-        // TODO: route task based on task.type
-        switch (task.type) {
-            case 'building_register':
-                await downloadBuildingRegister(task);
-                break;
-            // Assuming we also have a type for cadastral_map, but checking types.ts it doesn't exist yet so we'll route it later or fallback
-            // In types.ts there's no types, but we'll add support as an example for 'cadastral_map' anyway
-            case 'cadastral_map' as any:
-                await downloadCadastralMap(task);
-                break;
-            default:
-                throw new Error(`Unsupported task type: ${task.type}`);
+    // ============================================================
+    // 시작
+    // ============================================================
+    async start() {
+        console.log('===========================================');
+        console.log('  RealEstate AI OS — Local Agent v' + this.config.version);
+        console.log('  Agent: ' + this.config.agent_name);
+        console.log('===========================================');
+
+        // 1. Heartbeat으로 agent_key 검증 & org_id 확보
+        await this.validateAndRegister();
+
+        // 2. Graceful shutdown 핸들러
+        this.setupShutdownHandlers();
+
+        // 3. Heartbeat 타이머 시작
+        this.startHeartbeat();
+
+        // 4. Realtime 구독 시도
+        await this.subscribeRealtime();
+
+        // 5. 기존 pending/retrying 작업 즉시 처리 (오프라인 동안 쌓인 것)
+        await this.catchUpPendingTasks();
+
+        console.log('[Agent] 에이전트가 정상 가동되었습니다. 작업 대기 중...');
+    }
+
+    // ============================================================
+    // 1. 검증 & 등록
+    // ============================================================
+    private async validateAndRegister() {
+        console.log('[Agent] agent_key 검증 중...');
+
+        if (!this.config.agent_key) {
+            console.warn('[Agent] agent_key 미설정. DB 직접 폴링 모드로 동작합니다.');
+            // agent_key 없는 경우 service role key로 직접 DB 접근 (개발 모드)
+            this.startFallbackPolling();
+            return;
         }
 
-        // Mark task as success
-        await supabase
+        try {
+            const res = await sendHeartbeat(this.config, 'online');
+            if (res?.error) {
+                throw new Error(res.error);
+            }
+            console.log('[Agent] ✅ agent_key 검증 완료');
+
+            // org_id는 agent_connections 테이블에서 조회
+            const { data } = await this.supabase
+                .from('agent_connections')
+                .select('id, org_id')
+                .eq('agent_key', this.config.agent_key)
+                .single();
+
+            if (data) {
+                this.orgId = data.org_id;
+                this.agentConnectionId = data.id;
+                console.log(`[Agent] org_id: ${this.orgId}`);
+            }
+        } catch (err: any) {
+            console.error('[Agent] 검증 실패:', err.message);
+            console.log('[Agent] 폴백 폴링 모드로 전환합니다.');
+            this.startFallbackPolling();
+        }
+    }
+
+    // ============================================================
+    // 2. Graceful Shutdown
+    // ============================================================
+    private setupShutdownHandlers() {
+        const shutdown = async () => {
+            if (this.isShuttingDown) return;
+            this.isShuttingDown = true;
+            console.log('\n[Agent] 종료 시작...');
+
+            if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+            if (this.pollTimer) clearTimeout(this.pollTimer);
+
+            // offline 상태 전송
+            if (this.config.agent_key) {
+                try {
+                    await sendHeartbeat(this.config, 'offline');
+                } catch { /* ignore */ }
+            }
+
+            // Realtime 구독 해제
+            if (this.channel) {
+                await this.supabase.removeChannel(this.channel);
+            }
+
+            console.log('[Agent] 👋 에이전트가 종료되었습니다.');
+            process.exit(0);
+        };
+
+        process.on('SIGINT', shutdown);
+        process.on('SIGTERM', shutdown);
+        process.on('SIGHUP', shutdown);
+    }
+
+    // ============================================================
+    // 3. Heartbeat
+    // ============================================================
+    private startHeartbeat() {
+        if (!this.config.agent_key) return;
+
+        this.heartbeatTimer = setInterval(async () => {
+            try {
+                const status = this.isProcessing ? 'busy' : 'online';
+                await sendHeartbeat(this.config, status);
+            } catch (err: any) {
+                console.warn('[Heartbeat] 전송 실패:', err.message);
+            }
+        }, HEARTBEAT_INTERVAL);
+    }
+
+    // ============================================================
+    // 4. Realtime 구독
+    // ============================================================
+    private async subscribeRealtime() {
+        if (!this.orgId) {
+            console.log('[Agent] org_id 미확인, 폴백 폴링 사용');
+            this.startFallbackPolling();
+            return;
+        }
+
+        console.log('[Agent] Supabase Realtime 구독 시작...');
+
+        this.channel = this.supabase
+            .channel('agent-tasks')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'tasks',
+                    filter: `org_id=eq.${this.orgId}`,
+                },
+                (payload: any) => this.handleNewTask(payload.new)
+            )
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'tasks',
+                    filter: `org_id=eq.${this.orgId}`,
+                },
+                (payload: any) => {
+                    if (payload.new.status === 'retrying') {
+                        this.scheduleRetry(payload.new);
+                    }
+                }
+            )
+            .subscribe((status: string) => {
+                if (status === 'SUBSCRIBED') {
+                    console.log('[Agent] ✅ Realtime 구독 성공');
+                } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                    console.warn('[Agent] ⚠️ Realtime 연결 실패, 폴백 폴링 시작');
+                    this.startFallbackPolling();
+                }
+            });
+    }
+
+    // ============================================================
+    // 5. 폴백 폴링
+    // ============================================================
+    private startFallbackPolling() {
+        if (this.pollTimer) return;
+        console.log('[Agent] 폴링 모드 활성화');
+
+        const poll = async () => {
+            if (this.isShuttingDown) return;
+            await this.catchUpPendingTasks();
+            this.pollTimer = setTimeout(poll, POLL_INTERVAL);
+        };
+
+        poll();
+    }
+
+    // ============================================================
+    // 6. 밀린 작업 처리
+    // ============================================================
+    private async catchUpPendingTasks() {
+        try {
+            let query = this.supabase
+                .from('tasks')
+                .select('*')
+                .in('status', ['pending', 'retrying'])
+                .lte('scheduled_at', new Date().toISOString())
+                .order('scheduled_at', { ascending: true })
+                .limit(5);
+
+            if (this.orgId) {
+                query = query.eq('org_id', this.orgId);
+            }
+
+            const { data: tasks, error } = await query;
+
+            if (error) {
+                console.error('[Poll] 작업 조회 실패:', error.message);
+                return;
+            }
+
+            if (tasks && tasks.length > 0) {
+                for (const task of tasks) {
+                    if (AGENT_TASK_TYPES.includes(task.type)) {
+                        await this.handleNewTask(task);
+                    }
+                }
+            }
+        } catch (err: any) {
+            console.error('[Poll] 에러:', err.message);
+        }
+    }
+
+    // ============================================================
+    // 7. 새 작업 수신 핸들러
+    // ============================================================
+    private async handleNewTask(task: any) {
+        // 에이전트 담당 타입인지 확인
+        if (!AGENT_TASK_TYPES.includes(task.type)) return;
+        if (task.status !== 'pending' && task.status !== 'retrying') return;
+        if (this.isProcessing) return; // 현재 작업 중이면 스킵
+
+        // Optimistic Lock — 다른 에이전트가 먼저 claim 하면 실패
+        const claimed = await this.claimTask(task.id);
+        if (!claimed) {
+            console.log(`[Agent] 작업 ${task.id} claim 실패 (이미 다른 에이전트가 처리 중)`);
+            return;
+        }
+
+        this.isProcessing = true;
+        console.log(`[Agent] 📋 작업 시작: ${task.type} (${task.id})`);
+
+        try {
+            // webhook: task_started 전송
+            if (this.config.agent_key) {
+                await sendTaskStarted(this.config, task.id);
+            }
+
+            // 작업 타입별 실행
+            let result: Record<string, unknown> = {};
+
+            switch (task.type) {
+                case 'building_register':
+                case 'download_building_register':
+                    result = await downloadBuildingRegister(task, this.config);
+                    break;
+
+                case 'download_cadastral_map':
+                    result = await downloadCadastralMap(task, this.config);
+                    break;
+
+                case 'naver_upload':
+                case 'upload_naver_blog':
+                    result = await uploadNaverBlog(task, this.config);
+                    break;
+
+                case 'youtube_upload':
+                case 'upload_youtube':
+                    result = await uploadYoutube(task, this.config);
+                    break;
+
+                default:
+                    throw new Error(`지원하지 않는 작업 유형: ${task.type}`);
+            }
+
+            // webhook: task_completed 전송
+            if (this.config.agent_key) {
+                await sendTaskCompleted(this.config, task.id, result);
+            } else {
+                // agent_key 없는 개발 모드: 직접 DB 업데이트
+                await this.supabase
+                    .from('tasks')
+                    .update({
+                        status: 'success',
+                        result,
+                        completed_at: new Date().toISOString(),
+                    })
+                    .eq('id', task.id);
+            }
+
+            console.log(`[Agent] ✅ 작업 완료: ${task.type}`);
+
+        } catch (err: any) {
+            console.error(`[Agent] ❌ 작업 실패: ${err.message}`);
+
+            const errorCode = this.classifyError(err);
+
+            if (this.config.agent_key) {
+                await sendTaskFailed(this.config, task.id, errorCode, err.message, true);
+            } else {
+                await this.supabase
+                    .from('tasks')
+                    .update({
+                        status: 'failed',
+                        error_code: errorCode,
+                        error_message: err.message,
+                        completed_at: new Date().toISOString(),
+                    })
+                    .eq('id', task.id);
+            }
+        } finally {
+            this.isProcessing = false;
+        }
+    }
+
+    // ============================================================
+    // 8. Optimistic Lock
+    // ============================================================
+    private async claimTask(taskId: string): Promise<boolean> {
+        const { data, error } = await this.supabase
             .from('tasks')
             .update({
-                status: 'success',
-                completed_at: new Date().toISOString(),
-                result: task.result // save the URL to the result JSON
+                status: 'running',
+                agent_id: this.agentConnectionId || undefined,
+                started_at: new Date().toISOString(),
             })
-            .eq('id', task.id);
+            .eq('id', taskId)
+            .in('status', ['pending', 'retrying'])
+            .select();
 
-        await logTaskEvent(task.id, 'info', `Task completed naturally.`);
+        if (error || !data || data.length === 0) {
+            return false;
+        }
+        return true;
+    }
 
-    } catch (error: any) {
-        await logTaskEvent(task.id, 'error', `Task failed: ${error.message}`);
+    // ============================================================
+    // 9. Retry 스케줄링
+    // ============================================================
+    private scheduleRetry(task: any) {
+        const scheduledAt = new Date(task.scheduled_at).getTime();
+        const delayMs = Math.max(scheduledAt - Date.now(), 0);
+        console.log(`[Agent] ⏳ 재시도 예약: ${task.type} (${Math.round(delayMs / 1000)}초 후)`);
+        setTimeout(() => this.handleNewTask({ ...task, status: 'retrying' }), delayMs);
+    }
 
-        // Mark task as failed
-        await supabase
-            .from('tasks')
-            .update({
-                status: 'failed',
-                error_message: error.message,
-                completed_at: new Date().toISOString()
-            })
-            .eq('id', task.id);
+    // ============================================================
+    // 10. 에러 분류
+    // ============================================================
+    private classifyError(err: any): string {
+        const msg = (err.message || '').toLowerCase();
+        if (msg.includes('login') || msg.includes('로그인')) return 'LOGIN_FAILED';
+        if (msg.includes('captcha')) return 'CAPTCHA_TIMEOUT';
+        if (msg.includes('not found') || msg.includes('검색 결과 없음')) return 'SEARCH_NOT_FOUND';
+        if (msg.includes('download') || msg.includes('다운로드')) return 'DOWNLOAD_FAILED';
+        if (msg.includes('upload') || msg.includes('업로드')) return 'UPLOAD_FAILED';
+        if (msg.includes('network') || msg.includes('fetch')) return 'NETWORK_ERROR';
+        if (msg.includes('browser') || msg.includes('playwright')) return 'BROWSER_CRASH';
+        if (msg.includes('점검') || msg.includes('maintenance')) return 'SITE_MAINTENANCE';
+        return 'UNKNOWN_ERROR';
     }
 }
 
-async function pollTasks() {
-    console.log('Polling for pending tasks...');
-
-    // Find pending tasks
-    const { data: tasks, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: true })
-        .limit(1);
-
-    if (error) {
-        console.error('Error fetching tasks:', error);
-    } else if (tasks && tasks.length > 0) {
-        await processTask(tasks[0] as Task);
-    }
-
-    setTimeout(pollTasks, POLL_INTERVAL);
-}
-
-// Start worker
-console.log('Starting Local Automation Agent Worker...');
-pollTasks();
+// ============================================================
+// 에이전트 실행
+// ============================================================
+const agent = new LocalAgent();
+agent.start().catch((err) => {
+    console.error('[Agent] 치명적 오류:', err);
+    process.exit(1);
+});
