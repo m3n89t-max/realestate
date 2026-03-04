@@ -40,8 +40,8 @@ export default function ProjectsMap({
     // Kakao Map SDK 로드
     useEffect(() => {
         const apiKey = process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY
-        if (!apiKey || apiKey === 'YOUR_KAKAO_MAP_API_KEY_HERE') {
-            setIsLoaded(false)
+        if (!apiKey) {
+            console.warn('NEXT_PUBLIC_KAKAO_MAP_API_KEY 환경변수가 설정되지 않았습니다.')
             return
         }
 
@@ -51,13 +51,14 @@ export default function ProjectsMap({
         }
 
         const script = document.createElement('script')
-        script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${apiKey}&autoload=false`
+        script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${apiKey}&autoload=false&libraries=services`
         script.async = true
         script.onload = () => {
             window.kakao.maps.load(() => {
                 setIsLoaded(true)
             })
         }
+        script.onerror = () => console.error('Kakao Map SDK load failed — 도메인 등록 확인 필요')
         document.head.appendChild(script)
     }, [])
 
@@ -139,30 +140,23 @@ export default function ProjectsMap({
         }
     }, [map, projects, highlightedId, onMarkerHover, onMarkerClick])
 
-    // API 키가 없을 때 placeholder
-    if (!process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY || process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY === 'YOUR_KAKAO_MAP_API_KEY_HERE') {
-        return (
-            <div className="w-full h-full bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl flex flex-col items-center justify-center text-center p-6">
-                <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mb-4">
-                    <svg viewBox="0 0 24 24" className="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" strokeWidth="1.5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
-                    </svg>
-                </div>
-                <p className="text-sm font-medium text-blue-700">카카오맵 API 키 필요</p>
-                <p className="text-xs text-blue-500 mt-1 max-w-[200px]">
-                    .env.local 파일에 NEXT_PUBLIC_KAKAO_MAP_API_KEY를 설정해주세요
-                </p>
-            </div>
-        )
-    }
+
+
+    const noKey = !process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY
 
     return (
         <div className="w-full h-full rounded-2xl overflow-hidden relative">
             <div ref={mapRef} className="w-full h-full" />
             {!isLoaded && (
-                <div className="absolute inset-0 bg-gray-100 animate-pulse flex items-center justify-center">
-                    <span className="text-sm text-gray-400">지도 로딩 중...</span>
+                <div className="absolute inset-0 bg-gray-100 flex items-center justify-center">
+                    {noKey ? (
+                        <div className="text-center p-4">
+                            <p className="text-sm font-medium text-gray-500">카카오맵 API 키 미설정</p>
+                            <p className="text-xs text-gray-400 mt-1">Vercel 환경변수에 NEXT_PUBLIC_KAKAO_MAP_API_KEY를 추가하세요</p>
+                        </div>
+                    ) : (
+                        <span className="text-sm text-gray-400 animate-pulse">지도 로딩 중...</span>
+                    )}
                 </div>
             )}
         </div>
