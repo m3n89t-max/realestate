@@ -13,6 +13,7 @@ import CardNewsTab from './components/CardNewsTab'
 import DocsTab from './components/DocsTab'
 import ShortsTab from './components/ShortsTab'
 import TasksTab from './components/TasksTab'
+import ProjectActions from './components/ProjectActions'
 
 interface Params {
   id: string
@@ -101,7 +102,8 @@ export default async function ProjectDetailPage({
           </div>
 
           {/* 우측 액션 버튼 */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+            <ProjectActions projectId={id} currentStatus={project.status} />
             <button className="btn-secondary">
               <Share2 size={14} />
               공유
@@ -128,11 +130,10 @@ export default async function ProjectDetailPage({
             <Link
               key={t.id}
               href={`/projects/${id}?tab=${t.id}`}
-              className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-                tab === t.id
+              className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${tab === t.id
                   ? 'border-brand-600 text-brand-700'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
+                }`}
             >
               {t.label}
             </Link>
