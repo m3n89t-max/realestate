@@ -122,12 +122,42 @@ export default function NewProjectPage() {
           membership = { org_id: newOrg.id }
         }
 
+        // 주소를 좌표로 변환 (카카오 지오코딩)
+        let lat: number | null = null
+        let lng: number | null = null
+        let jibunAddress: string | null = null
+        try {
+          const geoRes = await fetch(`/api/geocode?address=${encodeURIComponent(form.address)}`)
+          if (geoRes.ok) {
+            const geoData = await geoRes.json()
+            if (geoData.lat && geoData.lng) {
+              lat = geoData.lat
+              lng = geoData.lng
+              jibunAddress = geoData.jibun_address || null
+            } else {
+              // 좌표 없음 → 지도 마커 미표시 경고
+              toast('⚠️ 주소 좌표를 찾지 못했습니다. 지도 마커가 표시되지 않을 수 있습니다.', { duration: 5000 })
+              console.warn('지오코딩 결과 없음:', geoData)
+            }
+          } else {
+            const errData = await geoRes.json().catch(() => ({}))
+            toast(`⚠️ 주소 좌표 변환 실패 (${geoRes.status}): ${errData.error ?? '알 수 없는 오류'}`, { duration: 5000 })
+            console.warn('지오코딩 API 오류:', geoRes.status, errData)
+          }
+        } catch (geoErr) {
+          toast('⚠️ 주소 좌표 변환 중 네트워크 오류가 발생했습니다.', { duration: 5000 })
+          console.warn('지오코딩 실패 (계속 진행):', geoErr)
+        }
+
         const { data, error } = await supabase
           .from('projects')
           .insert({
             org_id: membership.org_id,
             created_by: user.id,
             address: form.address,
+            jibun_address: jibunAddress,
+            lat,
+            lng,
             property_type: form.property_type || null,
             price: form.price ? parseInt(form.price.replace(/,/g, '')) : null,
             monthly_rent: form.monthly_rent ? parseInt(form.monthly_rent.replace(/,/g, '')) : null,
@@ -224,8 +254,8 @@ export default function NewProjectPage() {
                     type="button"
                     onClick={() => handleChange('property_type', type.value)}
                     className={`p-3 rounded-lg border-2 text-sm font-medium transition-colors flex flex-col items-center gap-1 ${form.property_type === type.value
-                        ? 'border-brand-500 bg-brand-50 text-brand-700'
-                        : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                      ? 'border-brand-500 bg-brand-50 text-brand-700'
+                      : 'border-gray-200 hover:border-gray-300 text-gray-600'
                       }`}
                   >
                     <span className="text-xl">{type.icon}</span>
@@ -304,8 +334,8 @@ export default function NewProjectPage() {
                     type="button"
                     onClick={() => handleChange('direction', form.direction === dir ? '' : dir)}
                     className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${form.direction === dir
-                        ? 'bg-brand-600 text-white border-brand-600'
-                        : 'border-gray-200 text-gray-600 hover:border-brand-300'
+                      ? 'bg-brand-600 text-white border-brand-600'
+                      : 'border-gray-200 text-gray-600 hover:border-brand-300'
                       }`}
                   >
                     {dir}
@@ -324,8 +354,8 @@ export default function NewProjectPage() {
                     type="button"
                     onClick={() => toggleFeature(feature)}
                     className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${form.features.includes(feature)
-                        ? 'bg-brand-600 text-white border-brand-600'
-                        : 'border-gray-200 text-gray-600 hover:border-brand-300'
+                      ? 'bg-brand-600 text-white border-brand-600'
+                      : 'border-gray-200 text-gray-600 hover:border-brand-300'
                       }`}
                   >
                     {feature}
