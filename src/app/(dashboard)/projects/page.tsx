@@ -35,6 +35,7 @@ export default async function ProjectsPage({
     .from('projects')
     .select('*')
     .eq('org_id', membership?.org_id)
+    .neq('status', 'archived')
     .order('created_at', { ascending: false })
 
   if (params.status) query = query.eq('status', params.status)
