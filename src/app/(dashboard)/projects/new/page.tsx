@@ -4,10 +4,66 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { StepperHeader, StepperNav } from '@/components/ui/StepperForm'
 import AssetUploader from '@/components/ui/AssetUploader'
-import { MapPin, Home, DollarSign, FileText } from 'lucide-react'
+import { MapPin, Home } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
 import type { PropertyType } from '@/lib/types'
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+declare global { interface Window { kakao: any } }
+
+/** 카카오 JS SDK를 이용한 클라이언트 사이드 지오코딩 (서버 REST API 키 불필요) */
+async function geocodeAddress(address: string): Promise<{ lat: number; lng: number; jibun_address: string | null } | null> {
+  const apiKey = process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY
+  if (!apiKey) return null
+
+  // SDK 로드 (아직 로드되지 않은 경우)
+  if (!window.kakao?.maps?.services) {
+    await new Promise<void>((resolve, reject) => {
+      if (document.querySelector('script[src*="dapi.kakao.com"]')) {
+        // 이미 스크립트 태그는 있지만 로딩 중
+        const check = setInterval(() => {
+          if (window.kakao?.maps?.services) { clearInterval(check); resolve() }
+        }, 100)
+        setTimeout(() => { clearInterval(check); reject(new Error('SDK timeout')) }, 10000)
+        return
+      }
+      const script = document.createElement('script')
+      script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${apiKey}&autoload=false&libraries=services`
+      script.onload = () => window.kakao.maps.load(resolve)
+      script.onerror = reject
+      document.head.appendChild(script)
+    })
+  }
+
+  return new Promise((resolve) => {
+    const geocoder = new window.kakao.maps.services.Geocoder()
+    geocoder.addressSearch(address, (result: any[], status: string) => {
+      if (status === window.kakao.maps.services.Status.OK && result.length > 0) {
+        const r = result[0]
+        resolve({
+          lat: parseFloat(r.y),
+          lng: parseFloat(r.x),
+          jibun_address: r.address?.address_name ?? null,
+        })
+      } else {
+        // 주소 검색 실패 시 키워드 검색으로 fallback
+        const places = new window.kakao.maps.services.Places()
+        places.keywordSearch(address, (kResult: any[], kStatus: string) => {
+          if (kStatus === window.kakao.maps.services.Status.OK && kResult.length > 0) {
+            resolve({
+              lat: parseFloat(kResult[0].y),
+              lng: parseFloat(kResult[0].x),
+              jibun_address: kResult[0].address_name ?? null,
+            })
+          } else {
+            resolve(null)
+          }
+        })
+      }
+    })
+  })
+}
 
 const STEPS = [
   { id: 'basic', title: '기본 정보', description: '주소 및 매물 유형' },
@@ -122,30 +178,22 @@ export default function NewProjectPage() {
           membership = { org_id: newOrg.id }
         }
 
-        // 주소를 좌표로 변환 (카카오 지오코딩)
+        // 주소를 좌표로 변환 (카카오 JS SDK 클라이언트 사이드 지오코딩)
         let lat: number | null = null
         let lng: number | null = null
         let jibunAddress: string | null = null
         try {
-          const geoRes = await fetch(`/api/geocode?address=${encodeURIComponent(form.address)}`)
-          if (geoRes.ok) {
-            const geoData = await geoRes.json()
-            if (geoData.lat && geoData.lng) {
-              lat = geoData.lat
-              lng = geoData.lng
-              jibunAddress = geoData.jibun_address || null
-            } else {
-              // 좌표 없음 → 지도 마커 미표시 경고
-              toast('⚠️ 주소 좌표를 찾지 못했습니다. 지도 마커가 표시되지 않을 수 있습니다.', { duration: 5000 })
-              console.warn('지오코딩 결과 없음:', geoData)
-            }
+          const geoResult = await geocodeAddress(form.address)
+          if (geoResult) {
+            lat = geoResult.lat
+            lng = geoResult.lng
+            jibunAddress = geoResult.jibun_address
           } else {
-            const errData = await geoRes.json().catch(() => ({}))
-            toast(`⚠️ 주소 좌표 변환 실패 (${geoRes.status}): ${errData.error ?? '알 수 없는 오류'}`, { duration: 5000 })
-            console.warn('지오코딩 API 오류:', geoRes.status, errData)
+            toast('⚠️ 주소 좌표를 찾지 못했습니다. 지도 마커가 표시되지 않을 수 있습니다.', { duration: 5000 })
+            console.warn('지오코딩 결과 없음:', form.address)
           }
         } catch (geoErr) {
-          toast('⚠️ 주소 좌표 변환 중 네트워크 오류가 발생했습니다.', { duration: 5000 })
+          toast('⚠️ 주소 좌표 변환 중 오류가 발생했습니다.', { duration: 5000 })
           console.warn('지오코딩 실패 (계속 진행):', geoErr)
         }
 
