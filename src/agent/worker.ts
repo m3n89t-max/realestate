@@ -11,6 +11,8 @@ import { downloadBuildingRegister } from './playwright/building_register';
 import { downloadCadastralMap } from './playwright/cadastral_map';
 import { uploadNaverBlog } from './playwright/naver_upload';
 import { uploadYoutube } from './playwright/youtube_upload';
+import { uploadInstagram } from './playwright/instagram_upload';
+import { startUIServer } from './ui/server';
 
 // ============================================================
 // 에이전트가 처리하는 작업 유형 (agent-protocol.md)
@@ -23,6 +25,8 @@ const AGENT_TASK_TYPES = [
     'upload_naver_blog',
     'youtube_upload',
     'upload_youtube',
+    'instagram_upload',
+    'upload_instagram',
 ];
 
 const HEARTBEAT_INTERVAL = 30_000; // 30초
@@ -73,6 +77,9 @@ class LocalAgent {
 
         // 5. 기존 pending/retrying 작업 즉시 처리 (오프라인 동안 쌓인 것)
         await this.catchUpPendingTasks();
+
+        // 6. 로컬 UI 설정 서버 시작
+        startUIServer();
 
         console.log('[Agent] 에이전트가 정상 가동되었습니다. 작업 대기 중...');
     }
@@ -311,6 +318,11 @@ class LocalAgent {
                 case 'youtube_upload':
                 case 'upload_youtube':
                     result = await uploadYoutube(task, this.config);
+                    break;
+
+                case 'instagram_upload':
+                case 'upload_instagram':
+                    result = await uploadInstagram(task, this.config);
                     break;
 
                 default:

@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { formatPrice } from '@/lib/utils'
+import { Layers } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 declare global {
@@ -35,6 +37,7 @@ export default function ProjectsMap({
     const mapRef = useRef<HTMLDivElement>(null)
     const [map, setMap] = useState<any>(null)
     const [isLoaded, setIsLoaded] = useState(false)
+    const [showCadastral, setShowCadastral] = useState(false)
     const overlaysRef = useRef<any[]>([])
 
     // Kakao Map SDK 로드
@@ -74,6 +77,18 @@ export default function ProjectsMap({
         const mapInstance = new kakaoMaps.Map(mapRef.current, options)
         setMap(mapInstance)
     }, [isLoaded])
+
+    // 지적도 토글
+    useEffect(() => {
+        if (!map || !window.kakao?.maps) return
+
+        const kakaoMaps = window.kakao.maps
+        if (showCadastral) {
+            map.addOverlayMapTypeId(kakaoMaps.MapTypeId.USE_DISTRICT)
+        } else {
+            map.removeOverlayMapTypeId(kakaoMaps.MapTypeId.USE_DISTRICT)
+        }
+    }, [map, showCadastral])
 
     // 마커 (CustomOverlay) 생성
     useEffect(() => {
@@ -147,6 +162,27 @@ export default function ProjectsMap({
     return (
         <div className="w-full h-full rounded-2xl overflow-hidden relative">
             <div ref={mapRef} className="w-full h-full" />
+
+            {isLoaded && !noKey && (
+                <div className="absolute top-4 right-4 z-10 flex gap-2">
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            setShowCadastral(!showCadastral)
+                        }}
+                        className={cn(
+                            "flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg shadow-md border text-sm font-medium transition-colors",
+                            showCadastral
+                                ? "bg-brand-50 border-brand-300 text-brand-700"
+                                : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                        )}
+                    >
+                        <Layers size={16} />
+                        지적도
+                    </button>
+                </div>
+            )}
+
             {!isLoaded && (
                 <div className="absolute inset-0 bg-gray-100 flex items-center justify-center">
                     {noKey ? (

@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
+import Link from 'next/link'
 import { Building2, Users, Key, CreditCard, Copy, Plus } from 'lucide-react'
 import StatusBadge from '@/components/ui/StatusBadge'
 import UsageMeter from '@/components/ui/UsageMeter'
@@ -112,9 +113,8 @@ export default async function SettingsPage() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {(['free', 'pro', 'premium'] as const).map(plan => (
-            <div key={plan} className={`rounded-xl border-2 p-4 ${
-              org?.plan_type === plan ? 'border-brand-500 bg-brand-50' : 'border-gray-200'
-            }`}>
+            <div key={plan} className={`rounded-xl border-2 p-4 ${org?.plan_type === plan ? 'border-brand-500 bg-brand-50' : 'border-gray-200'
+              }`}>
               <div className="flex items-center justify-between mb-2">
                 <StatusBadge status={plan} />
                 {org?.plan_type === plan && (
@@ -189,9 +189,9 @@ export default async function SettingsPage() {
         {(agents ?? []).length === 0 ? (
           <div className="text-center py-6">
             <p className="text-sm text-gray-500 mb-3">연결된 에이전트가 없습니다</p>
-            <button className="btn-primary">
+            <a href="/agent-setup.bat" download className="btn-primary inline-flex items-center gap-2">
               에이전트 다운로드 및 설치
-            </button>
+            </a>
           </div>
         ) : (
           <div className="space-y-3">
@@ -219,6 +219,36 @@ export default async function SettingsPage() {
             </button>
           </div>
         )}
+      </div>
+      {/* 자동화 계정 관리 */}
+      <div className="card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Key size={18} className="text-brand-500" />
+            <h2 className="section-title">자동화 계정 관리</h2>
+          </div>
+          <Link
+            href="/settings/credentials"
+            className="btn-secondary text-xs py-1.5"
+          >
+            계정 설정
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { icon: '🟢', name: '네이버', desc: '블로그 업로드' },
+            { icon: '▶️', name: '유튜브', desc: '영상 업로드' },
+            { icon: '📸', name: '인스타그램', desc: '카드뉴스' },
+            { icon: '💬', name: '카카오', desc: '채널 업로드' },
+          ].map(p => (
+            <Link key={p.name} href="/settings/credentials" className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl border border-gray-100 hover:border-brand-200 hover:bg-brand-50 transition-all group">
+              <span className="text-2xl">{p.icon}</span>
+              <p className="text-xs font-medium text-gray-700">{p.name}</p>
+              <p className="text-[10px] text-gray-400">{p.desc}</p>
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
   )

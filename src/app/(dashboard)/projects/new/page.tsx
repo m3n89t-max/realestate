@@ -259,6 +259,70 @@ export default function NewProjectPage() {
     }
   }
 
+  const handleUpload = async (files: File[]) => {
+    if (!projectId) return
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const { data: membership } = await supabase
+      .from('memberships')
+      .select('org_id')
+      .eq('user_id', user.id)
+      .not('joined_at', 'is', null)
+      .limit(1)
+      .single()
+
+    if (!membership) return
+
+    let firstUploadedUrl: string | null = null
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      const ext = file.name.split('.').pop()
+      const fileName = `${Math.random().toString(36).substring(2, 10)}_${Date.now()}.${ext}`
+      const filePath = `${membership.org_id}/${projectId}/${fileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('project-assets')
+        .upload(filePath, file)
+
+      if (uploadError) {
+        console.error('File upload failed:', uploadError)
+        continue
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('project-assets')
+        .getPublicUrl(filePath)
+
+      const fileUrl = urlData.publicUrl
+
+      if (!firstUploadedUrl) {
+        firstUploadedUrl = fileUrl
+      }
+
+      await supabase.from('assets').insert({
+        project_id: projectId,
+        org_id: membership.org_id,
+        type: file.type.startsWith('video/') ? 'video' : 'image',
+        file_name: file.name,
+        file_url: fileUrl,
+        file_size: file.size,
+        mime_type: file.type,
+        is_cover: i === 0,
+        sort_order: i
+      })
+    }
+
+    if (firstUploadedUrl) {
+      const { data: projectData } = await supabase.from('projects').select('cover_image_url').eq('id', projectId).single()
+      if (!projectData?.cover_image_url) {
+        await supabase.from('projects').update({ cover_image_url: firstUploadedUrl }).eq('id', projectId)
+      }
+    }
+  }
+
   return (
     <div className="max-w-2xl mx-auto animate-fade-in">
       <div className="mb-8">
@@ -436,7 +500,7 @@ export default function NewProjectPage() {
             <p className="text-sm text-gray-500">
               사진을 업로드하면 카테고리별로 자동 분류됩니다. 카드뉴스 및 영상 제작에 활용됩니다.
             </p>
-            <AssetUploader maxFiles={30} maxSize={20 * 1024 * 1024} />
+            <AssetUploader maxFiles={30} maxSize={20 * 1024 * 1024} onUpload={handleUpload} />
           </div>
         )}
 

@@ -1,5 +1,5 @@
 import { chromium } from 'playwright';
-import { AgentConfig } from '../config';
+import { AgentConfig, getCredentials } from '../config';
 import { sendTaskProgress } from '../webhook-client';
 import { createClient } from '@supabase/supabase-js';
 
@@ -70,15 +70,13 @@ export async function uploadNaverBlog(
             await loginBtn.click();
             await page.waitForTimeout(2000);
 
-            // 네이버 ID/PW 입력
-            // TODO: Windows Credential Manager에서 credentials 가져오기
-            // 현재는 환경변수에서 로드
-            const naverId = process.env.NAVER_ID || '';
-            const naverPw = process.env.NAVER_PW || '';
-
-            if (!naverId || !naverPw) {
-                throw new Error('[LOGIN_FAILED] NAVER_ID, NAVER_PW 환경변수가 설정되지 않았습니다.');
+            // 네이버 ID/PW — credentials.json 우선, .env 폴백
+            const creds = getCredentials('naver');
+            if (!creds?.id || !creds?.pw) {
+                throw new Error('[LOGIN_FAILED] 네이버 자격증명이 없습니다. /settings/credentials 에서 저장해주세요.');
             }
+            const naverId = creds.id;
+            const naverPw = creds.pw;
 
             // 네이버 로그인 폼 — 봇 탐지 우회를 위해 clipboard 방식 사용
             const idInput = page.locator('#id');

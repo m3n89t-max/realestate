@@ -1,5 +1,5 @@
 import { chromium } from 'playwright';
-import { AgentConfig } from '../config';
+import { AgentConfig, getCredentials } from '../config';
 import { sendTaskProgress } from '../webhook-client';
 import { createClient } from '@supabase/supabase-js';
 
@@ -91,12 +91,13 @@ export async function uploadYoutube(
 
         // 로그인 페이지 감지
         if (page.url().includes('accounts.google.com')) {
-            const googleEmail = process.env.GOOGLE_EMAIL || '';
-            const googlePw = process.env.GOOGLE_PW || '';
-
-            if (!googleEmail || !googlePw) {
-                throw new Error('[LOGIN_FAILED] GOOGLE_EMAIL, GOOGLE_PW 환경변수가 설정되지 않았습니다.');
+            // Google 자격증명 — credentials.json 우선, .env 폴백
+            const creds = getCredentials('google');
+            if (!creds?.email || !creds?.pw) {
+                throw new Error('[LOGIN_FAILED] 구글 자격증명이 없습니다. /settings/credentials 에서 저장해주세요.');
             }
+            const googleEmail = creds.email;
+            const googlePw = creds.pw;
 
             // 이메일 입력
             await page.locator('input[type="email"]').fill(googleEmail);

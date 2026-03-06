@@ -62,3 +62,57 @@ export function getConfig(): AgentConfig {
 
     return config;
 }
+
+// ============================================================
+// 플랫폼별 자격증명 로드
+// %APPDATA%/RealEstateAIOS/credentials.json → .env 폴백
+// ============================================================
+
+export interface PlatformCredential {
+    id?: string;
+    email?: string;
+    pw: string;
+}
+
+export function getCredentials(platform: 'naver' | 'google' | 'instagram' | 'kakao'): PlatformCredential | null {
+    const appDataPath = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
+    const credPath = path.join(appDataPath, 'RealEstateAIOS', 'credentials.json');
+
+    // credentials.json에서 로드 시도
+    if (fs.existsSync(credPath)) {
+        try {
+            const store = JSON.parse(fs.readFileSync(credPath, 'utf-8'));
+            if (store[platform]?.pw) {
+                return store[platform];
+            }
+        } catch {
+            console.warn(`[Config] credentials.json 파싱 실패`);
+        }
+    }
+
+    // .env 폴백
+    switch (platform) {
+        case 'naver':
+            if (process.env.NAVER_ID && process.env.NAVER_PW) {
+                return { id: process.env.NAVER_ID, pw: process.env.NAVER_PW };
+            }
+            break;
+        case 'google':
+            if (process.env.GOOGLE_EMAIL && process.env.GOOGLE_PW) {
+                return { email: process.env.GOOGLE_EMAIL, pw: process.env.GOOGLE_PW };
+            }
+            break;
+        case 'instagram':
+            if (process.env.INSTAGRAM_ID && process.env.INSTAGRAM_PW) {
+                return { id: process.env.INSTAGRAM_ID, pw: process.env.INSTAGRAM_PW };
+            }
+            break;
+        case 'kakao':
+            if (process.env.KAKAO_EMAIL && process.env.KAKAO_PW) {
+                return { email: process.env.KAKAO_EMAIL, pw: process.env.KAKAO_PW };
+            }
+            break;
+    }
+
+    return null;
+}
