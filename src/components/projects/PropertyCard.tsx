@@ -47,18 +47,19 @@ export default function PropertyCard({
         ? [cover_image_url, ...images.filter(img => img !== cover_image_url)]
         : images
 
-    const hasMultipleImages = allImages.length > 1
+    const displayImages = allImages.length > 0 ? allImages : ['/images/default-property.png']
+    const hasMultipleImages = displayImages.length > 1
 
     const nextImage = (e: React.MouseEvent) => {
         e.preventDefault()
         e.stopPropagation()
-        setCurrentImage(prev => (prev + 1) % allImages.length)
+        setCurrentImage(prev => (prev + 1) % displayImages.length)
     }
 
     const prevImage = (e: React.MouseEvent) => {
         e.preventDefault()
         e.stopPropagation()
-        setCurrentImage(prev => (prev - 1 + allImages.length) % allImages.length)
+        setCurrentImage(prev => (prev - 1 + displayImages.length) % displayImages.length)
     }
 
     return (
@@ -75,17 +76,22 @@ export default function PropertyCard({
         >
             {/* 이미지 영역 */}
             <div className="relative aspect-[4/3] rounded-t-2xl overflow-hidden bg-gray-100">
-                {allImages.length > 0 ? (
-                    <Image
-                        src={allImages[currentImage]}
-                        alt={address}
-                        fill
-                        className="object-cover group-hover:scale-105 transition-transform duration-500"
-                        sizes="(max-width: 768px) 100vw, 300px"
-                    />
-                ) : (
-                    <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
-                        <Maximize2 size={32} className="text-gray-300" />
+                <Image
+                    src={displayImages[currentImage]}
+                    alt={address || '매물 사진'}
+                    fill
+                    className={cn(
+                        "object-cover transition-transform duration-500",
+                        allImages.length > 0 ? "group-hover:scale-105" : "opacity-80"
+                    )}
+                    sizes="(max-width: 768px) 100vw, 300px"
+                />
+
+                {allImages.length === 0 && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+                        <span className="px-3 py-1.5 bg-white/90 text-gray-700 text-xs font-semibold rounded-full shadow-sm">
+                            대표사진 없음
+                        </span>
                     </div>
                 )}
 
@@ -106,7 +112,7 @@ export default function PropertyCard({
                         </button>
                         {/* 인디케이터 */}
                         <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex gap-1">
-                            {allImages.map((_, i) => (
+                            {displayImages.map((_, i) => (
                                 <span
                                     key={i}
                                     className={cn(
