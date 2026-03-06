@@ -418,10 +418,7 @@ class LocalAgent {
 }
 
 // ============================================================
-// 에이전트 실행
+// 에이전트 인터페이스 (main.ts에서 제어)
 // ============================================================
-const agent = new LocalAgent();
-agent.start().catch((err) => {
-    console.error('[Agent] 치명적 오류:', err);
-    process.exit(1);
-});
+export const agent = new LocalAgent();
+

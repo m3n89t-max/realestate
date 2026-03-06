@@ -190,8 +190,9 @@ export default async function SettingsPage() {
           <div className="text-center py-6">
             <p className="text-sm text-gray-500 mb-3">연결된 에이전트가 없습니다</p>
             <a href="/agent-setup.bat" download className="btn-primary inline-flex items-center gap-2">
-              에이전트 다운로드 및 설치
+              에이전트 Windows 설치 (Setup.exe) 다운로드
             </a>
+            <p className="text-[10px] text-gray-400 mt-2">※ 관리자 페이지에서 생성된 Setup.exe를 올려주세요.</p>
           </div>
         ) : (
           <div className="space-y-3">

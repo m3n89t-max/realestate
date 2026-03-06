@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { formatPrice } from '@/lib/utils'
-import { Layers } from 'lucide-react'
+import { Layers, Map as MapIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -38,6 +38,7 @@ export default function ProjectsMap({
     const [map, setMap] = useState<any>(null)
     const [isLoaded, setIsLoaded] = useState(false)
     const [showCadastral, setShowCadastral] = useState(false)
+    const [mapType, setMapType] = useState<'ROADMAP' | 'SKYVIEW'>('ROADMAP')
     const overlaysRef = useRef<any[]>([])
 
     // Kakao Map SDK 로드
@@ -77,6 +78,18 @@ export default function ProjectsMap({
         const mapInstance = new kakaoMaps.Map(mapRef.current, options)
         setMap(mapInstance)
     }, [isLoaded])
+
+    // 지도 타입 토글
+    useEffect(() => {
+        if (!map || !window.kakao?.maps) return
+
+        const kakaoMaps = window.kakao.maps
+        if (mapType === 'SKYVIEW') {
+            map.setMapTypeId(kakaoMaps.MapTypeId.SKYVIEW)
+        } else {
+            map.setMapTypeId(kakaoMaps.MapTypeId.ROADMAP)
+        }
+    }, [map, mapType])
 
     // 지적도 토글
     useEffect(() => {
@@ -165,6 +178,21 @@ export default function ProjectsMap({
 
             {isLoaded && !noKey && (
                 <div className="absolute top-4 right-4 z-10 flex gap-2">
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            setMapType(prev => prev === 'ROADMAP' ? 'SKYVIEW' : 'ROADMAP')
+                        }}
+                        className={cn(
+                            "flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg shadow-md border text-sm font-medium transition-colors",
+                            mapType === 'SKYVIEW'
+                                ? "bg-brand-50 border-brand-300 text-brand-700"
+                                : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                        )}
+                    >
+                        <MapIcon size={16} />
+                        위성사진
+                    </button>
                     <button
                         onClick={(e) => {
                             e.stopPropagation()

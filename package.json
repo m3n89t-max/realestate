@@ -2,6 +2,7 @@
   "name": "realestate-ai-os",
   "version": "1.0.0",
   "private": true,
+  "main": "dist-agent/main.js",
   "engines": {
     "node": ">=20.0.0"
   },
@@ -13,7 +14,9 @@
     "type-check": "tsc --noEmit",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "agent:start": "npx tsx src/agent/worker.ts"
+    "agent:start": "npx tsx src/agent/worker.ts",
+    "agent:dev": "tsc -p tsconfig.agent.json && electron .",
+    "agent:build": "tsc -p tsconfig.agent.json && electron-builder --win"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -52,11 +55,30 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.19",
+    "concurrently": "^9.2.1",
+    "electron": "^40.8.0",
+    "electron-builder": "^26.8.1",
     "eslint": "^8.57.0",
     "eslint-config-next": "^16.1.6",
     "postcss": "^8.4.39",
     "tailwindcss": "^3.4.6",
     "tsx": "^4.21.0",
-    "typescript": "^5.5.3"
+    "typescript": "^5.5.3",
+    "wait-on": "^9.0.4"
+  },
+  "build": {
+    "appId": "com.realestate.agent",
+    "productName": "RealEstateAgent",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "files": [
+      "dist-agent/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ]
   }
 }
