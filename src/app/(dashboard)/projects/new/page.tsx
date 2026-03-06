@@ -237,11 +237,26 @@ export default function NewProjectPage() {
     if (!projectId) return
     setSubmitting(true)
     try {
-      // 입지 분석 Edge Function 호출
-      const { error } = await supabase.functions.invoke('analyze-location', {
-        body: { project_id: projectId },
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: membership } = await supabase
+        .from('memberships')
+        .select('org_id')
+        .eq('user_id', user.id)
+        .not('joined_at', 'is', null)
+        .limit(1)
+        .single()
+
+      if (!membership) return
+
+      // 입지 분석 작업을 큐에 삽입 (Webhook이 자동으로 Edge Function 호출)
+      await supabase.from('tasks').insert({
+        project_id: projectId,
+        org_id: membership.org_id,
+        type: 'location_analyze',
+        status: 'pending'
       })
-      if (error) console.warn('입지 분석 실패 (비필수):', error)
 
       // 상태를 active로 업데이트
       await supabase
@@ -249,7 +264,7 @@ export default function NewProjectPage() {
         .update({ status: 'active' })
         .eq('id', projectId)
 
-      toast.success('매물이 등록되었습니다!')
+      toast.success('매물이 등록되었습니다! 입지 분석은 대시보드에서 진행됩니다.')
       router.push(`/projects/${projectId}`)
     } catch (err) {
       toast.error('완료 처리에 실패했습니다')
@@ -263,9 +278,12 @@ export default function NewProjectPage() {
     if (!projectId) return
 
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) {
+      toast.error('사용자 인증 정보를 찾을 수 없습니다.')
+      return
+    }
 
-    const { data: membership } = await supabase
+    const { data: membership, error: memError } = await supabase
       .from('memberships')
       .select('org_id')
       .eq('user_id', user.id)
@@ -273,9 +291,14 @@ export default function NewProjectPage() {
       .limit(1)
       .single()
 
-    if (!membership) return
+    if (memError || !membership) {
+      console.error('Membership fetch failed:', memError)
+      toast.error('조직 정보를 불러오지 못했습니다.')
+      return
+    }
 
     let firstUploadedUrl: string | null = null
+    let uploadSuccessCount = 0
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
@@ -289,6 +312,7 @@ export default function NewProjectPage() {
 
       if (uploadError) {
         console.error('File upload failed:', uploadError)
+        toast.error(`${file.name} 업로드 실패: ${uploadError.message}`)
         continue
       }
 
@@ -302,7 +326,7 @@ export default function NewProjectPage() {
         firstUploadedUrl = fileUrl
       }
 
-      await supabase.from('assets').insert({
+      const { error: insertError } = await supabase.from('assets').insert({
         project_id: projectId,
         org_id: membership.org_id,
         type: file.type.startsWith('video/') ? 'video' : 'image',
@@ -313,13 +337,27 @@ export default function NewProjectPage() {
         is_cover: i === 0,
         sort_order: i
       })
+
+      if (insertError) {
+        console.error('Asset insert error:', insertError)
+        toast.error(`${file.name} 저장 실패: ${insertError.message}`)
+      } else {
+        uploadSuccessCount++
+      }
     }
 
     if (firstUploadedUrl) {
       const { data: projectData } = await supabase.from('projects').select('cover_image_url').eq('id', projectId).single()
       if (!projectData?.cover_image_url) {
-        await supabase.from('projects').update({ cover_image_url: firstUploadedUrl }).eq('id', projectId)
+        const { error: updateError } = await supabase.from('projects').update({ cover_image_url: firstUploadedUrl }).eq('id', projectId)
+        if (updateError) {
+          console.error('Project cover image update failed:', updateError)
+        }
       }
+    }
+
+    if (uploadSuccessCount > 0) {
+      toast.success(`${uploadSuccessCount}개의 파일이 업로드되었습니다.`)
     }
   }
 

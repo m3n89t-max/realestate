@@ -7,46 +7,78 @@ Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
   if (corsResponse) return corsResponse
 
-  try {
-    const { user, supabaseClient } = await getAuthenticatedUser(req)
-    const orgId = await getOrgId(supabaseClient, user.id)
+  let project_id: string
+  let task_id: string | null = null
 
-    const { project_id } = await req.json()
-    if (!project_id) throw new Error('project_id가 필요합니다')
+  // Webhook (service role) 또는 클라이언트 (JWT) 호출 지원
+  const authHeader = req.headers.get('Authorization') ?? ''
+  const isServiceRole = authHeader.includes(Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? 'never-match')
 
-    const { data: project } = await supabaseClient
-      .from('projects')
-      .select('*')
-      .eq('id', project_id)
-      .single()
-    if (!project) throw new Error('프로젝트를 찾을 수 없습니다')
+  const supabaseClient = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    isServiceRole ? (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '') : (Deno.env.get('SUPABASE_ANON_KEY') ?? ''),
+    { global: { headers: { Authorization: authHeader } } }
+  )
 
-    // 카카오맵 Geocoding (좌표가 없는 경우)
-    let lat = project.lat
-    let lng = project.lng
+  let userId: string | null = null
+  let orgId: string | null = null
 
-    if (!lat || !lng) {
-      const kakaoKey = Deno.env.get('KAKAO_REST_API_KEY')
-      if (kakaoKey) {
-        const geoRes = await fetch(
-          `https://dapi.kakao.com/v2/local/search/address.json?query=${encodeURIComponent(project.address)}`,
-          { headers: { Authorization: `KakaoAK ${kakaoKey}` } }
-        )
-        const geoData = await geoRes.json()
-        if (geoData.documents?.length > 0) {
-          lat = parseFloat(geoData.documents[0].y)
-          lng = parseFloat(geoData.documents[0].x)
+  if (isServiceRole) {
+    // Webhook payload에서 데이터 추출
+    const body = await req.json()
+    // Webhook payload 구조 (Supabase DB Webhook)
+    project_id = body.record?.project_id || body.project_id
+    task_id = body.record?.id || body.task_id
+    orgId = body.record?.org_id || body.org_id
+  } else {
+    const { data: { user }, error } = await supabaseClient.auth.getUser()
+    if (error || !user) throw new Error('인증되지 않은 요청입니다')
+    userId = user.id
+    orgId = await getOrgId(supabaseClient, userId)
+    const body = await req.json()
+    project_id = body.project_id
+  }
 
-          await supabaseClient
-            .from('projects')
-            .update({ lat, lng })
-            .eq('id', project_id)
-        }
+  if (!project_id) throw new Error('project_id가 필요합니다')
+
+  // 작업 상태 'running'으로 업데이트
+  if (task_id) {
+    await supabaseClient.from('tasks').update({ status: 'running', started_at: new Date().toISOString() }).eq('id', task_id)
+  }
+
+  const { data: project } = await supabaseClient
+    .from('projects')
+    .select('*')
+    .eq('id', project_id)
+    .single()
+  if (!project) throw new Error('프로젝트를 찾을 수 없습니다')
+
+  // 카카오맵 Geocoding (좌표가 없는 경우)
+  let lat = project.lat
+  let lng = project.lng
+
+  if (!lat || !lng) {
+    const kakaoKey = Deno.env.get('KAKAO_REST_API_KEY')
+    if (kakaoKey) {
+      const geoRes = await fetch(
+        `https://dapi.kakao.com/v2/local/search/address.json?query=${encodeURIComponent(project.address)}`,
+        { headers: { Authorization: `KakaoAK ${kakaoKey}` } }
+      )
+      const geoData = await geoRes.json()
+      if (geoData.documents?.length > 0) {
+        lat = parseFloat(geoData.documents[0].y)
+        lng = parseFloat(geoData.documents[0].x)
+
+        await supabaseClient
+          .from('projects')
+          .update({ lat, lng })
+          .eq('id', project_id)
       }
     }
+  }
 
-    // AI 입지 분석 프롬프트
-    const systemPrompt = `당신은 대한민국 부동산 입지 분석 전문가입니다.
+  // AI 입지 분석 프롬프트
+  const systemPrompt = `당신은 대한민국 부동산 입지 분석 전문가입니다.
 주어진 주소를 기반으로 실거주자와 투자자 관점의 입지 분석을 수행하세요.
 
 [출력 형식: JSON]
@@ -67,7 +99,7 @@ Deno.serve(async (req) => {
   "analysis_text": "종합 분석 문장 (100자 내외)"
 }`
 
-    const userPrompt = `다음 매물의 입지를 분석하세요:
+  const userPrompt = `다음 매물의 입지를 분석하세요:
 
 주소: ${project.address}
 매물 유형: ${project.property_type ?? '아파트'}
@@ -83,49 +115,79 @@ ${lat && lng ? `좌표: 위도 ${lat}, 경도 ${lng}` : ''}
 6. 장점은 "도보/차량 N분" 형태의 구체적 표현 사용
 7. 추천 타겟은 신혼부부/직장인/투자자/은퇴자/1인가구 등에서 매물에 맞게 선택`
 
-    const responseText = await callOpenAI(
-      [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      { responseFormat: 'json', maxTokens: 2000, temperature: 0.6 }
-    )
+  const responseText = await callOpenAI(
+    [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ],
+    { responseFormat: 'json', maxTokens: 2000, temperature: 0.6 }
+  )
 
-    const analysis = JSON.parse(responseText)
+  const analysis = JSON.parse(responseText)
 
-    // location_analyses 업데이트 (upsert)
-    const { error: upsertError } = await supabaseClient
-      .from('location_analyses')
-      .upsert({
-        project_id,
-        advantages: analysis.advantages,
-        recommended_targets: analysis.recommended_targets,
-        nearby_facilities: analysis.nearby_facilities,
-        analysis_text: analysis.analysis_text,
-      }, { onConflict: 'project_id' })
+  // location_analyses 업데이트 (upsert)
+  const { error: upsertError } = await supabaseClient
+    .from('location_analyses')
+    .upsert({
+      project_id,
+      advantages: analysis.advantages,
+      recommended_targets: analysis.recommended_targets,
+      nearby_facilities: analysis.nearby_facilities,
+      analysis_text: analysis.analysis_text,
+    }, { onConflict: 'project_id' })
 
-    if (upsertError) throw upsertError
+  if (upsertError) throw upsertError
 
-    // 사용량 기록
+  // 작업 상태 'success'로 업데이트
+  if (task_id) {
+    await supabaseClient.from('tasks').update({
+      status: 'success',
+      result: analysis,
+      completed_at: new Date().toISOString()
+    }).eq('id', task_id)
+  }
+
+  // 사용량 기록
+  if (orgId) {
     const adminClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
     await adminClient.rpc('increment_usage', { p_org_id: orgId, p_type: 'generation', p_amount: 1 })
-
-    return new Response(JSON.stringify({
-      success: true,
-      analysis,
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-
-  } catch (err) {
-    console.error('[analyze-location]', err)
-    const message = err instanceof Error ? err.message : '입지 분석에 실패했습니다'
-    return new Response(JSON.stringify({ error: message }), {
-      status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
   }
+
+  return new Response(JSON.stringify({
+    success: true,
+    analysis,
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
+
+} catch (err) {
+  console.error('[analyze-location]', err)
+  const message = err instanceof Error ? err.message : '입지 분석에 실패했습니다'
+
+  // 실패 상태 업데이트
+  try {
+    const body = await req.clone().json()
+    const task_id = body.record?.id || body.task_id
+    if (task_id) {
+      const adminClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      )
+      await adminClient.from('tasks').update({
+        status: 'failed',
+        error_message: message,
+        completed_at: new Date().toISOString()
+      }).eq('id', task_id)
+    }
+  } catch { /* ignore */ }
+
+  return new Response(JSON.stringify({ error: message }), {
+    status: 400,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
+}
+})
 })

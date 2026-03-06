@@ -92,8 +92,10 @@ Deno.serve(async (req) => {
     const task_ids: string[] = (createdTasks ?? []).map((t: { id: string }) => t.id)
 
     return ok(
-      { normalized_address, lat, lng, sigungu_code, legal_dong,
-        region_1depth_name, region_2depth_name, region_3depth_name, task_ids },
+      {
+        normalized_address, lat, lng, sigungu_code, legal_dong,
+        region_1depth_name, region_2depth_name, region_3depth_name, task_ids
+      },
       { org_id: orgId }
     )
 

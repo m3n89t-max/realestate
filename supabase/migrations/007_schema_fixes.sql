@@ -49,7 +49,7 @@ ALTER TABLE generated_contents ADD CONSTRAINT generated_contents_type_check CHEC
 -- 4. Storage bucket: project-assets
 -- ============================================================
 INSERT INTO storage.buckets (id, name, public, file_size_limit)
-VALUES ('project-assets', 'project-assets', false, 104857600)
+VALUES ('project-assets', 'project-assets', true, 104857600)
 ON CONFLICT (id) DO NOTHING;
 
 -- Storage RLS: org 멤버만 자기 org 파일에 접근

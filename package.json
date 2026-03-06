@@ -45,7 +45,8 @@
     "react-kakao-maps-sdk": "^1.2.1",
     "recharts": "^2.12.7",
     "tailwind-merge": "^2.4.0",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "playwright": "^1.45.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
