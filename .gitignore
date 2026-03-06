@@ -35,3 +35,7 @@ Thumbs.db
 .vscode/
 .idea/
 tsconfig.tsbuildinfo
+
+# Agent build output
+dist/
+dist-agent/
