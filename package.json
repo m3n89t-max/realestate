@@ -74,12 +74,30 @@
       "output": "dist"
     },
     "win": {
-      "target": "nsis"
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "zip",  "arch": ["x64"] }
+      ],
+      "icon": "public/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerLanguages": ["Korean"],
+      "language": "1042",
+      "shortcutName": "부동산 AI 에이전트"
     },
     "files": [
       "dist-agent/**/*",
       "node_modules/**/*",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "scripts/",
+        "to": "scripts/",
+        "filter": ["**/*.bat", "**/*.sh"]
+      }
     ]
   }
 }
