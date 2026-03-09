@@ -13,6 +13,20 @@ import { uploadNaverBlog } from './playwright/naver_upload';
 import { uploadYoutube } from './playwright/youtube_upload';
 import { uploadInstagram } from './playwright/instagram_upload';
 import { startUIServer } from './ui/server';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+
+const LOG_DIR = path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'RealEstateAIOS');
+const LOG_FILE = path.join(LOG_DIR, 'agent.log');
+
+function log(msg: string) {
+    const timestamp = new Date().toISOString();
+    const line = `[${timestamp}] ${msg}\n`;
+    console.log(msg);
+    if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true });
+    fs.appendFileSync(LOG_FILE, line);
+}
 
 // ============================================================
 // 에이전트가 처리하는 작업 유형 (agent-protocol.md)
@@ -58,13 +72,20 @@ class LocalAgent {
         this.config = getConfig();
         this.supabase = createClient(
             this.config.supabase_url,
-            this.config.supabase_anon_key
+            this.config.supabase_anon_key,
+            {
+                global: {
+                    headers: {
+                        'x-agent-key': this.config.agent_key || '',
+                    },
+                },
+            }
         );
 
-        console.log('===========================================');
-        console.log('  RealEstate AI OS — Local Agent v' + this.config.version);
-        console.log('  Agent: ' + this.config.agent_name);
-        console.log('===========================================');
+        log('===========================================');
+        log('  RealEstate AI OS — Local Agent v' + this.config.version);
+        log('  Agent: ' + this.config.agent_name);
+        log('===========================================');
 
         // 1. Heartbeat으로 agent_key 검증 & org_id 확보
         await this.validateAndRegister();
@@ -105,23 +126,28 @@ class LocalAgent {
             if (res?.error) {
                 throw new Error(res.error);
             }
-            console.log('[Agent] ✅ agent_key 검증 완료');
+            log('[Agent] ✅ agent_key 검증 완료');
 
             // org_id는 agent_connections 테이블에서 조회
-            const { data } = await this.supabase
+            const { data, error } = await this.supabase
                 .from('agent_connections')
                 .select('id, org_id')
                 .eq('agent_key', this.config.agent_key)
                 .single();
 
+            if (error) {
+                log(`[Agent] DB 조회 에러: ${error.message}`);
+                throw error;
+            }
+
             if (data) {
                 this.orgId = data.org_id;
                 this.agentConnectionId = data.id;
-                console.log(`[Agent] org_id: ${this.orgId}`);
+                log(`[Agent] org_id: ${this.orgId}`);
             }
         } catch (err: any) {
-            console.error('[Agent] 검증 실패:', err.message);
-            console.log('[Agent] 폴백 폴링 모드로 전환합니다.');
+            log(`[Agent] 검증 실패: ${err.message}`);
+            log('[Agent] 폴백 폴링 모드로 전환합니다.');
             this.startFallbackPolling();
         }
     }
@@ -168,9 +194,11 @@ class LocalAgent {
         this.heartbeatTimer = setInterval(async () => {
             try {
                 const status = this.isProcessing ? 'busy' : 'online';
-                await sendHeartbeat(this.config, status);
+                log(`[Heartbeat] 전송 중 (${status})...`);
+                const res = await sendHeartbeat(this.config, status);
+                if (res?.error) log(`[Heartbeat] 서버 응답 에러: ${res.error}`);
             } catch (err: any) {
-                console.warn('[Heartbeat] 전송 실패:', err.message);
+                log(`[Heartbeat] 전송 실패: ${err.message}`);
             }
         }, HEARTBEAT_INTERVAL);
     }
@@ -215,10 +243,12 @@ class LocalAgent {
             )
             .subscribe((status: string) => {
                 if (status === 'SUBSCRIBED') {
-                    console.log('[Agent] ✅ Realtime 구독 성공');
+                    log('[Agent] ✅ Realtime 구독 성공');
                 } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-                    console.warn('[Agent] ⚠️ Realtime 연결 실패, 폴백 폴링 시작');
+                    log(`[Agent] ⚠️ Realtime 연결 실패 (상태: ${status}), 폴백 폴링 시작`);
                     this.startFallbackPolling();
+                } else {
+                    log(`[Agent] Realtime 상태 변경: ${status}`);
                 }
             });
     }

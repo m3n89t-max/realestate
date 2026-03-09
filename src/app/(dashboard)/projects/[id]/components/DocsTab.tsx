@@ -31,7 +31,11 @@ const RISK_STATUS_CONFIG = {
 
 function DocumentCard({ doc }: { doc: Document }) {
   const [expanded, setExpanded] = useState(false)
-  const summary = doc.summary as DocumentSummary | null
+  const rawSummary = doc.summary
+  // summary가 문자열인 경우(Edge Function이 텍스트로 저장) summary_text로 래핑
+  const summary: DocumentSummary | null = typeof rawSummary === 'string'
+    ? { summary_text: rawSummary as string }
+    : (rawSummary as DocumentSummary | null)
   const riskItems = doc.risk_items as RiskItem[] | null
 
   return (

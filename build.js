@@ -9,6 +9,9 @@ process.env.ELECTRON_SKIP_BINARY_DOWNLOAD = '1';
 
 try {
     // src/agent/setup.html 복사
+    if (!fs.existsSync('dist-agent')) {
+        fs.mkdirSync('dist-agent', { recursive: true });
+    }
     fs.copyFileSync('src/agent/setup.html', 'dist-agent/setup.html');
     console.log('✅ setup.html 복사 완료');
 
