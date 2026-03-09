@@ -1,169 +1,126 @@
-import { chromium, Browser, Page } from 'playwright';
 import { AgentConfig } from '../config';
-import { sendTaskProgress, sendDocumentUploaded } from '../webhook-client';
+import { sendTaskProgress } from '../webhook-client';
 import { createClient } from '@supabase/supabase-js';
 
-// ============================================================
-// 건축물대장 다운로드 — 정부24 (gov.kr)
-// agent-protocol.md 섹션 3 참조
-// ============================================================
-
+/**
+ * 건축물대장 다운로드 — 공공데이터포털 건축HUB API
+ * Playwright 스크래핑 방식에서 공식 REST API 방식으로 교체
+ */
 export async function downloadBuildingRegister(
     task: any,
     config: AgentConfig
 ): Promise<Record<string, unknown>> {
-    const projectId = task.project_id;
-    const address = task.payload?.jibun_address || task.payload?.address || '';
+    const projectId  = task.project_id
+    const sigunguCd  = task.payload?.sigungu_code ?? ''
+    const bjdongCd   = task.payload?.bjdong_code  ?? ''
+    const bun        = (task.payload?.bun  ?? '0000').padStart(4, '0')
+    const ji         = (task.payload?.ji   ?? '0000').padStart(4, '0')
+    const address    = task.payload?.normalized_address ?? task.payload?.address ?? ''
 
-    if (!address) {
-        throw new Error('[SEARCH_NOT_FOUND] 주소 정보가 없습니다.');
+    if (!sigunguCd || !bjdongCd) {
+        throw new Error('[SEARCH_NOT_FOUND] 지번 코드 정보가 없습니다. 주소 정규화를 먼저 실행하세요.')
     }
 
-    const browser = await chromium.launch({
-        headless: false,  // CAPTCHA 대응을 위해 headful
-        args: ['--start-maximized'],
-    });
+    const apiKey = (config as any).building_api_key
+    if (!apiKey) {
+        throw new Error('[CONFIG_MISSING] building_api_key가 설정되지 않았습니다. 에이전트 설정 화면에서 입력하세요.')
+    }
 
-    try {
-        const context = await browser.newContext({
-            viewport: { width: 1280, height: 900 },
-            locale: 'ko-KR',
-        });
-        const page = await context.newPage();
+    await progress(config, task.id, `건축물대장 API 조회 시작: ${address}`, 10)
 
-        // ---- Step 1: 정부24 접속 ----
-        await progress(config, task.id, '정부24 접속 중...', 5);
-        await page.goto('https://www.gov.kr/mw/AA020InfoCappView.do?HighCtgCD=A09002&CappBizCD=13100000015', {
-            waitUntil: 'domcontentloaded',
-            timeout: 30_000,
-        });
+    // ── 표제부 조회 ───────────────────────────────────────────
+    await progress(config, task.id, '표제부 조회 중...', 30)
+    const titleItems = await callApi(apiKey, 'getBrTitleInfo', sigunguCd, bjdongCd, bun, ji)
 
-        // ---- Step 2: 로그인 (필요 시) ----
-        await progress(config, task.id, '로그인 확인 중...', 10);
+    // ── 층별개요 조회 ─────────────────────────────────────────
+    await progress(config, task.id, '층별개요 조회 중...', 55)
+    const floorItems = await callApi(apiKey, 'getBrFlrOulnInfo', sigunguCd, bjdongCd, bun, ji)
 
-        // 비로그인 열람 가능 여부 확인 — 정부24는 비로그인으로 건축물대장 열람 가능
-        // 로그인이 필요한 경우 Windows Credential Manager에서 인증정보 가져옴
-        // TODO: Windows Credential Manager 연동 필요 시 구현
-        await progress(config, task.id, '비로그인 열람 모드 진행', 15);
+    // ── 전유부 조회 (집합건물) ────────────────────────────────
+    await progress(config, task.id, '전유부 조회 중...', 70)
+    const exclItems  = await callApi(apiKey, 'getBrExposPublcInfo', sigunguCd, bjdongCd, bun, ji).catch(() => [])
 
-        // ---- Step 3: 주소 검색 ----
-        await progress(config, task.id, `주소 검색: ${address}`, 20);
+    const results = { title: titleItems, floors: floorItems, exclusive: exclItems }
 
-        // 지번 주소 입력
-        const searchInput = page.locator('input[name="search_addr"], input[id*="addr"], input[placeholder*="주소"]').first();
-        if (await searchInput.count() > 0) {
-            await searchInput.fill(address);
-            // 검색 버튼 클릭
-            const searchBtn = page.locator('button:has-text("검색"), input[type="submit"], a:has-text("검색")').first();
-            if (await searchBtn.count() > 0) {
-                await searchBtn.click();
-            } else {
-                await searchInput.press('Enter');
-            }
-            await page.waitForTimeout(3000);
-        }
+    // ── Supabase documents 저장 ───────────────────────────────
+    await progress(config, task.id, 'Supabase에 저장 중...', 85)
+    const supabase = createClient(config.supabase_url, config.supabase_anon_key)
 
-        await progress(config, task.id, '검색 결과 확인 중...', 40);
+    const { data: proj } = await supabase.from('projects').select('org_id').eq('id', projectId).single()
 
-        // ---- Step 4: 결과 선택 ----
-        // 검색 결과 목록에서 첫 번째 항목 선택
-        const resultItem = page.locator('table tbody tr, .result-item, .list-item').first();
-        if (await resultItem.count() > 0) {
-            await resultItem.click();
-            await page.waitForTimeout(2000);
-        }
+    if (proj) {
+        await supabase.from('documents').upsert({
+            project_id: projectId,
+            org_id:     proj.org_id,
+            type:       'building_register',
+            status:     'completed',
+            raw_data:   results,
+            summary:    formatSummary(titleItems),
+            fetched_at: new Date().toISOString(),
+        }, { onConflict: 'project_id,type' })
+    }
 
-        // ---- Step 5: PDF 다운로드 ----
-        await progress(config, task.id, 'PDF 발급 요청 중...', 60);
+    await progress(config, task.id, '건축물대장 조회 완료! ✅', 100)
 
-        // 다운로드 이벤트 대기
-        const downloadPromise = page.waitForEvent('download', { timeout: 60_000 }).catch(() => null);
-
-        // 발급/다운로드 버튼 클릭
-        const downloadBtn = page.locator('button:has-text("발급"), a:has-text("열람"), button:has-text("다운로드")').first();
-        if (await downloadBtn.count() > 0) {
-            await downloadBtn.click();
-        }
-
-        const download = await downloadPromise;
-        let filePath = '';
-        let fileName = `building_register_${Date.now()}.pdf`;
-
-        if (download) {
-            filePath = await download.path() || '';
-            fileName = download.suggestedFilename() || fileName;
-            await progress(config, task.id, `PDF 다운로드 완료: ${fileName}`, 70);
-        } else {
-            // 다운로드 실패 시 페이지 스크린샷으로 대체
-            await progress(config, task.id, 'PDF 다운로드 실패, 스크린샷 캡처 중...', 70);
-            const screenshotBuffer = await page.screenshot({ fullPage: true });
-            filePath = ''; // 스크린샷은 buffer로 처리
-            fileName = `building_register_screenshot_${Date.now()}.png`;
-        }
-
-        // ---- Step 6: 텍스트 추출 ----
-        await progress(config, task.id, '문서 텍스트 추출 중...', 80);
-        const rawText = await page.evaluate(() => document.body.innerText).catch(() => '');
-
-        // ---- Step 7: Supabase Storage 업로드 ----
-        await progress(config, task.id, 'Supabase Storage 업로드 중...', 85);
-
-        const supabase = createClient(config.supabase_url, config.supabase_anon_key);
-        const storagePath = `${task.org_id}/${projectId}/${fileName}`;
-
-        let fileUrl = '';
-        if (filePath) {
-            const fs = await import('fs');
-            const fileBuffer = fs.readFileSync(filePath);
-            const { data: uploadData, error: uploadError } = await supabase.storage
-                .from('documents')
-                .upload(storagePath, fileBuffer, {
-                    contentType: 'application/pdf',
-                    upsert: true,
-                });
-
-            if (uploadError) {
-                throw new Error(`[UPLOAD_FAILED] Storage 업로드 실패: ${uploadError.message}`);
-            }
-
-            const { data: urlData } = supabase.storage
-                .from('documents')
-                .getPublicUrl(storagePath);
-            fileUrl = urlData.publicUrl;
-        }
-
-        // ---- Step 8: document_uploaded 웹훅 ----
-        await progress(config, task.id, '문서 등록 완료 처리 중...', 95);
-        if (config.agent_key && fileUrl) {
-            await sendDocumentUploaded(
-                config,
-                projectId,
-                'building_register',
-                fileUrl,
-                fileName,
-                rawText
-            );
-        }
-
-        await progress(config, task.id, '건축물대장 다운로드 완료! ✅', 100);
-
-        return {
-            file_url: fileUrl,
-            file_name: fileName,
-            page_count: 1,
-        };
-
-    } catch (err: any) {
-        throw err;
-    } finally {
-        await browser.close();
+    return {
+        title_count: titleItems.length,
+        floor_count: floorItems.length,
+        summary:     formatSummary(titleItems),
     }
 }
 
-// progress 헬퍼
+// ── API 호출 공통 함수 ────────────────────────────────────────
+async function callApi(
+    apiKey: string,
+    operation: string,
+    sigunguCd: string,
+    bjdongCd: string,
+    bun: string,
+    ji: string
+): Promise<any[]> {
+    const url = new URL(`https://apis.data.go.kr/1613000/BldRgstHubService/${operation}`)
+    url.searchParams.set('serviceKey', apiKey)
+    url.searchParams.set('sigunguCd', sigunguCd)
+    url.searchParams.set('bjdongCd',  bjdongCd)
+    url.searchParams.set('bun',       bun)
+    url.searchParams.set('ji',        ji)
+    url.searchParams.set('numOfRows', '100')
+    url.searchParams.set('pageNo',    '1')
+    url.searchParams.set('_type',     'json')
+
+    const res = await fetch(url.toString())
+    if (!res.ok) throw new Error(`API 오류 ${res.status}: ${operation}`)
+
+    const json = await res.json()
+    const resultCode = json?.response?.header?.resultCode
+    if (resultCode && resultCode !== '00') {
+        throw new Error(`API 오류 ${resultCode}: ${json?.response?.header?.resultMsg}`)
+    }
+
+    const item = json?.response?.body?.items?.item
+    if (!item) return []
+    return Array.isArray(item) ? item : [item]
+}
+
+// ── 표제부 요약 텍스트 ────────────────────────────────────────
+function formatSummary(items: any[]): string {
+    if (!Array.isArray(items) || items.length === 0) return ''
+    const t = items[0]
+    return [
+        `건물명: ${t.bldNm ?? '-'}`,
+        `주용도: ${t.mainPurpsCdNm ?? '-'}`,
+        `구조: ${t.strctCdNm ?? '-'}`,
+        `연면적: ${t.totArea ?? '-'}㎡`,
+        `건폐율: ${t.bcRat ?? '-'}%`,
+        `용적률: ${t.vlRat ?? '-'}%`,
+        `사용승인일: ${t.useAprDay ?? '-'}`,
+        `지상층수: ${t.grndFlrCnt ?? '-'}층 / 지하 ${t.ugrndFlrCnt ?? '-'}층`,
+    ].join('\n')
+}
+
 async function progress(config: AgentConfig, taskId: string, message: string, pct: number) {
-    console.log(`  [${pct}%] ${message}`);
+    console.log(`  [${pct}%] ${message}`)
     if (config.agent_key) {
-        await sendTaskProgress(config, taskId, message, 'info', pct);
+        await sendTaskProgress(config, taskId, message, 'info', pct)
     }
 }

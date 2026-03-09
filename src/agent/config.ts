@@ -16,6 +16,7 @@ export interface AgentConfig {
     webhook_url: string;
     agent_name: string;
     version: string;
+    building_api_key: string;
 }
 
 // ============================================================
@@ -36,6 +37,16 @@ function loadConfigFromFile(): Partial<AgentConfig> | null {
     return null;
 }
 
+function loadBuildingApiKeyFromCreds(): string {
+    const appDataPath = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
+    const credPath = path.join(appDataPath, 'RealEstateAIOS', 'credentials.json');
+    if (!fs.existsSync(credPath)) return '';
+    try {
+        const store = JSON.parse(fs.readFileSync(credPath, 'utf-8'));
+        return store.building_api_key || '';
+    } catch { return ''; }
+}
+
 export function getConfig(): AgentConfig {
     const fileConfig = loadConfigFromFile();
 
@@ -54,6 +65,9 @@ export function getConfig(): AgentConfig {
         agent_name: fileConfig?.agent_name
             || process.env.AGENT_NAME || `Agent-${os.hostname()}`,
         version: fileConfig?.version || '1.0.0',
+        building_api_key: (fileConfig as any)?.building_api_key
+            || loadBuildingApiKeyFromCreds()
+            || process.env.BUILDING_API_KEY || '',
     };
 
     if (!config.supabase_url) {

@@ -66,7 +66,8 @@ export function startUIServer() {
                         naver: data.naver,
                         google: data.google,
                         instagram: data.instagram,
-                        kakao: data.kakao
+                        kakao: data.kakao,
+                        building_api_key: data.building_api_key,
                     };
                     fs.writeFileSync(path.join(targetDir, 'credentials.json'), JSON.stringify(credsData, null, 2));
 
@@ -149,6 +150,11 @@ function getHtmlContent(creds: Record<string, any>, agentKey: string) {
                 <input type="text" id="agent_key" value="${agentKey}" placeholder="웹 관리자에서 발급받은 연결키">
                 <p class="hint">웹사이트의 [설정] &gt; [로컬 에이전트] 메뉴에서 키를 발급받으세요.</p>
             </div>
+            <div class="form-group mb-4">
+                <label>건축물대장 API 키 (공공데이터포털)</label>
+                <input type="text" id="building_api_key" value="${creds.building_api_key || ''}" placeholder="공공데이터포털 일반 인증키 (Decoding)">
+                <p class="hint">data.go.kr → 마이페이지 → 개발계정 → 일반 인증키(Decoding) 값 입력</p>
+            </div>
 
             <div class="platform-title">🟢 네이버 (블로그 업로드 용)</div>
             <div class="input-row">
@@ -220,6 +226,7 @@ function getHtmlContent(creds: Record<string, any>, agentKey: string) {
 
             const data = {
                 agent_key: document.getElementById('agent_key').value,
+                building_api_key: document.getElementById('building_api_key').value,
                 naver: {
                     id: document.getElementById('naver_id').value,
                     pw: document.getElementById('naver_pw').value

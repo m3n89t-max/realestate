@@ -54,6 +54,9 @@ Deno.serve(async (req) => {
 
     const bCode: string = addr?.b_code ?? ''
     const sigungu_code: string = extractSigunguCode(bCode)
+    const bjdong_code: string = bCode.slice(5, 10)
+    const bun: string = (addr?.main_address_no ?? '0').padStart(4, '0')
+    const ji: string = (addr?.sub_address_no ?? '0').padStart(4, '0')
     const legal_dong: string = region_3depth_name
     const normalized_address: string = roadAddr?.address_name ?? addr?.address_name ?? address_name
 
@@ -82,7 +85,7 @@ Deno.serve(async (req) => {
           project_id,
           type: 'download_building_register',
           status: 'pending',
-          payload: { project_id, normalized_address, sigungu_code, legal_dong },
+          payload: { project_id, normalized_address, sigungu_code, bjdong_code, bun, ji, legal_dong },
         },
       ])
       .select('id, type')
