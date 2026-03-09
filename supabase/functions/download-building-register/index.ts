@@ -21,15 +21,9 @@ Deno.serve(async (req) => {
     const task_id = task.id
     const payload = task.payload ?? {}
 
-    const project_id      = payload.project_id ?? task.project_id
-    const sigungu_code    = payload.sigungu_code ?? ''
-    const bjdong_code     = payload.bjdong_code  ?? ''
-    const bun             = (payload.bun ?? '0000').padStart(4, '0')
-    const ji              = (payload.ji  ?? '0000').padStart(4, '0')
+    const project_id = payload.project_id ?? task.project_id
 
-    if (!project_id)   throw new Error('project_id가 없습니다')
-    if (!sigungu_code) throw new Error('sigungu_code가 없습니다 (매물 주소 정규화 먼저 실행)')
-    if (!bjdong_code)  throw new Error('bjdong_code가 없습니다 (매물 주소 정규화 먼저 실행)')
+    if (!project_id) throw new Error('project_id가 없습니다')
 
     const apiKey = Deno.env.get('BUILDING_API_KEY')
     if (!apiKey) throw new Error('BUILDING_API_KEY 환경변수가 설정되지 않았습니다')
@@ -38,6 +32,30 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
+
+    // payload에 코드가 없으면 projects 테이블에서 조회
+    let sigungu_code = payload.sigungu_code ?? ''
+    let bjdong_code  = payload.bjdong_code  ?? ''
+    let bun          = payload.bun ?? ''
+    let ji           = payload.ji  ?? ''
+
+    if (!sigungu_code || !bjdong_code) {
+      const { data: projData } = await adminClient
+        .from('projects')
+        .select('sigungu_code, bjdong_code, bun, ji')
+        .eq('id', project_id)
+        .single()
+      sigungu_code = projData?.sigungu_code ?? ''
+      bjdong_code  = projData?.bjdong_code  ?? ''
+      bun          = bun || projData?.bun || '0'
+      ji           = ji  || projData?.ji  || '0'
+    }
+
+    bun = (bun || '0').padStart(4, '0')
+    ji  = (ji  || '0').padStart(4, '0')
+
+    if (!sigungu_code) throw new Error('sigungu_code가 없습니다 (매물 주소 정규화 먼저 실행)')
+    if (!bjdong_code)  throw new Error('bjdong_code가 없습니다 (매물 주소 정규화 먼저 실행)')
 
     // task → running
     if (task_id) {

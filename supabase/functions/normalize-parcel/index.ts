@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
 
     await supabaseClient
       .from('projects')
-      .update({ address: normalized_address, lat, lng })
+      .update({ address: normalized_address, lat, lng, sigungu_code, bjdong_code, bun, ji, legal_dong })
       .eq('id', project_id)
 
     const adminClient = createClient(

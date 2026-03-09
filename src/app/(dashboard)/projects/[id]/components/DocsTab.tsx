@@ -147,17 +147,13 @@ export default function DocsTab({ projectId, documents }: DocsTabProps) {
     setRequesting(type)
     try {
       if (type === 'building_register') {
-        // 로컬 에이전트에 건축물대장 다운로드 요청
-        const { error } = await supabase
-          .from('tasks')
-          .insert({
-            project_id: projectId,
-            type: 'building_register',
-            status: 'pending',
-            payload: { project_id: projectId },
-          })
+        // 건축물대장 Edge Function 직접 호출
+        const { error } = await supabase.functions.invoke('download-building-register', {
+          body: { project_id: projectId },
+        })
         if (error) throw error
-        toast.success('건축물대장 수집 요청이 등록되었습니다.\n로컬 에이전트가 자동으로 처리합니다.')
+        toast.success('건축물대장 수집이 완료되었습니다.')
+        window.location.reload()
       } else if (type === 'seumteo') {
         // 세움터 API는 서버에서 직접 처리
         const { error } = await supabase.functions.invoke('seumteo-api', {
@@ -191,7 +187,7 @@ export default function DocsTab({ projectId, documents }: DocsTabProps) {
             </div>
             <div className="flex-1">
               <p className="font-medium text-gray-800 text-sm">건축물대장 자동 수집</p>
-              <p className="text-xs text-gray-400 mt-0.5">로컬 에이전트를 통해 정부24에서 자동 다운로드</p>
+              <p className="text-xs text-gray-400 mt-0.5">공공데이터포털 건축HUB API로 자동 수집</p>
               <button
                 onClick={() => requestDocument('building_register')}
                 disabled={requesting === 'building_register'}
