@@ -2,7 +2,6 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { getCredentials } from '../config';
 
 const PORT = 3005;
 
@@ -106,11 +105,11 @@ function getHtmlContent(creds: Record<string, any>) {
             <div class="input-row">
                 <div>
                     <label>아이디</label>
-                    <input type="text" id="naver_id" value="\${creds.naver?.id || ''}" placeholder="네이버 아이디">
+                    <input type="text" id="naver_id" value="${creds.naver?.id || ''}" placeholder="네이버 아이디">
                 </div>
                 <div>
                     <label>비밀번호</label>
-                    <input type="password" id="naver_pw" value="\${creds.naver?.pw || ''}" placeholder="비밀번호">
+                    <input type="password" id="naver_pw" value="${creds.naver?.pw || ''}" placeholder="비밀번호">
                 </div>
             </div>
 
@@ -118,11 +117,11 @@ function getHtmlContent(creds: Record<string, any>) {
             <div class="input-row">
                 <div>
                     <label>구글 이메일</label>
-                    <input type="email" id="google_email" value="\${creds.google?.email || ''}" placeholder="구글 이메일">
+                    <input type="email" id="google_email" value="${creds.google?.email || ''}" placeholder="구글 이메일">
                 </div>
                 <div>
                     <label>비밀번호</label>
-                    <input type="password" id="google_pw" value="\${creds.google?.pw || ''}" placeholder="비밀번호">
+                    <input type="password" id="google_pw" value="${creds.google?.pw || ''}" placeholder="비밀번호">
                 </div>
             </div>
 
@@ -130,11 +129,11 @@ function getHtmlContent(creds: Record<string, any>) {
             <div class="input-row">
                 <div>
                     <label>아이디/이메일</label>
-                    <input type="text" id="instagram_id" value="\${creds.instagram?.id || ''}" placeholder="인스타 아이디">
+                    <input type="text" id="instagram_id" value="${creds.instagram?.id || ''}" placeholder="인스타 아이디">
                 </div>
                 <div>
                     <label>비밀번호</label>
-                    <input type="password" id="instagram_pw" value="\${creds.instagram?.pw || ''}" placeholder="비밀번호">
+                    <input type="password" id="instagram_pw" value="${creds.instagram?.pw || ''}" placeholder="비밀번호">
                 </div>
             </div>
 
@@ -142,11 +141,11 @@ function getHtmlContent(creds: Record<string, any>) {
             <div class="input-row">
                 <div>
                     <label>이메일</label>
-                    <input type="email" id="kakao_email" value="\${creds.kakao?.email || ''}" placeholder="카카오 이메일">
+                    <input type="email" id="kakao_email" value="${creds.kakao?.email || ''}" placeholder="카카오 이메일">
                 </div>
                 <div>
                     <label>비밀번호</label>
-                    <input type="password" id="kakao_pw" value="\${creds.kakao?.pw || ''}" placeholder="비밀번호">
+                    <input type="password" id="kakao_pw" value="${creds.kakao?.pw || ''}" placeholder="비밀번호">
                 </div>
             </div>
 

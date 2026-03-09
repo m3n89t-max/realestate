@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, ipcMain } from 'electron';
+import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
@@ -42,6 +42,8 @@ ipcMain.handle('config-saved', async () => {
     mainWindow?.close();
     await startAgent();
     createTray();
+    // UI 서버 기동 대기 후 메인 창 오픈
+    setTimeout(() => showMainUI(), 2000);
 });
 
 async function startAgent() {
@@ -54,11 +56,18 @@ async function startAgent() {
 }
 
 const createTray = () => {
-    const iconPath = path.join(__dirname, '../../public/favicon.ico');
-    const icon = fs.existsSync(iconPath) ? iconPath : undefined;
-
-    // @ts-ignore
-    tray = new Tray(icon || app.getAppPath());
+    try {
+        const iconPath = path.join(__dirname, '../../public/favicon.ico');
+        const icon = fs.existsSync(iconPath)
+            ? nativeImage.createFromPath(iconPath)
+            : nativeImage.createFromDataURL(
+                'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABmJLR0QA/wD/AP+gvaeTAAAASklEQVQ4jWNgYGD4z8BQDwAHhAH/GRiAGBiIoRkYGBgYGBiAGBiAGBiAGBiAGBiAGBiAGBiAGBiAGBiAGBiAGBgYGBjqAQAzJAMBvM74XAAAAABJRU5ErkJggg=='
+              );
+        tray = new Tray(icon);
+    } catch (e) {
+        console.error('[Tray] 트레이 아이콘 생성 실패:', e);
+        tray = new Tray(nativeImage.createEmpty());
+    }
     const contextMenu = Menu.buildFromTemplate([
         {
             label: '설정 열기',
@@ -120,7 +129,7 @@ app.on('ready', async () => {
         // 설정 있음: 바로 시작
         await startAgent();
         createTray();
-        showMainUI();
+        setTimeout(() => showMainUI(), 2000);
     }
 });
 
