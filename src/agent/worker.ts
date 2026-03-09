@@ -36,8 +36,8 @@ const POLL_INTERVAL = 30_000;      // Realtime 실패 시 폴백 폴링 30초
 // Main Agent Class
 // ============================================================
 class LocalAgent {
-    private config: AgentConfig;
-    private supabase;
+    private config!: AgentConfig;
+    private supabase: any;
     private orgId: string = '';
     private agentConnectionId: string = '';
     private channel: RealtimeChannel | null = null;
@@ -47,17 +47,20 @@ class LocalAgent {
     private isShuttingDown = false;
 
     constructor() {
-        this.config = getConfig();
-        this.supabase = createClient(
-            this.config.supabase_url,
-            this.config.supabase_anon_key
-        );
+        // config는 start() 호출 시점에 로드 (설정 완료 후 실행 보장)
     }
 
     // ============================================================
     // 시작
     // ============================================================
     async start() {
+        // 설정 로드 (여기서 처음 getConfig 호출)
+        this.config = getConfig();
+        this.supabase = createClient(
+            this.config.supabase_url,
+            this.config.supabase_anon_key
+        );
+
         console.log('===========================================');
         console.log('  RealEstate AI OS — Local Agent v' + this.config.version);
         console.log('  Agent: ' + this.config.agent_name);
