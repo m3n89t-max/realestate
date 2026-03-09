@@ -144,126 +144,124 @@ export default async function ProjectDetailPage({
 
       {/* 탭 콘텐츠 */}
       {tab === 'overview' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* 좌측: 기본 정보 */}
-          <div className="lg:col-span-2 space-y-5">
-            {/* 매물 정보 */}
-            <div className="card p-5">
-              <h3 className="section-title mb-4 flex items-center gap-2">
-                <Home size={16} className="text-brand-500" />
-                매물 정보
-              </h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                {[
-                  { label: '주소', value: project.address },
-                  { label: '매물 유형', value: getPropertyTypeLabel(project.property_type ?? '') },
-                  { label: '매매가', value: project.price ? formatPrice(project.price) : '—' },
-                  { label: '전용면적', value: project.area ? formatArea(project.area) : '—' },
-                  { label: '층수', value: project.floor ? `${project.floor}층 / ${project.total_floors}층` : '—' },
-                  { label: '방향', value: project.direction ?? '—' },
-                ].map(item => (
-                  <div key={item.label}>
-                    <p className="text-gray-400 text-xs mb-0.5">{item.label}</p>
-                    <p className="font-medium text-gray-800">{item.value}</p>
-                  </div>
-                ))}
-              </div>
-              {project.features && project.features.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-gray-100">
-                  <p className="text-xs text-gray-400 mb-2">특징</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {project.features.map((f: string) => (
-                      <span key={f} className="px-2.5 py-1 bg-brand-50 text-brand-700 text-xs rounded-full">
-                        {f}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* 입지 분석 */}
-            {locationAnalysis?.advantages && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* 좌측: 기본 정보 */}
+            <div className="lg:col-span-2 space-y-5">
+              {/* 매물 정보 */}
               <div className="card p-5">
                 <h3 className="section-title mb-4 flex items-center gap-2">
-                  <MapPin size={16} className="text-brand-500" />
-                  입지 분석
+                  <Home size={16} className="text-brand-500" />
+                  매물 정보
                 </h3>
-                <ul className="space-y-2">
-                  {locationAnalysis.advantages.map((adv: string, i: number) => (
-                    <li key={i} className="flex items-start gap-2 text-sm">
-                      <span className="w-5 h-5 bg-green-100 text-green-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
-                        {i + 1}
-                      </span>
-                      <span className="text-gray-700">{adv}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-
-          {/* 우측: 생성 현황 */}
-          <div className="space-y-4">
-            <div className="card p-5">
-              <h3 className="section-title mb-4">생성 현황</h3>
-              <div className="space-y-3">
-                {[
-                  { label: '블로그 글', count: blogContents.length, tab: 'blog', color: 'bg-blue-500' },
-                  { label: '카드뉴스', count: cardNewsContents.length, tab: 'card_news', color: 'bg-purple-500' },
-                  { label: '서류', count: (documents ?? []).length, tab: 'docs', color: 'bg-green-500' },
-                ].map(item => (
-                  <Link
-                    key={item.label}
-                    href={`/projects/${id}?tab=${item.tab}`}
-                    className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${item.color}`} />
-                      <span className="text-sm text-gray-700">{item.label}</span>
-                    </div>
-                    <span className={`text-sm font-medium ${item.count > 0 ? 'text-brand-600' : 'text-gray-400'}`}>
-                      {item.count > 0 ? `${item.count}건` : '미생성'}
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            </div>
-
-            {/* 사진 수 */}
-            <div className="card p-5">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="section-title">업로드된 사진</h3>
-                <span className="text-sm font-medium text-brand-600 bg-brand-50 px-2 py-1 rounded-md">{(assets ?? []).length}장</span>
-              </div>
-
-              {/* 이미지 갤러리 */}
-              {assets && assets.length > 0 ? (
-                <div className="grid grid-cols-2 gap-2 mt-4">
-                  {assets.slice(0, 4).map((asset: any, idx: number) => (
-                    <div key={asset.id ?? idx} className="relative aspect-square rounded-lg overflow-hidden border border-gray-100 group">
-                      <Image
-                        src={asset.file_url}
-                        alt={`매물 사진 ${idx + 1}`}
-                        fill
-                        className="object-cover group-hover:scale-110 transition-transform duration-300"
-                        sizes="(max-width: 768px) 100vw, 150px"
-                      />
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  {[
+                    { label: '주소', value: project.address },
+                    { label: '매물 유형', value: getPropertyTypeLabel(project.property_type ?? '') },
+                    { label: '매매가', value: project.price ? formatPrice(project.price) : '—' },
+                    { label: '전용면적', value: project.area ? formatArea(project.area) : '—' },
+                    { label: '층수', value: project.floor ? `${project.floor}층 / ${project.total_floors}층` : '—' },
+                    { label: '방향', value: project.direction ?? '—' },
+                  ].map(item => (
+                    <div key={item.label}>
+                      <p className="text-gray-400 text-xs mb-0.5">{item.label}</p>
+                      <p className="font-medium text-gray-800">{item.value}</p>
                     </div>
                   ))}
-                  {assets.length > 4 && (
-                    <div className="col-span-2 py-2 mt-1 bg-gray-50 rounded-lg text-center cursor-pointer hover:bg-gray-100 transition-colors">
-                      <p className="text-xs font-semibold text-gray-500">+ {assets.length - 4}장 더보기</p>
-                    </div>
-                  )}
                 </div>
-              ) : (
-                <div className="bg-gray-50 rounded-lg p-6 text-center border-2 border-dashed border-gray-200 mt-4">
-                  <Upload size={24} className="mx-auto text-gray-300 mb-2" />
-                  <p className="text-sm text-gray-400">등록된 사진이 없습니다</p>
+                {project.features && project.features.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-gray-100">
+                    <p className="text-xs text-gray-400 mb-2">특징</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {project.features.map((f: string) => (
+                        <span key={f} className="px-2.5 py-1 bg-brand-50 text-brand-700 text-xs rounded-full">
+                          {f}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 입지 분석 */}
+              {locationAnalysis?.advantages && (
+                <div className="card p-5">
+                  <h3 className="section-title mb-4 flex items-center gap-2">
+                    <MapPin size={16} className="text-brand-500" />
+                    입지 분석
+                  </h3>
+                  <ul className="space-y-2">
+                    {locationAnalysis.advantages.map((adv: string, i: number) => (
+                      <li key={i} className="flex items-start gap-2 text-sm">
+                        <span className="w-5 h-5 bg-green-100 text-green-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
+                          {i + 1}
+                        </span>
+                        <span className="text-gray-700">{adv}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
             </div>
+
+            {/* 우측: 생성 현황 */}
+            <div className="space-y-4">
+              <div className="card p-5">
+                <h3 className="section-title mb-4">생성 현황</h3>
+                <div className="space-y-3">
+                  {[
+                    { label: '블로그 글', count: blogContents.length, tab: 'blog', color: 'bg-blue-500' },
+                    { label: '카드뉴스', count: cardNewsContents.length, tab: 'card_news', color: 'bg-purple-500' },
+                    { label: '서류', count: (documents ?? []).length, tab: 'docs', color: 'bg-green-500' },
+                  ].map(item => (
+                    <Link
+                      key={item.label}
+                      href={`/projects/${id}?tab=${item.tab}`}
+                      className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${item.color}`} />
+                        <span className="text-sm text-gray-700">{item.label}</span>
+                      </div>
+                      <span className={`text-sm font-medium ${item.count > 0 ? 'text-brand-600' : 'text-gray-400'}`}>
+                        {item.count > 0 ? `${item.count}건` : '미생성'}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 하단: 업로드된 사진 전체 갤러리 */}
+          <div className="card p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="section-title">업로드된 사진</h3>
+              <span className="text-sm font-medium text-brand-600 bg-brand-50 px-2 py-1 rounded-md">{(assets ?? []).length}장</span>
+            </div>
+
+            {/* 이미지 갤러리 */}
+            {assets && assets.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {assets.map((asset: any, idx: number) => (
+                  <div key={asset.id ?? idx} className="relative aspect-[4/3] rounded-lg overflow-hidden border border-gray-100 group">
+                    <Image
+                      src={asset.file_url}
+                      alt={`매물 사진 ${idx + 1}`}
+                      fill
+                      className="object-cover group-hover:scale-105 transition-transform duration-300"
+                      sizes="(max-width: 768px) 100vw, 300px"
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-gray-50 rounded-lg p-8 text-center border-2 border-dashed border-gray-200">
+                <Upload size={32} className="mx-auto text-gray-300 mb-3" />
+                <p className="text-sm font-medium text-gray-500">등록된 사진이 없습니다</p>
+                <p className="text-xs text-gray-400 mt-1">새 매물 등록 화면에서 사진을 업로드할 수 있습니다.</p>
+              </div>
+            )}
           </div>
         </div>
       )}
