@@ -63,6 +63,13 @@ export function startUIServer() {
             return;
         }
 
+        if (req.method === 'POST' && req.url === '/api/quit') {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true }));
+            setTimeout(() => process.exit(0), 300);
+            return;
+        }
+
         res.writeHead(404);
         res.end('Not Found');
     });
@@ -89,13 +96,21 @@ function getHtmlContent(creds: Record<string, any>) {
         input { w-full; padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem; width: 100%; box-sizing: border-box; }
         button { background: #2563eb; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%; font-size: 1rem; margin-top: 1rem; transition: background 0.2s; }
         button:hover { background: #1d4ed8; }
+        .btn-quit { background: #ef4444; margin-top: 0.75rem; }
+        .btn-quit:hover { background: #dc2626; }
         .platform-title { font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; margin-top: 1.5rem; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.25rem; display:flex; align-items:center; gap: 8px;}
         .hint { font-size: 0.75rem; color: #6b7280; margin-top: 0.25rem; }
+        .status-bar { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: #6b7280; margin-bottom: 1.5rem; padding: 0.5rem 0.75rem; background: #f0fdf4; border-radius: 6px; border: 1px solid #bbf7d0; }
+        .status-dot { width: 8px; height: 8px; background: #22c55e; border-radius: 50%; flex-shrink: 0; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🤖 로컬 자동화 계정 설정</h1>
+        <div class="status-bar">
+            <span class="status-dot"></span>
+            에이전트 실행 중 — 작업 대기 중
+        </div>
         <p style="font-size: 0.875rem; color: #4b5563; margin-bottom: 2rem;">
             이 정보는 현재 PC에만 저장되며 외부 서버로 전송되지 않습니다.
         </p>
@@ -150,10 +165,19 @@ function getHtmlContent(creds: Record<string, any>) {
             </div>
 
             <button type="submit">저장하기</button>
+            <button type="button" class="btn-quit" onclick="quitAgent()">에이전트 종료</button>
         </form>
     </div>
 
     <script>
+        async function quitAgent() {
+            if (!confirm('에이전트를 종료하시겠습니까?')) return;
+            try {
+                await fetch('/api/quit', { method: 'POST' });
+            } catch { /* 종료 중 연결 끊김은 정상 */ }
+            window.close();
+        }
+
         document.getElementById('credsForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = e.target.querySelector('button');
