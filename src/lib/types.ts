@@ -163,6 +163,11 @@ export interface Document {
   file_url?: string
   file_name?: string
   raw_text?: string
+  raw_data?: {
+    title?: any[]
+    floors?: any[]
+    exclusive?: any[]
+  }
   summary?: DocumentSummary
   risk_items?: RiskItem[]
   created_at: string

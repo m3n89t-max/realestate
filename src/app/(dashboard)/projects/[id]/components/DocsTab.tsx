@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { Document, DocumentSummary, RiskItem } from '@/lib/types'
 import toast from 'react-hot-toast'
 import { cn } from '@/lib/utils'
+import BuildingRegisterPrint from './BuildingRegisterPrint'
 
 interface DocsTabProps {
   projectId: string
@@ -58,19 +59,28 @@ function DocumentCard({ doc }: { doc: Document }) {
               다운로드
             </a>
           )}
-          {(summary || riskItems) && (
+          {(summary || riskItems || doc.raw_data) && (
             <button
               onClick={() => setExpanded(!expanded)}
               className="btn-secondary py-1.5 text-xs"
             >
               {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-              분석 결과
+              {doc.raw_data ? '서류 보기' : '분석 결과'}
             </button>
           )}
         </div>
       </div>
 
-      {expanded && summary && (
+      {expanded && doc.raw_data && (
+        <div className="border-t border-gray-100 p-4 bg-white">
+          <BuildingRegisterPrint
+            data={doc.raw_data}
+            fetchedAt={doc.created_at}
+          />
+        </div>
+      )}
+
+      {expanded && !doc.raw_data && summary && (
         <div className="border-t border-gray-100 p-4 space-y-3 bg-gray-50">
           <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">요약 정보</h4>
           <div className="grid grid-cols-2 gap-3">

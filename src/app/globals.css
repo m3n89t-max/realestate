@@ -90,3 +90,9 @@
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-stone-400;
 }
+@media print {
+  body > *:not(#print-area) { display: none !important; }
+  nav, header, aside, .print\:hidden { display: none !important; }
+  #print-area { display: block !important; }
+  @page { margin: 15mm; }
+}
