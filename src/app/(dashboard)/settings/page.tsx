@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Building2, Users, Key, CreditCard, Copy, Plus } from 'lucide-react'
 import StatusBadge from '@/components/ui/StatusBadge'
 import UsageMeter from '@/components/ui/UsageMeter'
+import AgentManager from './AgentManager'
 
 export default async function SettingsPage() {
   const supabase = await createClient()
@@ -186,40 +187,7 @@ export default async function SettingsPage() {
           </p>
         </div>
 
-        {(agents ?? []).length === 0 ? (
-          <div className="text-center py-6">
-            <p className="text-sm text-gray-500 mb-3">연결된 에이전트가 없습니다</p>
-            <a href="/Setup.exe" download className="btn-primary inline-flex items-center gap-2">
-              에이전트 Windows 설치 (Setup.exe) 다운로드
-            </a>
-            <p className="text-[10px] text-gray-400 mt-2">※ 관리자 페이지에서 생성된 Setup.exe를 올려주세요.</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {(agents ?? []).map(agent => (
-              <div key={agent.id} className="flex items-center justify-between p-3 rounded-lg border border-gray-200">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <StatusBadge status={agent.status} size="sm" />
-                    <p className="text-sm font-medium text-gray-800">{agent.name ?? '에이전트'}</p>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {agent.platform} · v{agent.version}
-                    {agent.last_seen_at && ` · 마지막 연결: ${new Date(agent.last_seen_at).toLocaleDateString('ko-KR')}`}
-                  </p>
-                </div>
-                <button className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
-                  <Copy size={12} />
-                  연결키 복사
-                </button>
-              </div>
-            ))}
-            <button className="btn-secondary text-xs w-full justify-center py-2 mt-2">
-              <Plus size={12} />
-              새 에이전트 연결키 발급
-            </button>
-          </div>
-        )}
+        <AgentManager orgId={org?.id ?? ''} initialAgents={agents ?? []} />
       </div>
       {/* 자동화 계정 관리 */}
       <div className="card p-5">
