@@ -2,6 +2,41 @@ import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
+import zlib from 'zlib';
+
+// Node.js 내장 zlib로 16x16 파란색 PNG 버퍼 생성 (외부 파일 불필요)
+function createIconBuffer(): Buffer {
+    const w = 16, h = 16;
+    const sig = Buffer.from([0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A]);
+
+    function crc32(buf: Buffer): number {
+        let c = 0xFFFFFFFF;
+        for (const b of buf) { c ^= b; for (let i=0;i<8;i++) c=(c&1)?(c>>>1)^0xEDB88320:c>>>1; }
+        return (c ^ 0xFFFFFFFF) >>> 0;
+    }
+    function chunk(type: string, data: Buffer): Buffer {
+        const t = Buffer.from(type,'ascii');
+        const l = Buffer.alloc(4); l.writeUInt32BE(data.length);
+        const cr = Buffer.alloc(4); cr.writeUInt32BE(crc32(Buffer.concat([t,data])));
+        return Buffer.concat([l,t,data,cr]);
+    }
+
+    const ihdrData = Buffer.alloc(13);
+    ihdrData.writeUInt32BE(w,0); ihdrData.writeUInt32BE(h,4);
+    ihdrData[8]=8; ihdrData[9]=2; // bit depth=8, RGB
+
+    // 각 행: filter=0 + 16픽셀 RGB (파란색 #0D5EAF)
+    const raw = Buffer.alloc(h*(1+w*3));
+    for (let y=0;y<h;y++) {
+        raw[y*(1+w*3)]=0;
+        for (let x=0;x<w;x++) {
+            const o=y*(1+w*3)+1+x*3;
+            raw[o]=0x0D; raw[o+1]=0x5E; raw[o+2]=0xAF;
+        }
+    }
+    const idat = chunk('IDAT', zlib.deflateSync(raw));
+    return Buffer.concat([sig, chunk('IHDR',ihdrData), idat, chunk('IEND',Buffer.alloc(0))]);
+}
 
 let mainWindow: BrowserWindow | null;
 let tray: Tray | null;
@@ -56,18 +91,11 @@ async function startAgent() {
 }
 
 const createTray = () => {
-    try {
-        const iconPath = path.join(__dirname, '../../public/favicon.ico');
-        const icon = fs.existsSync(iconPath)
-            ? nativeImage.createFromPath(iconPath)
-            : nativeImage.createFromDataURL(
-                'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABmJLR0QA/wD/AP+gvaeTAAAASklEQVQ4jWNgYGD4z8BQDwAHhAH/GRiAGBiIoRkYGBgYGBiAGBiAGBiAGBiAGBiAGBiAGBiAGBiAGBiAGBiAGBgYGBjqAQAzJAMBvM74XAAAAABJRU5ErkJggg=='
-              );
-        tray = new Tray(icon);
-    } catch (e) {
-        console.error('[Tray] 트레이 아이콘 생성 실패:', e);
-        tray = new Tray(nativeImage.createEmpty());
-    }
+    const iconPath = path.join(__dirname, '../../public/favicon.ico');
+    const icon = fs.existsSync(iconPath)
+        ? nativeImage.createFromPath(iconPath)
+        : nativeImage.createFromBuffer(createIconBuffer());
+    tray = new Tray(icon);
     const contextMenu = Menu.buildFromTemplate([
         {
             label: '설정 열기',
@@ -120,6 +148,17 @@ const showMainUI = () => {
         mainWindow?.hide();
     });
 };
+
+// exe 중복 실행 시 기존 창 포커스
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+    app.quit();
+} else {
+    app.on('second-instance', () => {
+        if (mainWindow) { mainWindow.show(); mainWindow.focus(); }
+        else showMainUI();
+    });
+}
 
 app.on('ready', async () => {
     if (!hasConfig()) {
