@@ -72,12 +72,12 @@ const STEPS = [
 ]
 
 const PROPERTY_TYPES: { value: PropertyType; label: string; icon: string }[] = [
-  { value: 'apartment', label: '아파트', icon: '🏢' },
-  { value: 'officetel', label: '오피스텔', icon: '🏨' },
-  { value: 'villa', label: '빌라/다세대', icon: '🏘️' },
-  { value: 'commercial', label: '상가/사무실', icon: '🏪' },
-  { value: 'land', label: '토지', icon: '🗾' },
-  { value: 'house', label: '단독주택', icon: '🏠' },
+  { value: 'apartment', label: '아파트', icon: '' },
+  { value: 'officetel', label: '오피스텔', icon: '' },
+  { value: 'villa', label: '빌라/다세대', icon: '' },
+  { value: 'commercial', label: '상가/사무실', icon: '' },
+  { value: 'land', label: '토지', icon: '' },
+  { value: 'house', label: '단독주택', icon: '' },
 ]
 
 const DIRECTIONS = ['남향', '남동향', '남서향', '동향', '서향', '북향', '북동향', '북서향']
@@ -189,11 +189,11 @@ export default function NewProjectPage() {
             lng = geoResult.lng
             jibunAddress = geoResult.jibun_address
           } else {
-            toast('⚠️ 주소 좌표를 찾지 못했습니다. 지도 마커가 표시되지 않을 수 있습니다.', { duration: 5000 })
+            toast('주소 좌표를 찾지 못했습니다. 지도 마커가 표시되지 않을 수 있습니다.', { duration: 5000 })
             console.warn('지오코딩 결과 없음:', form.address)
           }
         } catch (geoErr) {
-          toast('⚠️ 주소 좌표 변환 중 오류가 발생했습니다.', { duration: 5000 })
+          toast('주소 좌표 변환 중 오류가 발생했습니다.', { duration: 5000 })
           console.warn('지오코딩 실패 (계속 진행):', geoErr)
         }
 

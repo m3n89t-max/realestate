@@ -15,7 +15,7 @@ const PLATFORMS = [
         color: 'bg-green-500',
         fields: [{ key: 'id', label: '아이디', placeholder: '네이버 아이디' }],
         desc: '블로그 자동 업로드에 사용됩니다.',
-        icon: '🟢',
+        icon: '',
     },
     {
         key: 'google',
@@ -23,7 +23,7 @@ const PLATFORMS = [
         color: 'bg-red-500',
         fields: [{ key: 'email', label: '이메일', placeholder: 'example@gmail.com' }],
         desc: '유튜브 영상 자동 업로드에 사용됩니다.',
-        icon: '▶️',
+        icon: '',
     },
     {
         key: 'instagram',
@@ -31,7 +31,7 @@ const PLATFORMS = [
         color: 'bg-gradient-to-tr from-purple-500 to-pink-500',
         fields: [{ key: 'id', label: '아이디', placeholder: '인스타그램 아이디 또는 이메일' }],
         desc: '카드뉴스 자동 업로드에 사용됩니다.',
-        icon: '📸',
+        icon: '',
     },
     {
         key: 'kakao',
@@ -39,7 +39,7 @@ const PLATFORMS = [
         color: 'bg-yellow-400',
         fields: [{ key: 'email', label: '이메일 또는 전화번호', placeholder: '카카오 로그인 이메일' }],
         desc: '카카오 채널 콘텐츠 업로드에 사용됩니다.',
-        icon: '💬',
+        icon: '',
     },
 ] as const
 
@@ -275,7 +275,7 @@ export default function CredentialForm() {
         <div className="space-y-4">
             {/* 보안 안내 */}
             <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex gap-3">
-                <span className="text-xl flex-shrink-0">🔒</span>
+                <span className="text-xl flex-shrink-0"></span>
                 <div>
                     <p className="text-sm font-semibold text-blue-800">로컬 전용 보안 저장</p>
                     <p className="text-xs text-blue-600 mt-0.5 leading-relaxed">
@@ -300,7 +300,7 @@ export default function CredentialForm() {
 
             {/* 에이전트 안내 */}
             <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 flex gap-3">
-                <span className="text-xl flex-shrink-0">🤖</span>
+                <span className="text-xl flex-shrink-0"></span>
                 <div>
                     <p className="text-sm font-semibold text-amber-800">에이전트 실행 필요</p>
                     <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">

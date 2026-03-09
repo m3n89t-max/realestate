@@ -238,10 +238,10 @@ export default async function SettingsPage() {
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { icon: '🟢', name: '네이버', desc: '블로그 업로드' },
-            { icon: '▶️', name: '유튜브', desc: '영상 업로드' },
-            { icon: '📸', name: '인스타그램', desc: '카드뉴스' },
-            { icon: '💬', name: '카카오', desc: '채널 업로드' },
+            { icon: '', name: '네이버', desc: '블로그 업로드' },
+            { icon: '', name: '유튜브', desc: '영상 업로드' },
+            { icon: '', name: '인스타그램', desc: '카드뉴스' },
+            { icon: '', name: '카카오', desc: '채널 업로드' },
           ].map(p => (
             <Link key={p.name} href="/settings/credentials" className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl border border-gray-100 hover:border-brand-200 hover:bg-brand-50 transition-all group">
               <span className="text-2xl">{p.icon}</span>

@@ -88,15 +88,15 @@ export default function KakaoMapTestPage() {
     }
 
     const bannerStyle: Record<string, { bg: string; border: string; color: string; text: string }> = {
-        loading: { bg: '#f0f9ff', border: '#bfdbfe', color: '#1e40af', text: '⏳ 카카오맵 SDK 로딩 중...' },
-        loaded: { bg: '#ecfdf5', border: '#a7f3d0', color: '#065f46', text: '✅ 카카오맵 로드 성공! 지도가 정상 표시됩니다.' },
-        error: { bg: '#fef2f2', border: '#fecaca', color: '#991b1b', text: `❌ 오류: ${errorMsg}` },
+        loading: { bg: '#f0f9ff', border: '#bfdbfe', color: '#1e40af', text: '카카오맵 SDK 로딩 중...' },
+        loaded: { bg: '#ecfdf5', border: '#a7f3d0', color: '#065f46', text: '카카오맵 로드 성공! 지도가 정상 표시됩니다.' },
+        error: { bg: '#fef2f2', border: '#fecaca', color: '#991b1b', text: `오류: ${errorMsg}` },
     }
     const b = bannerStyle[status] || bannerStyle.loading
 
     return (
         <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto', fontFamily: 'sans-serif' }}>
-            <h1 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>🗺️ 카카오맵 통합 테스트</h1>
+            <h1 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>카카오맵 통합 테스트</h1>
             <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>
                 API Key: {KAKAO_API_KEY.substring(0, 8)}... | 도메인: {typeof window !== 'undefined' ? window.location.hostname : ''}
             </p>
@@ -128,11 +128,11 @@ export default function KakaoMapTestPage() {
                 <div style={{ marginTop: '16px', padding: '16px', borderRadius: '12px', background: 'white', border: '1px solid #e5e7eb' }}>
                     <p style={{ fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>테스트 결과</p>
                     <div style={{ fontSize: '13px', lineHeight: '2' }}>
-                        ✅ SDK 로드 완료<br />
-                        ✅ 지도 렌더링 성공<br />
-                        ✅ 줌 컨트롤 표시<br />
-                        ✅ 가격 마커 5개 표시<br />
-                        ✅ 바운드 자동 맞춤
+                        SDK 로드 완료<br />
+                        지도 렌더링 성공<br />
+                        줌 컨트롤 표시<br />
+                        가격 마커 5개 표시<br />
+                        바운드 자동 맞춤
                     </div>
                 </div>
             )}

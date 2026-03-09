@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>부동산 AI 에이전트 초기 설정</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Malgun Gothic', sans-serif;
+      background: #f0f4f8;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; padding: 24px;
+    }
+    .card {
+      background: white; border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+      padding: 40px 36px; width: 100%; max-width: 480px;
+    }
+    .logo { font-size: 28px; font-weight: 700; color: #0ea5e9; margin-bottom: 4px; }
+    .subtitle { font-size: 14px; color: #64748b; margin-bottom: 32px; }
+    label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px; }
+    input {
+      width: 100%; padding: 10px 14px; border: 1.5px solid #e2e8f0;
+      border-radius: 10px; font-size: 14px; outline: none;
+      transition: border-color 0.2s; margin-bottom: 20px;
+    }
+    input:focus { border-color: #0ea5e9; }
+    .hint { font-size: 11px; color: #94a3b8; margin-top: -16px; margin-bottom: 20px; }
+    button {
+      width: 100%; padding: 13px; background: #0ea5e9;
+      color: white; border: none; border-radius: 10px;
+      font-size: 15px; font-weight: 600; cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: #0284c7; }
+    button:disabled { background: #94a3b8; cursor: not-allowed; }
+    .error { color: #ef4444; font-size: 13px; margin-top: 12px; display: none; }
+    .success { color: #10b981; font-size: 13px; margin-top: 12px; display: none; }
+    .divider { border: none; border-top: 1px solid #f1f5f9; margin: 24px 0; }
+    .info-box {
+      background: #f0f9ff; border: 1px solid #bae6fd;
+      border-radius: 10px; padding: 14px 16px;
+      font-size: 12px; color: #0369a1; margin-bottom: 24px; line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">🏠 부동산 AI OS</div>
+    <div class="subtitle">로컬 자동화 에이전트 초기 설정</div>
+
+    <div class="info-box">
+      Supabase URL과 키는 웹 관리자가 제공합니다.<br>
+      한 번만 입력하면 이후 자동으로 연결됩니다.
+    </div>
+
+    <label>Supabase URL</label>
+    <input type="text" id="url" placeholder="https://xxxx.supabase.co" />
+
+    <label>Supabase Anon Key</label>
+    <input type="text" id="anon_key" placeholder="sb_publishable_..." />
+    <p class="hint">※ 비밀번호가 아닌 공개 키입니다</p>
+
+    <label>에이전트 이름 (선택)</label>
+    <input type="text" id="agent_name" placeholder="예: 홍길동 중개사무소" />
+
+    <hr class="divider">
+
+    <button id="saveBtn" onclick="save()">설정 저장 및 시작</button>
+    <div class="error" id="errMsg"></div>
+    <div class="success" id="okMsg">✓ 설정 완료! 에이전트를 시작합니다...</div>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+
+    async function save() {
+      const url = document.getElementById('url').value.trim();
+      const anon_key = document.getElementById('anon_key').value.trim();
+      const agent_name = document.getElementById('agent_name').value.trim();
+
+      const errEl = document.getElementById('errMsg');
+      errEl.style.display = 'none';
+
+      if (!url || !anon_key) {
+        errEl.textContent = 'Supabase URL과 Anon Key는 필수입니다.';
+        errEl.style.display = 'block';
+        return;
+      }
+      if (!url.startsWith('https://')) {
+        errEl.textContent = 'URL은 https://로 시작해야 합니다.';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      const btn = document.getElementById('saveBtn');
+      btn.disabled = true;
+      btn.textContent = '저장 중...';
+
+      const result = await ipcRenderer.invoke('save-config', { url, anon_key, agent_name });
+      if (result.ok) {
+        document.getElementById('okMsg').style.display = 'block';
+        setTimeout(() => ipcRenderer.invoke('config-saved'), 1500);
+      } else {
+        errEl.textContent = '저장 실패: ' + result.error;
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = '설정 저장 및 시작';
+      }
+    }
+  </script>
+</body>
+</html>

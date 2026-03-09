@@ -139,8 +139,8 @@ export default function ShortsTab({ projectId }: ShortsTabProps) {
                   <span className={cn(
                     'text-xs font-bold px-2.5 py-1 rounded-full',
                     scene.scene_number === 1 ? 'bg-brand-100 text-brand-700' :
-                    scene.scene_number === 6 ? 'bg-orange-100 text-orange-700' :
-                    'bg-gray-100 text-gray-600'
+                      scene.scene_number === 6 ? 'bg-orange-100 text-orange-700' :
+                        'bg-gray-100 text-gray-600'
                   )}>
                     장면 {scene.scene_number}
                   </span>
@@ -148,12 +148,12 @@ export default function ShortsTab({ projectId }: ShortsTabProps) {
                 </div>
 
                 <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">📷 화면 구성</p>
+                  <p className="text-xs font-medium text-gray-500 mb-1">화면 구성</p>
                   <p className="text-sm text-gray-700">{scene.visual_description}</p>
                 </div>
 
                 <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">🎙️ 나레이션</p>
+                  <p className="text-xs font-medium text-gray-500 mb-1">나레이션</p>
                   <p className="text-sm text-gray-800 font-medium">{scene.narration}</p>
                 </div>
 
