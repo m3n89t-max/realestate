@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import {
   ArrowLeft, MapPin, Home, Share2, Download, Upload
 } from 'lucide-react'
@@ -131,8 +132,8 @@ export default async function ProjectDetailPage({
               key={t.id}
               href={`/projects/${id}?tab=${t.id}`}
               className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${tab === t.id
-                  ? 'border-brand-600 text-brand-700'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                ? 'border-brand-600 text-brand-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
             >
               {t.label}
@@ -231,9 +232,37 @@ export default async function ProjectDetailPage({
 
             {/* 사진 수 */}
             <div className="card p-5">
-              <h3 className="section-title mb-3">업로드된 사진</h3>
-              <p className="text-3xl font-bold text-gray-900">{(assets ?? []).length}</p>
-              <p className="text-sm text-gray-400 mt-0.5">장</p>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="section-title">업로드된 사진</h3>
+                <span className="text-sm font-medium text-brand-600 bg-brand-50 px-2 py-1 rounded-md">{(assets ?? []).length}장</span>
+              </div>
+
+              {/* 이미지 갤러리 */}
+              {assets && assets.length > 0 ? (
+                <div className="grid grid-cols-2 gap-2 mt-4">
+                  {assets.slice(0, 4).map((asset: any, idx: number) => (
+                    <div key={asset.id ?? idx} className="relative aspect-square rounded-lg overflow-hidden border border-gray-100 group">
+                      <Image
+                        src={asset.file_url}
+                        alt={`매물 사진 ${idx + 1}`}
+                        fill
+                        className="object-cover group-hover:scale-110 transition-transform duration-300"
+                        sizes="(max-width: 768px) 100vw, 150px"
+                      />
+                    </div>
+                  ))}
+                  {assets.length > 4 && (
+                    <div className="col-span-2 py-2 mt-1 bg-gray-50 rounded-lg text-center cursor-pointer hover:bg-gray-100 transition-colors">
+                      <p className="text-xs font-semibold text-gray-500">+ {assets.length - 4}장 더보기</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-gray-50 rounded-lg p-6 text-center border-2 border-dashed border-gray-200 mt-4">
+                  <Upload size={24} className="mx-auto text-gray-300 mb-2" />
+                  <p className="text-sm text-gray-400">등록된 사진이 없습니다</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
