@@ -39,3 +39,7 @@ tsconfig.tsbuildinfo
 # Agent build output
 dist/
 dist-agent/
+
+# Agent package output
+release-agent/
+realestate-agent-setup.zip
