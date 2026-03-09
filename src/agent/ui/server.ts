@@ -28,6 +28,7 @@ export function startUIServer() {
         if (req.method === 'GET' && (req.url === '/' || req.url === '/index.html')) {
             const appDataPath = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
             const credPath = path.join(appDataPath, 'RealEstateAIOS', 'credentials.json');
+            const configPath = path.join(appDataPath, 'RealEstateAIOS', 'config.json');
 
             let currentCreds: Record<string, any> = {};
             if (fs.existsSync(credPath)) {
@@ -36,8 +37,16 @@ export function startUIServer() {
                 } catch { }
             }
 
+            let agentKey = '';
+            if (fs.existsSync(configPath)) {
+                try {
+                    const cfg = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+                    agentKey = cfg.agent_key || '';
+                } catch { }
+            }
+
             res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-            res.end(getHtmlContent(currentCreds));
+            res.end(getHtmlContent(currentCreds, agentKey));
             return;
         }
 
@@ -51,7 +60,25 @@ export function startUIServer() {
                     const targetDir = path.join(appDataPath, 'RealEstateAIOS');
 
                     ensureDirSync(targetDir);
-                    fs.writeFileSync(path.join(targetDir, 'credentials.json'), JSON.stringify(data, null, 2));
+
+                    // 1. Save credentials
+                    const credsData = {
+                        naver: data.naver,
+                        google: data.google,
+                        instagram: data.instagram,
+                        kakao: data.kakao
+                    };
+                    fs.writeFileSync(path.join(targetDir, 'credentials.json'), JSON.stringify(credsData, null, 2));
+
+                    // 2. Update agent_key in config.json
+                    if (data.agent_key !== undefined) {
+                        const configPath = path.join(targetDir, 'config.json');
+                        if (fs.existsSync(configPath)) {
+                            const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+                            config.agent_key = data.agent_key;
+                            fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+                        }
+                    }
 
                     res.writeHead(200, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ success: true }));
@@ -79,7 +106,7 @@ export function startUIServer() {
     });
 }
 
-function getHtmlContent(creds: Record<string, any>) {
+function getHtmlContent(creds: Record<string, any>, agentKey: string) {
     return `<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -116,6 +143,13 @@ function getHtmlContent(creds: Record<string, any>) {
         </p>
 
         <form id="credsForm">
+            <div class="platform-title">🔑 시스템 설정</div>
+            <div class="form-group mb-4">
+                <label>에이전트 연결키 (Agent Key)</label>
+                <input type="text" id="agent_key" value="${agentKey}" placeholder="웹 관리자에서 발급받은 연결키">
+                <p class="hint">웹사이트의 [설정] &gt; [로컬 에이전트] 메뉴에서 키를 발급받으세요.</p>
+            </div>
+
             <div class="platform-title">🟢 네이버 (블로그 업로드 용)</div>
             <div class="input-row">
                 <div>
@@ -185,6 +219,7 @@ function getHtmlContent(creds: Record<string, any>) {
             btn.disabled = true;
 
             const data = {
+                agent_key: document.getElementById('agent_key').value,
                 naver: {
                     id: document.getElementById('naver_id').value,
                     pw: document.getElementById('naver_pw').value

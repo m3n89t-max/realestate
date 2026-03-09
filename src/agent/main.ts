@@ -7,35 +7,35 @@ import zlib from 'zlib';
 // Node.js 내장 zlib로 16x16 파란색 PNG 버퍼 생성 (외부 파일 불필요)
 function createIconBuffer(): Buffer {
     const w = 16, h = 16;
-    const sig = Buffer.from([0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A]);
+    const sig = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
 
     function crc32(buf: Buffer): number {
         let c = 0xFFFFFFFF;
-        for (const b of buf) { c ^= b; for (let i=0;i<8;i++) c=(c&1)?(c>>>1)^0xEDB88320:c>>>1; }
+        for (const b of buf) { c ^= b; for (let i = 0; i < 8; i++) c = (c & 1) ? (c >>> 1) ^ 0xEDB88320 : c >>> 1; }
         return (c ^ 0xFFFFFFFF) >>> 0;
     }
     function chunk(type: string, data: Buffer): Buffer {
-        const t = Buffer.from(type,'ascii');
+        const t = Buffer.from(type, 'ascii');
         const l = Buffer.alloc(4); l.writeUInt32BE(data.length);
-        const cr = Buffer.alloc(4); cr.writeUInt32BE(crc32(Buffer.concat([t,data])));
-        return Buffer.concat([l,t,data,cr]);
+        const cr = Buffer.alloc(4); cr.writeUInt32BE(crc32(Buffer.concat([t, data])));
+        return Buffer.concat([l, t, data, cr]);
     }
 
     const ihdrData = Buffer.alloc(13);
-    ihdrData.writeUInt32BE(w,0); ihdrData.writeUInt32BE(h,4);
-    ihdrData[8]=8; ihdrData[9]=2; // bit depth=8, RGB
+    ihdrData.writeUInt32BE(w, 0); ihdrData.writeUInt32BE(h, 4);
+    ihdrData[8] = 8; ihdrData[9] = 2; // bit depth=8, RGB
 
     // 각 행: filter=0 + 16픽셀 RGB (파란색 #0D5EAF)
-    const raw = Buffer.alloc(h*(1+w*3));
-    for (let y=0;y<h;y++) {
-        raw[y*(1+w*3)]=0;
-        for (let x=0;x<w;x++) {
-            const o=y*(1+w*3)+1+x*3;
-            raw[o]=0x0D; raw[o+1]=0x5E; raw[o+2]=0xAF;
+    const raw = Buffer.alloc(h * (1 + w * 3));
+    for (let y = 0; y < h; y++) {
+        raw[y * (1 + w * 3)] = 0;
+        for (let x = 0; x < w; x++) {
+            const o = y * (1 + w * 3) + 1 + x * 3;
+            raw[o] = 0x0D; raw[o + 1] = 0x5E; raw[o + 2] = 0xAF;
         }
     }
     const idat = chunk('IDAT', zlib.deflateSync(raw));
-    return Buffer.concat([sig, chunk('IHDR',ihdrData), idat, chunk('IEND',Buffer.alloc(0))]);
+    return Buffer.concat([sig, chunk('IHDR', ihdrData), idat, chunk('IEND', Buffer.alloc(0))]);
 }
 
 let mainWindow: BrowserWindow | null;
@@ -55,12 +55,13 @@ function hasConfig(): boolean {
 }
 
 // ─── IPC: 설정 저장 ───────────────────────────────────────────
-ipcMain.handle('save-config', (_event, data: { url: string; anon_key: string; agent_name: string }) => {
+ipcMain.handle('save-config', (_event, data: { url: string; anon_key: string; agent_name: string; agent_key: string }) => {
     try {
         if (!fs.existsSync(CONFIG_DIR)) fs.mkdirSync(CONFIG_DIR, { recursive: true });
         const config = {
             supabase_url: data.url,
             supabase_anon_key: data.anon_key,
+            agent_key: data.agent_key,
             webhook_url: `${data.url}/functions/v1/webhook-agent`,
             agent_name: data.agent_name || `Agent-${os.hostname()}`,
             version: '1.0.0',
@@ -143,7 +144,7 @@ const showMainUI = () => {
     });
     mainWindow.loadURL('http://localhost:3005');
     mainWindow.on('closed', () => { mainWindow = null; });
-    ;(mainWindow as any).on('minimize', (event: any) => {
+    ; (mainWindow as any).on('minimize', (event: any) => {
         event.preventDefault();
         mainWindow?.hide();
     });

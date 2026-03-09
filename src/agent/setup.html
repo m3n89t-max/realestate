@@ -61,6 +61,10 @@
     <input type="text" id="anon_key" placeholder="sb_publishable_..." />
     <p class="hint">※ 비밀번호가 아닌 공개 키입니다</p>
 
+    <label>에이전트 연결키 (Agent Key)</label>
+    <input type="text" id="agent_key" placeholder="agent-..." />
+    <p class="hint">※ 관리자 설정에서 발급받은 키를 입력하세요</p>
+
     <label>에이전트 이름 (선택)</label>
     <input type="text" id="agent_name" placeholder="예: 홍길동 중개사무소" />
 
@@ -78,12 +82,13 @@
       const url = document.getElementById('url').value.trim();
       const anon_key = document.getElementById('anon_key').value.trim();
       const agent_name = document.getElementById('agent_name').value.trim();
+      const agent_key = document.getElementById('agent_key').value.trim();
 
       const errEl = document.getElementById('errMsg');
       errEl.style.display = 'none';
 
-      if (!url || !anon_key) {
-        errEl.textContent = 'Supabase URL과 Anon Key는 필수입니다.';
+      if (!url || !anon_key || !agent_key) {
+        errEl.textContent = 'Supabase URL, Anon Key, 그리고 연결키(Agent Key)는 필수입니다.';
         errEl.style.display = 'block';
         return;
       }
@@ -97,7 +102,7 @@
       btn.disabled = true;
       btn.textContent = '저장 중...';
 
-      const result = await ipcRenderer.invoke('save-config', { url, anon_key, agent_name });
+      const result = await ipcRenderer.invoke('save-config', { url, anon_key, agent_name, agent_key });
       if (result.ok) {
         document.getElementById('okMsg').style.display = 'block';
         setTimeout(() => ipcRenderer.invoke('config-saved'), 1500);
