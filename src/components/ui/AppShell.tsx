@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Building2, Bell, Menu, X, ChevronDown, LogOut,
   LayoutDashboard, FolderOpen, Wand2, FileText, ListTodo, Settings, BarChart3
@@ -12,26 +12,20 @@ import { cn } from '@/lib/utils'
 interface NavItem {
   href: string
   label: string
-  icon?: React.ReactNode
+  icon: React.ReactNode
 }
 
-const mainNav: NavItem[] = [
-  { href: '/dashboard', label: '대시보드' },
-  { href: '/projects', label: '매물관리' },
-  { href: '/studio', label: '콘텐츠' },
-  { href: '/docs', label: '서류' },
-  { href: '/tasks', label: '작업' },
-  { href: '/settings', label: '설정' },
+const navItems: NavItem[] = [
+  { href: '/dashboard', label: '대시보드', icon: <LayoutDashboard size={20} /> },
+  { href: '/projects', label: '매물관리', icon: <FolderOpen size={20} /> },
+  { href: '/studio', label: '콘텐츠', icon: <Wand2 size={20} /> },
+  { href: '/docs', label: '서류', icon: <FileText size={20} /> },
+  { href: '/tasks', label: '작업', icon: <ListTodo size={20} /> },
+  { href: '/usage', label: '사용량', icon: <BarChart3 size={20} /> },
 ]
 
-const mobileNav: NavItem[] = [
-  { href: '/dashboard', label: '대시보드', icon: <LayoutDashboard size={18} /> },
-  { href: '/projects', label: '매물관리', icon: <FolderOpen size={18} /> },
-  { href: '/studio', label: '콘텐츠', icon: <Wand2 size={18} /> },
-  { href: '/docs', label: '서류', icon: <FileText size={18} /> },
-  { href: '/tasks', label: '작업', icon: <ListTodo size={18} /> },
-  { href: '/usage', label: '사용량', icon: <BarChart3 size={18} /> },
-  { href: '/settings', label: '설정', icon: <Settings size={18} /> },
+const bottomNavItems: NavItem[] = [
+  { href: '/settings', label: '설정', icon: <Settings size={20} /> },
 ]
 
 interface AppShellProps {
@@ -42,143 +36,177 @@ interface AppShellProps {
 
 export default function AppShell({ children, agentStatus = 'offline', orgName = '' }: AppShellProps) {
   const pathname = usePathname()
-  const [mobileOpen, setMobileOpen] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
+  // Prevent background scrolling when mobile menu is open
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = 'auto'
+    }
+    return () => {
+      document.body.style.overflow = 'auto'
+    }
+  }, [isMobileMenuOpen])
 
   return (
-    <div className="min-h-screen bg-stone-50 font-sans">
-      {/* 모바일 오버레이 */}
-      {mobileOpen && (
+    <div className="flex h-screen overflow-hidden bg-stone-50 font-sans text-stone-900">
+      {/* ────────── Mobile Overlay ────────── */}
+      {isMobileMenuOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm lg:hidden"
-          onClick={() => setMobileOpen(false)}
+          className="fixed inset-0 z-40 bg-stone-900/40 backdrop-blur-sm lg:hidden transition-opacity"
+          onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
 
-      {/* ────────── 상단 네비게이션 바 ────────── */}
-      <header className="sticky top-0 z-30 bg-white border-b border-stone-100 shadow-sm">
-        <div className="max-w-[1440px] mx-auto px-4 lg:px-6">
-          <div className="flex items-center justify-between h-16">
-            {/* 좌측: 로고 + 네비 */}
-            <div className="flex items-center gap-8">
-              {/* 로고 */}
-              <Link href="/dashboard" className="flex items-center gap-2.5 flex-shrink-0">
-                <div className="w-9 h-9 bg-stone-900 rounded-xl flex items-center justify-center">
-                  <Building2 size={18} className="text-stone-50" />
-                </div>
-                <div className="hidden sm:block">
-                  <span className="text-[15px] font-medium text-stone-900 tracking-tight">RealEstate AI OS</span>
-                  {orgName && (
-                    <span className="ml-1.5 text-xs text-stone-400 font-medium">{orgName}</span>
-                  )}
-                </div>
-              </Link>
-
-              {/* 데스크탑 네비게이션 */}
-              <nav className="hidden lg:flex items-center gap-1">
-                {mainNav.map(item => {
-                  const isActive = pathname.startsWith(item.href)
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={cn(
-                        'px-3.5 py-2 rounded-lg text-sm font-medium transition-all duration-200',
-                        isActive
-                          ? 'text-stone-900 bg-stone-100/70'
-                          : 'text-stone-500 hover:text-stone-900 hover:bg-stone-50'
-                      )}
-                    >
-                      {item.label}
-                    </Link>
-                  )
-                })}
-              </nav>
+      {/* ────────── Left Sidebar (Desktop & Mobile Slide-over) ────────── */}
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-stone-200 flex flex-col transition-transform duration-300 ease-in-out lg:static lg:translate-x-0",
+          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        {/* Brand / Logo Area */}
+        <div className="flex items-center justify-between h-16 px-6 border-b border-stone-100 shrink-0">
+          <Link href="/dashboard" className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-stone-900 rounded-lg flex items-center justify-center shrink-0">
+              <Building2 size={16} className="text-stone-50" />
             </div>
-
-            {/* 우측: 알림 + 프로필 */}
-            <div className="flex items-center gap-3">
-              {/* 에이전트 상태 (데스크탑) */}
-              <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-50 border border-stone-200">
-                <span className={cn(
-                  'w-2 h-2 rounded-full',
-                  agentStatus === 'online' ? 'bg-green-500 animate-pulse' :
-                    agentStatus === 'busy' ? 'bg-amber-500 animate-pulse' :
-                      'bg-stone-300'
-                )} />
-                <span className="text-xs text-stone-600 font-medium">
-                  {agentStatus === 'online' ? '에이전트 연결됨' : agentStatus === 'busy' ? '작업 중' : '오프라인'}
+            <div className="flex flex-col">
+              <span className="text-[15px] font-semibold tracking-tight text-stone-900 leading-tight">
+                RealEstate AI OS
+              </span>
+              {orgName && (
+                <span className="text-[10px] text-stone-500 font-medium leading-none mt-0.5">
+                  {orgName}
                 </span>
-              </div>
-
-              {/* 알림 */}
-              <button className="relative p-2 rounded-xl hover:bg-stone-50 transition-colors">
-                <Bell size={18} className="text-stone-500 hover:text-stone-900" />
-              </button>
-
-              {/* 프로필 */}
-              <button className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl hover:bg-stone-50 transition-colors">
-                <div className="w-8 h-8 bg-stone-200 rounded-full flex items-center justify-center">
-                  <span className="text-xs font-semibold text-stone-700">나</span>
-                </div>
-                <ChevronDown size={14} className="text-stone-400 hidden sm:block" />
-              </button>
-
-              {/* 모바일 햄버거 */}
-              <button
-                className="lg:hidden p-2 rounded-xl hover:bg-gray-100 transition-colors"
-                onClick={() => setMobileOpen(!mobileOpen)}
-              >
-                {mobileOpen ? <X size={20} /> : <Menu size={20} />}
-              </button>
+              )}
             </div>
-          </div>
-        </div>
-      </header>
-
-      {/* ────────── 모바일 사이드 패널 ────────── */}
-      <div className={cn(
-        'fixed right-0 top-0 z-50 h-full w-72 bg-white shadow-2xl transform transition-transform duration-300 lg:hidden',
-        mobileOpen ? 'translate-x-0' : 'translate-x-full'
-      )}>
-        <div className="flex items-center justify-between p-4 border-b border-stone-100">
-          <span className="font-semibold text-stone-900">메뉴</span>
-          <button onClick={() => setMobileOpen(false)} className="p-1.5 rounded-lg hover:bg-stone-100">
-            <X size={18} />
+          </Link>
+          <button
+            className="lg:hidden p-1.5 rounded-lg text-stone-400 hover:text-stone-900 hover:bg-stone-50"
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
+            <X size={20} />
           </button>
         </div>
-        <nav className="p-3 space-y-0.5">
-          {mobileNav.map(item => {
+
+        {/* Main Navigation */}
+        <div className="flex-1 overflow-y-auto px-4 py-6">
+          <div className="space-y-1">
+            <p className="px-3 mb-2 text-xs font-semibold text-stone-400 uppercase tracking-wider">
+              Workspace
+            </p>
+            {navItems.map((item) => {
+              const isActive = pathname.startsWith(item.href)
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group",
+                    isActive
+                      ? "bg-stone-100 text-stone-900"
+                      : "text-stone-500 hover:text-stone-900 hover:bg-stone-50"
+                  )}
+                >
+                  <span className={cn("shrink-0 transition-colors", isActive ? "text-stone-900" : "text-stone-400 group-hover:text-stone-600")}>
+                    {item.icon}
+                  </span>
+                  {item.label}
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Bottom Actions Area */}
+        <div className="p-4 border-t border-stone-100 flex flex-col gap-2 shrink-0 bg-stone-50/50">
+          {/* Agent Status */}
+          <div className="flex items-center gap-2.5 px-3 py-2 mb-2 rounded-xl bg-white border border-stone-200 shadow-sm">
+            <span className={cn(
+              'w-2 h-2 rounded-full shrink-0',
+              agentStatus === 'online' ? 'bg-green-500 animate-pulse' :
+                agentStatus === 'busy' ? 'bg-amber-500 animate-pulse' :
+                  'bg-stone-300'
+            )} />
+            <div className="flex flex-col">
+              <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider leading-none">Local Agent</span>
+              <span className="text-[13px] font-medium text-stone-900 mt-1">
+                {agentStatus === 'online' ? 'Connected' : agentStatus === 'busy' ? 'Working...' : 'Offline'}
+              </span>
+            </div>
+          </div>
+
+          {bottomNavItems.map((item) => {
             const isActive = pathname.startsWith(item.href)
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                onClick={() => setMobileOpen(false)}
+                onClick={() => setIsMobileMenuOpen(false)}
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                  "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group",
                   isActive
-                    ? 'bg-stone-100 text-stone-900'
-                    : 'text-stone-600 hover:bg-stone-50'
+                    ? "bg-stone-100 text-stone-900"
+                    : "text-stone-500 hover:text-stone-900 hover:bg-white"
                 )}
               >
-                {item.icon}
+                <span className={cn("shrink-0 transition-colors", isActive ? "text-stone-900" : "text-stone-400 group-hover:text-stone-600")}>
+                  {item.icon}
+                </span>
                 {item.label}
               </Link>
             )
           })}
-        </nav>
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-stone-100">
-          <button className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-stone-500 hover:text-stone-900 hover:bg-stone-50 w-full">
-            <LogOut size={16} />
+
+          <button className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-stone-500 hover:text-stone-900 hover:bg-white transition-all duration-200 w-full text-left group">
+            <span className="shrink-0 text-stone-400 group-hover:text-stone-600 transition-colors">
+              <LogOut size={20} />
+            </span>
             로그아웃
           </button>
         </div>
-      </div>
+      </aside>
 
-      {/* ────────── 메인 콘텐츠 ────────── */}
-      <main className="max-w-[1440px] mx-auto">
-        {children}
-      </main>
+      {/* ────────── Main Content Area ────────── */}
+      <div className="flex-1 flex flex-col min-w-0 bg-stone-50">
+
+        {/* Top Header */}
+        <header className="h-16 flex items-center justify-between px-4 lg:px-8 border-b border-stone-100 bg-white/70 backdrop-blur-md sticky top-0 z-20 shrink-0">
+          <div className="flex items-center gap-3">
+            <button
+              className="lg:hidden p-2 -ml-2 rounded-md text-stone-500 hover:text-stone-900 hover:bg-stone-100 transition-colors"
+              onClick={() => setIsMobileMenuOpen(true)}
+            >
+              <Menu size={20} />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <button className="relative p-2 rounded-full text-stone-400 hover:text-stone-800 hover:bg-stone-100 transition-colors">
+              <Bell size={20} />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500 border-2 border-white"></span>
+            </button>
+
+            <button className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full hover:bg-stone-100 transition-colors border border-transparent hover:border-stone-200">
+              <div className="w-8 h-8 rounded-full bg-stone-200 flex items-center justify-center shrink-0">
+                <span className="text-xs font-semibold text-stone-600">나</span>
+              </div>
+              <ChevronDown size={14} className="text-stone-400 hidden sm:block" />
+            </button>
+          </div>
+        </header>
+
+        {/* Scrollable Page Content */}
+        <main className="flex-1 overflow-y-auto w-full">
+          <div className="w-full h-full p-4 lg:p-8 max-w-[1440px] mx-auto">
+            {children}
+          </div>
+        </main>
+      </div>
     </div>
   )
 }
