@@ -120,7 +120,7 @@ async function collectRealPrice(
 ): Promise<any[]> {
   const now = new Date()
   const months: string[] = []
-  for (let i = 0; i < 3; i++) {
+  for (let i = 1; i <= 6; i++) {  // 최근 6개월 (1달 전부터 - 당월은 데이터 없음)
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
     months.push(`${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}`)
   }
@@ -167,11 +167,20 @@ async function collectRealPrice(
         // <item> 블록 파싱
         const itemBlocks = [...text.matchAll(/<item>([\s\S]*?)<\/item>/g)].map(m => m[1])
         console.log('[RealPrice]', svcName, ym, 'items:', itemBlocks.length)
+        if (itemBlocks.length > 0) {
+          // 첫 아이템 raw 로그 (금액 파싱 디버그용)
+          console.log('[RealPrice] first item sample:', itemBlocks[0].slice(0, 200))
+        }
         for (const block of itemBlocks) {
-          const amountStr = xmlTagValue(block, '거래금액')
-          const amount = amountStr ? parseInt(amountStr.replace(/,/g, '').trim()) : null
+          // 금액: 공백/쉼표 제거 후 파싱 (EUC-KR 인코딩 대비 Buffer 변환 없이 정규식 사용)
+          const amountRaw = xmlTagValue(block, '거래금액')
+          const amount = amountRaw ? parseInt(amountRaw.replace(/[^0-9]/g, '').trim()) || null : null
+          // 실제 계약일 사용 (XML에서 년/월 추출)
+          const yr = xmlTagValue(block, '년') ?? xmlTagValue(block, '계약년도')
+          const mo = xmlTagValue(block, '월') ?? xmlTagValue(block, '계약월')
+          const dealYm = (yr && mo) ? `${yr}${mo.padStart(2, '0')}` : ym
           allItems.push({
-            deal_ym: ym,
+            deal_ym: dealYm,
             amount,
             area:    parseFloat(xmlTagValue(block, '전용면적') ?? '0') || null,
             floor:   xmlTagValue(block, '층'),
