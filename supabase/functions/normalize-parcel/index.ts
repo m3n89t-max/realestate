@@ -176,20 +176,19 @@ async function collectRealPrice(
           console.log('[RealPrice] first item sample:', itemBlocks[0].slice(0, 200))
         }
         for (const block of itemBlocks) {
-          // 금액: 공백/쉼표 제거 후 파싱 (EUC-KR 인코딩 대비 Buffer 변환 없이 정규식 사용)
-          const amountRaw = xmlTagValue(block, '거래금액')
-          const amount = amountRaw ? parseInt(amountRaw.replace(/[^0-9]/g, '').trim()) || null : null
-          // 실제 계약일 사용 (XML에서 년/월 추출)
-          const yr = xmlTagValue(block, '년') ?? xmlTagValue(block, '계약년도')
-          const mo = xmlTagValue(block, '월') ?? xmlTagValue(block, '계약월')
+          // 국토부 API가 영문 필드명으로 변경됨 (한글 태그 병행 지원)
+          const amountRaw = xmlTagValue(block, 'dealAmount') ?? xmlTagValue(block, '거래금액')
+          const amount = amountRaw ? parseInt(amountRaw.replace(/[^0-9]/g, '')) || null : null
+          const yr = xmlTagValue(block, 'dealYear')  ?? xmlTagValue(block, '년') ?? xmlTagValue(block, '계약년도')
+          const mo = xmlTagValue(block, 'dealMonth') ?? xmlTagValue(block, '월') ?? xmlTagValue(block, '계약월')
           const dealYm = (yr && mo) ? `${yr}${mo.padStart(2, '0')}` : ym
           allItems.push({
             deal_ym: dealYm,
             amount,
-            area:    parseFloat(xmlTagValue(block, '전용면적') ?? '0') || null,
-            floor:   xmlTagValue(block, '층'),
-            name:    xmlTagValue(block, '아파트') ?? xmlTagValue(block, '건물명'),
-            dong:    xmlTagValue(block, '법정동') ?? xmlTagValue(block, '법정동명'),
+            area:    parseFloat(xmlTagValue(block, 'excluUseAr') ?? xmlTagValue(block, '전용면적') ?? '0') || null,
+            floor:   xmlTagValue(block, 'floor') ?? xmlTagValue(block, '층'),
+            name:    xmlTagValue(block, 'aptNm')  ?? xmlTagValue(block, '아파트') ?? xmlTagValue(block, '건물명'),
+            dong:    xmlTagValue(block, 'umdNm')  ?? xmlTagValue(block, '법정동') ?? xmlTagValue(block, '법정동명'),
             type:    svcName,
           })
         }
