@@ -55,56 +55,50 @@ async function collectPOI(lat: number, lng: number, kakaoKey: string): Promise<R
   return results
 }
 
-// ── 토지이용규제 API 수집 (국토교통부_토지이용규제정보서비스) ──
+// ── XML 파싱 헬퍼 (실거래가 API용) ──────────────────────────
 function xmlTagValue(xml: string, tag: string): string | null {
   const m = xml.match(new RegExp(`<${tag}>([^<]*)</${tag}>`))
   return m ? m[1].trim() || null : null
 }
 
+// ── 토지이용계획 수집 (VWorld 2D 데이터 API) ─────────────────
+// 기존 arLandUseInfoService는 행위제한 조회용 (필지 조회 불가)
+// VWorld LT_C_LHBLPN: 필지 PNU로 용도지역지구 조회
 async function collectLandUse(
   sigunguCd: string,
   bjdongCd: string,
   bun: string,
   ji: string,
-  apiKey: string
+  vworldKey: string
 ): Promise<any[]> {
-  // serviceKey를 URLSearchParams에 넣으면 이중 인코딩 → 인증 실패
-  // 공공데이터포털 키는 이미 URL-encoded이므로 raw로 연결
-  const params = new URLSearchParams({
-    sigunguCd,
-    bjdongCd,
-    bun,
-    ji,
-    numOfRows: '20',
-    pageNo: '1',
-  })
-  const url = `https://apis.data.go.kr/1613000/arLandUseInfoService/DTarLandUseInfo?serviceKey=${apiKey}&${params}`
+  // PNU 19자리: 시군구(5) + 법정동(5) + 산구분(1,0=대지) + 본번(4) + 부번(4)
+  const pnu = `${sigunguCd}${bjdongCd}0${bun}${ji}`
+  const url = `https://api.vworld.kr/req/data?service=data&request=GetFeature&data=LT_C_LHBLPN&key=${vworldKey}&attrFilter=pnu:=:${pnu}&format=json&geometry=false&pagenum=1&pagesize=20`
 
-  console.log('[LandUse] request:', { sigunguCd, bjdongCd, bun, ji })
+  console.log('[LandUse] VWorld PNU:', pnu)
   const res = await fetch(url)
-  if (!res.ok) throw new Error(`토지이용규제 API HTTP 오류: ${res.status}`)
-
-  const text = await res.text()
-  console.log('[LandUse] response preview:', text.slice(0, 400))
-
-  // 에러 응답 체크 - 공공데이터포털 에러 포맷: <ERROR_CODE>, 정상 포맷: <resultCode>
-  const resultCode = xmlTagValue(text, 'resultCode') ?? xmlTagValue(text, 'ERROR_CODE')
-  if (resultCode && resultCode !== '00' && resultCode !== '000' && resultCode !== '0000') {
-    const msg = xmlTagValue(text, 'resultMsg') ?? xmlTagValue(text, 'ERROR_MSG') ?? resultCode
-    console.error('[LandUse] API 오류 코드:', resultCode, msg)
+  if (!res.ok) {
+    console.error('[LandUse] VWorld HTTP error:', res.status)
     return []
   }
 
-  // <item> 블록 추출
-  const itemBlocks = [...text.matchAll(/<item>([\s\S]*?)<\/item>/g)].map(m => m[1])
-  console.log('[LandUse] items found:', itemBlocks.length)
+  const data = await res.json()
+  console.log('[LandUse] VWorld status:', data?.response?.status)
 
-  return itemBlocks.map(block => ({
-    zone_name:  xmlTagValue(block, 'prposAreaDstrcNm')   ?? xmlTagValue(block, 'lndcgrCodeNm') ?? null,
-    zone_code:  xmlTagValue(block, 'prposAreaDstrcCdNm') ?? xmlTagValue(block, 'lndcgrCode')   ?? null,
-    reg_date:   xmlTagValue(block, 'regStrDate')         ?? null,
-    law_name:   xmlTagValue(block, 'refLawNm')           ?? null,
-    group_name: xmlTagValue(block, 'manageGroupNm')      ?? null,
+  if (data?.response?.status !== 'OK') {
+    console.error('[LandUse] VWorld error:', JSON.stringify(data?.response).slice(0, 300))
+    return []
+  }
+
+  const features: any[] = data?.response?.result?.featureCollection?.features ?? []
+  console.log('[LandUse] features found:', features.length)
+
+  return features.map((f: any) => ({
+    zone_name:  f.properties?.prposAreaDstrcCodeNm ?? null,
+    zone_code:  f.properties?.prposAreaDstrcCode   ?? null,
+    reg_date:   f.properties?.lastUpdtDt           ?? null,
+    law_name:   null,
+    group_name: f.properties?.ldCodeNm             ?? null,
   }))
 }
 
@@ -301,10 +295,11 @@ Deno.serve(async (req) => {
 
     // ── 2. 데이터 수집 (병렬) ────────────────────────────────
     const publicApiKey = Deno.env.get('PUBLIC_DATA_API_KEY') ?? Deno.env.get('BUILDING_API_KEY') ?? ''
+    const vworldKey    = Deno.env.get('VWORLD_API_KEY') ?? ''
 
     const [poiResult, landUseResult, realPriceResult] = await Promise.allSettled([
       collectPOI(lat, lng, kakaoKey),
-      (publicApiKey && sigungu_code && bjdong_code) ? collectLandUse(sigungu_code, bjdong_code, bun, ji, publicApiKey) : Promise.resolve(null),
+      (vworldKey && sigungu_code && bjdong_code) ? collectLandUse(sigungu_code, bjdong_code, bun, ji, vworldKey) : Promise.resolve(null),
       (publicApiKey && sigungu_code) ? collectRealPrice(sigungu_code, project.property_type ?? null, publicApiKey) : Promise.resolve(null),
     ])
 
