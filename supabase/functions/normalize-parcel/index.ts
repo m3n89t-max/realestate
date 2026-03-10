@@ -85,14 +85,14 @@ async function collectLandUse(
   if (!res.ok) throw new Error(`토지이용규제 API HTTP 오류: ${res.status}`)
 
   const text = await res.text()
-  console.log('[LandUse] response preview:', text.slice(0, 300))
+  console.log('[LandUse] response preview:', text.slice(0, 400))
 
-  // 에러 응답 체크
-  const resultCode = xmlTagValue(text, 'resultCode')
-  if (resultCode && resultCode !== '00' && resultCode !== '0000') {
-    const msg = xmlTagValue(text, 'resultMsg') ?? resultCode
+  // 에러 응답 체크 - 공공데이터포털 에러 포맷: <ERROR_CODE>, 정상 포맷: <resultCode>
+  const resultCode = xmlTagValue(text, 'resultCode') ?? xmlTagValue(text, 'ERROR_CODE')
+  if (resultCode && resultCode !== '00' && resultCode !== '000' && resultCode !== '0000') {
+    const msg = xmlTagValue(text, 'resultMsg') ?? xmlTagValue(text, 'ERROR_MSG') ?? resultCode
     console.error('[LandUse] API 오류 코드:', resultCode, msg)
-    return []  // 에러 시 빈 배열 (throw 아님 - null로 저장되지 않도록)
+    return []
   }
 
   // <item> 블록 추출
@@ -162,10 +162,10 @@ async function collectRealPrice(
           return
         }
 
-        // 에러 코드 체크
-        const resultCode = xmlTagValue(text, 'resultCode')
-        if (resultCode && resultCode !== '00' && resultCode !== '0000') {
-          const msg = xmlTagValue(text, 'returnReasonCode') ?? xmlTagValue(text, 'resultMsg') ?? resultCode
+        // 에러 코드 체크 - 성공: '00', '000', '0000' / 에러: 그 외
+        const resultCode = xmlTagValue(text, 'resultCode') ?? xmlTagValue(text, 'ERROR_CODE')
+        if (resultCode && resultCode !== '00' && resultCode !== '000' && resultCode !== '0000') {
+          const msg = xmlTagValue(text, 'returnReasonCode') ?? xmlTagValue(text, 'resultMsg') ?? xmlTagValue(text, 'ERROR_MSG') ?? resultCode
           console.error('[RealPrice] API 오류:', svcName, ym, resultCode, msg)
           return
         }
