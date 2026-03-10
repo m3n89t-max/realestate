@@ -71,14 +71,26 @@ function WorkflowStatus({ steps }: { steps: WorkflowStep[] }) {
 }
 
 // ── AI 분석 보고서 섹션 ───────────────────────────────────────
-function AIAnalysisReport({ analysis, projectId }: {
+function AIAnalysisReport({ analysis, projectId, hasCoords, hasPOI, hasRealPrice }: {
   analysis: any
   projectId: string
+  hasCoords: boolean
+  hasPOI: boolean
+  hasRealPrice: boolean
 }) {
   const [loading, setLoading] = useState(false)
   const supabase = createClient()
 
+  // 선행 조건 체크
+  const prereqs = [
+    { label: '좌표 변환', done: hasCoords },
+    { label: 'POI 수집',  done: hasPOI },
+    { label: '부동산 데이터', done: hasRealPrice },
+  ]
+  const canAnalyze = prereqs.every(p => p.done)
+
   const runAnalysis = async () => {
+    if (!canAnalyze) return
     setLoading(true)
     try {
       const { error } = await supabase.functions.invoke('analyze-location', {
@@ -99,10 +111,35 @@ function AIAnalysisReport({ analysis, projectId }: {
       <div className="card p-8 text-center border-2 border-dashed border-gray-200">
         <MapPin size={36} className="mx-auto text-gray-300 mb-3" />
         <p className="font-medium text-gray-600 mb-1">AI 입지 분석 미실행</p>
-        <p className="text-sm text-gray-400 mb-4">POI · 토지이용규제 · 실거래가 데이터를 기반으로 AI가 종합 분석합니다</p>
-        <button onClick={runAnalysis} disabled={loading} className="btn-primary">
+        <p className="text-sm text-gray-400 mb-3">좌표 변환 → POI 수집 → 부동산 데이터 수집 완료 후 실행 가능합니다</p>
+
+        {/* 선행 조건 체크리스트 */}
+        <div className="flex items-center justify-center gap-3 mb-5">
+          {prereqs.map((p, i) => (
+            <div key={i} className="flex items-center gap-1.5">
+              {p.done
+                ? <CheckCircle2 size={13} className="text-green-500" />
+                : <div className="w-3 h-3 rounded-full border-2 border-gray-300" />
+              }
+              <span className={`text-xs ${p.done ? 'text-green-600 font-medium' : 'text-gray-400'}`}>{p.label}</span>
+              {i < prereqs.length - 1 && <span className="text-gray-200 ml-1">→</span>}
+            </div>
+          ))}
+        </div>
+
+        <button
+          onClick={runAnalysis}
+          disabled={loading || !canAnalyze}
+          className="btn-primary disabled:opacity-40 disabled:cursor-not-allowed"
+          title={!canAnalyze ? '선행 데이터 수집이 필요합니다' : undefined}
+        >
           {loading ? <><Loader2 size={14} className="animate-spin" /> 분석 중...</> : <><RefreshCw size={14} /> AI 분석 실행</>}
         </button>
+        {!canAnalyze && (
+          <p className="text-xs text-amber-600 mt-2">
+            미완료 항목: {prereqs.filter(p => !p.done).map(p => p.label).join(', ')}
+          </p>
+        )}
       </div>
     )
   }
@@ -405,7 +442,13 @@ const hasRealPrice = project.real_price_data != null
       </div>
 
       {/* AI 분석 보고서 */}
-      <AIAnalysisReport analysis={locationAnalysis} projectId={projectId} />
+      <AIAnalysisReport
+        analysis={locationAnalysis}
+        projectId={projectId}
+        hasCoords={!!(project.lat && project.lng)}
+        hasPOI={hasPOI}
+        hasRealPrice={hasRealPrice}
+      />
 
       {/* 수집 데이터 3단 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
