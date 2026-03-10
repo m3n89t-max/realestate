@@ -4,11 +4,12 @@ import { useState } from 'react'
 import {
   MapPin, TrendingUp, Building2, Target, FileText,
   Loader2, CheckCircle2, AlertCircle, RefreshCw, ChevronDown, ChevronUp,
-  Train, ShoppingCart, Hospital, GraduationCap, Coffee, Pill, Landmark
+  Train, ShoppingCart, Hospital, GraduationCap, Coffee, Pill, Landmark,
+  ExternalLink, Navigation
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
-import type { POIItem, LandUseItem, RealPriceItem } from '@/lib/types'
+import type { POIItem, RealPriceItem } from '@/lib/types'
 
 // ── POI 아이콘 맵 ─────────────────────────────────────────────
 const POI_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
@@ -236,22 +237,91 @@ function POISection({ poi_data }: { poi_data: Record<string, POIItem[]> }) {
   )
 }
 
-// ── 토지이용규제 섹션 ─────────────────────────────────────────
-function LandUseSection({ land_use_data }: { land_use_data: LandUseItem[] }) {
-  if (!land_use_data.length) return (
-    <div className="text-center py-6 text-gray-400 text-sm">토지이용규제 데이터 없음</div>
+// ── 지도 + 주변시설/시세 섹션 ────────────────────────────────
+function MapSection({
+  lat, lng, poi_data, real_price_data,
+}: {
+  lat: number | null
+  lng: number | null
+  poi_data: Record<string, POIItem[]> | null
+  real_price_data: RealPriceItem[] | null
+}) {
+  if (!lat || !lng) return (
+    <div className="text-center py-6 text-gray-400 text-sm">좌표 없음</div>
   )
+
+  // POI 요약: 6개 카테고리 중 가장 가까운 것
+  const poiSummary = SHOW_POI.slice(0, 6).map(key => {
+    const items = poi_data?.[key] ?? []
+    const nearest = items[0]
+    return nearest ? { key, cfg: POI_CONFIG[key], nearest } : null
+  }).filter(Boolean) as { key: string; cfg: typeof POI_CONFIG[string]; nearest: POIItem }[]
+
+  // 실거래가 요약
+  const amounts = (real_price_data ?? []).map(t => t.amount).filter((a): a is number => a !== null && a > 0)
+  const avgPrice = amounts.length ? Math.round(amounts.reduce((s, a) => s + a, 0) / amounts.length) : null
+  const maxPrice = amounts.length ? Math.max(...amounts) : null
+
   return (
-    <div className="space-y-2">
-      {land_use_data.slice(0, 10).map((item, i) => (
-        <div key={i} className="flex items-start justify-between gap-2 text-sm py-2 border-b border-gray-50 last:border-0">
-          <span className="font-medium text-gray-800">{item.zone_name ?? '-'}</span>
-          <div className="text-right flex-shrink-0">
-            {item.law_name && <p className="text-xs text-gray-500">{item.law_name}</p>}
-            {item.reg_date && <p className="text-xs text-gray-400">지정: {item.reg_date}</p>}
+    <div className="space-y-3">
+      {/* 지도 이미지 */}
+      <div className="relative rounded-lg overflow-hidden border border-gray-100 bg-gray-100" style={{ height: 200 }}>
+        <img
+          src={`/api/map?lat=${lat}&lng=${lng}&w=600&h=400&level=4`}
+          alt="매물 위치 지도"
+          className="w-full h-full object-cover"
+        />
+        <a
+          href={`https://map.kakao.com/link/map/${lat},${lng}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="absolute bottom-2 right-2 flex items-center gap-1 bg-white/90 backdrop-blur-sm text-xs text-gray-600 px-2 py-1 rounded-full shadow hover:bg-white"
+        >
+          <ExternalLink size={10} />
+          카카오지도
+        </a>
+      </div>
+
+      {/* POI 요약 */}
+      {poiSummary.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1">
+            <Navigation size={10} /> 주변시설
+          </p>
+          <div className="grid grid-cols-2 gap-1.5">
+            {poiSummary.map(({ key, cfg, nearest }) => (
+              <div key={key} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                <span className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${cfg.color}`}>
+                  {cfg.icon}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-gray-700 truncate">{nearest.name}</p>
+                  <p className="text-xs text-gray-400">{distanceLabel(nearest.distance_m)}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-      ))}
+      )}
+
+      {/* 주변 시세 요약 */}
+      {avgPrice && (
+        <div className="p-3 bg-brand-50 rounded-lg border border-brand-100">
+          <p className="text-xs font-semibold text-brand-600 mb-2 flex items-center gap-1">
+            <TrendingUp size={10} /> 주변 시세 ({amounts.length}건)
+          </p>
+          <div className="flex gap-4">
+            <div>
+              <p className="text-xs text-gray-400">평균</p>
+              <p className="text-sm font-bold text-brand-700">{formatAmount(avgPrice)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400">최고</p>
+              <p className="text-sm font-bold text-red-600">{formatAmount(maxPrice)}</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -324,15 +394,13 @@ interface AnalysisTabProps {
 export default function AnalysisTab({ projectId, project, locationAnalysis }: AnalysisTabProps) {
   const hasPOI       = project.poi_data != null && Object.keys(project.poi_data).length > 0
   // 빈 배열이어도 수집 시도된 것으로 간주 (해당 지역 데이터 없음)
-  const hasLandUse   = project.land_use_data != null
-  const hasRealPrice = project.real_price_data != null
+const hasRealPrice = project.real_price_data != null
   const hasAnalysis  = !!locationAnalysis
 
   const workflowSteps = [
     { label: '좌표 변환',   done: !!(project.lat && project.lng) },
     { label: 'POI 수집',    done: hasPOI },
     { label: '부동산 데이터', done: hasRealPrice },
-    { label: '개발 정보',   done: hasLandUse },
     { label: '입지 분석',   done: hasAnalysis },
   ]
 
@@ -342,7 +410,7 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
       <div className="card p-4">
         <p className="text-xs text-gray-400 mb-3 font-medium uppercase tracking-wide">데이터 수집 현황</p>
         <WorkflowStatus steps={workflowSteps} />
-        {(!hasPOI || !hasLandUse || !hasRealPrice) && (
+        {(!hasPOI || !hasRealPrice) && (
           <div className="flex items-center gap-2 mt-3 p-2.5 bg-amber-50 rounded-lg">
             <AlertCircle size={13} className="text-amber-500 flex-shrink-0" />
             <p className="text-xs text-amber-700">
@@ -369,16 +437,18 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
           }
         </div>
 
-        {/* 토지이용규제 */}
+        {/* 지도 */}
         <div className="card p-5">
           <h3 className="section-title mb-4 flex items-center gap-2">
-            <Building2 size={15} className="text-brand-500" />
-            개발 정보 (토지이용규제)
+            <MapPin size={15} className="text-brand-500" />
+            매물 위치
           </h3>
-          {hasLandUse
-            ? <LandUseSection land_use_data={project.land_use_data} />
-            : <div className="text-center py-6 text-gray-400 text-sm">데이터 없음</div>
-          }
+          <MapSection
+            lat={project.lat}
+            lng={project.lng}
+            poi_data={project.poi_data}
+            real_price_data={project.real_price_data}
+          />
         </div>
 
         {/* 실거래가 */}
