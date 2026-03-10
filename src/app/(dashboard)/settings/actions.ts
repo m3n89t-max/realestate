@@ -32,3 +32,20 @@ export async function generateAgentKey(orgId: string) {
     revalidatePath('/settings')
     return { success: true, key: agentKey }
 }
+
+export async function deleteAgentKey(agentId: string, orgId: string) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Unauthorized')
+
+    const { error } = await supabase
+        .from('agent_connections')
+        .delete()
+        .eq('id', agentId)
+        .eq('org_id', orgId)
+
+    if (error) throw new Error('삭제에 실패했습니다.')
+
+    revalidatePath('/settings')
+    return { success: true }
+}

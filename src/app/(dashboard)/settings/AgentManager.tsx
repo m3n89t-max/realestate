@@ -1,9 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Copy, Plus, Check } from 'lucide-react'
+import { Copy, Plus, Check, Trash2 } from 'lucide-react'
 import StatusBadge from '@/components/ui/StatusBadge'
-import { generateAgentKey } from './actions'
+import { generateAgentKey, deleteAgentKey } from './actions'
 import toast from 'react-hot-toast'
 
 interface Agent {
@@ -19,6 +19,7 @@ interface Agent {
 export default function AgentManager({ orgId, initialAgents }: { orgId: string, initialAgents: Agent[] }) {
     const [isGenerating, setIsGenerating] = useState(false)
     const [copiedKey, setCopiedKey] = useState<string | null>(null)
+    const [deletingId, setDeletingId] = useState<string | null>(null)
 
     const handleCopy = (key: string) => {
         navigator.clipboard.writeText(key)
@@ -39,6 +40,19 @@ export default function AgentManager({ orgId, initialAgents }: { orgId: string, 
             toast.error(e.message || '연결키 발급에 실패했습니다.')
         } finally {
             setIsGenerating(false)
+        }
+    }
+
+    const handleDelete = async (agentId: string, agentName: string) => {
+        if (!confirm(`"${agentName}" 연결키를 삭제하시겠습니까?\n삭제하면 해당 에이전트는 더 이상 연결되지 않습니다.`)) return
+        try {
+            setDeletingId(agentId)
+            await deleteAgentKey(agentId, orgId)
+            toast.success('연결키가 삭제되었습니다.')
+        } catch (e: any) {
+            toast.error(e.message || '삭제에 실패했습니다.')
+        } finally {
+            setDeletingId(null)
         }
     }
 
@@ -65,7 +79,7 @@ export default function AgentManager({ orgId, initialAgents }: { orgId: string, 
                 <div className="space-y-3">
                     {initialAgents.map(agent => (
                         <div key={agent.id} className="flex items-center justify-between p-3 rounded-lg border border-gray-200">
-                            <div>
+                            <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2">
                                     <StatusBadge status={agent.status} size="sm" />
                                     <p className="text-sm font-medium text-gray-800">{agent.name ?? '에이전트'}</p>
@@ -74,15 +88,25 @@ export default function AgentManager({ orgId, initialAgents }: { orgId: string, 
                                     {agent.platform} · v{agent.version}
                                     {agent.last_seen_at && ` · 마지막 연결: ${new Date(agent.last_seen_at).toLocaleDateString('ko-KR')}`}
                                 </p>
-                                <p className="text-xs text-brand-600 mt-1 font-mono">{agent.agent_key}</p>
+                                <p className="text-xs text-brand-600 mt-1 font-mono truncate">{agent.agent_key}</p>
                             </div>
-                            <button
-                                onClick={() => handleCopy(agent.agent_key)}
-                                className="text-xs text-gray-500 hover:text-gray-800 flex items-center gap-1 bg-gray-50 px-2 py-1 rounded"
-                            >
-                                {copiedKey === agent.agent_key ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
-                                {copiedKey === agent.agent_key ? '복사됨' : '키 복사'}
-                            </button>
+                            <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                                <button
+                                    onClick={() => handleCopy(agent.agent_key)}
+                                    className="text-xs text-gray-500 hover:text-gray-800 flex items-center gap-1 bg-gray-50 px-2 py-1 rounded"
+                                >
+                                    {copiedKey === agent.agent_key ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                                    {copiedKey === agent.agent_key ? '복사됨' : '복사'}
+                                </button>
+                                <button
+                                    onClick={() => handleDelete(agent.id, agent.name ?? '에이전트')}
+                                    disabled={deletingId === agent.id}
+                                    className="text-xs text-red-400 hover:text-red-600 flex items-center gap-1 bg-red-50 hover:bg-red-100 px-2 py-1 rounded disabled:opacity-50"
+                                >
+                                    <Trash2 size={12} />
+                                    {deletingId === agent.id ? '삭제 중' : '삭제'}
+                                </button>
+                            </div>
                         </div>
                     ))}
                     <button

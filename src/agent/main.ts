@@ -73,6 +73,31 @@ ipcMain.handle('save-config', (_event, data: { url: string; anon_key: string; ag
     }
 });
 
+// ─── IPC: SNS 자격증명 저장 ──────────────────────────────────
+ipcMain.handle('save-credentials', (_event, data: {
+    naver?: { id?: string; pw?: string };
+    google?: { email?: string; pw?: string };
+    instagram?: { id?: string; pw?: string };
+}) => {
+    try {
+        if (!fs.existsSync(CONFIG_DIR)) fs.mkdirSync(CONFIG_DIR, { recursive: true });
+        const credPath = path.join(CONFIG_DIR, 'credentials.json');
+        // 기존 데이터 유지하며 병합
+        let existing: Record<string, any> = {};
+        if (fs.existsSync(credPath)) {
+            try { existing = JSON.parse(fs.readFileSync(credPath, 'utf-8')); } catch { }
+        }
+        const merged = { ...existing };
+        if (data.naver?.id || data.naver?.pw) merged.naver = data.naver;
+        if (data.google?.email || data.google?.pw) merged.google = data.google;
+        if (data.instagram?.id || data.instagram?.pw) merged.instagram = data.instagram;
+        fs.writeFileSync(credPath, JSON.stringify(merged, null, 2));
+        return { ok: true };
+    } catch (e: any) {
+        return { ok: false, error: e.message };
+    }
+});
+
 // ─── IPC: 설정 완료 → 에이전트 시작 ─────────────────────────
 ipcMain.handle('config-saved', async () => {
     mainWindow?.close();

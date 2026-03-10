@@ -2,115 +2,382 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>부동산 AI 에이전트 초기 설정</title>
+  <title>부동산 AI 에이전트 설정</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: 'Malgun Gothic', sans-serif;
-      background: #f0f4f8;
+      font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+      background: linear-gradient(135deg, #f0f4f8 0%, #e8f4fd 100%);
       display: flex; align-items: center; justify-content: center;
-      min-height: 100vh; padding: 24px;
+      min-height: 100vh; padding: 20px;
     }
     .card {
-      background: white; border-radius: 16px;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.10);
-      padding: 40px 36px; width: 100%; max-width: 480px;
+      background: white; border-radius: 20px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.12);
+      width: 100%; max-width: 500px; overflow: hidden;
     }
-    .logo { font-size: 28px; font-weight: 700; color: #0ea5e9; margin-bottom: 4px; }
-    .subtitle { font-size: 14px; color: #64748b; margin-bottom: 32px; }
+    .card-header {
+      background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+      padding: 28px 36px 24px;
+      color: white;
+    }
+    .logo { font-size: 26px; font-weight: 800; margin-bottom: 4px; }
+    .tagline { font-size: 13px; opacity: 0.85; }
+    .card-body { padding: 28px 36px 32px; }
+
+    /* 단계 표시기 */
+    .steps {
+      display: flex; align-items: center; gap: 0;
+      margin-bottom: 28px;
+    }
+    .step-item {
+      display: flex; flex-direction: column; align-items: center;
+      flex: 1; position: relative;
+    }
+    .step-item:not(:last-child)::after {
+      content: '';
+      position: absolute; top: 14px; left: calc(50% + 14px);
+      width: calc(100% - 28px); height: 2px;
+      background: #e2e8f0;
+    }
+    .step-item.done:not(:last-child)::after { background: #0ea5e9; }
+    .step-circle {
+      width: 28px; height: 28px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700;
+      background: #e2e8f0; color: #94a3b8;
+      z-index: 1; margin-bottom: 6px;
+      transition: all 0.3s;
+    }
+    .step-item.active .step-circle { background: #0ea5e9; color: white; }
+    .step-item.done .step-circle { background: #0ea5e9; color: white; }
+    .step-item.done .step-circle::before { content: '✓'; }
+    .step-label { font-size: 11px; color: #94a3b8; text-align: center; }
+    .step-item.active .step-label { color: #0ea5e9; font-weight: 600; }
+
+    /* 패널 */
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* 입력 */
+    .field { margin-bottom: 18px; }
     label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px; }
-    input {
+    .label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .badge {
+      font-size: 10px; padding: 2px 8px; border-radius: 10px;
+      background: #fef3c7; color: #92400e; font-weight: 600;
+    }
+    .badge.optional { background: #f1f5f9; color: #64748b; }
+    input[type="text"], input[type="password"], input[type="email"] {
       width: 100%; padding: 10px 14px; border: 1.5px solid #e2e8f0;
       border-radius: 10px; font-size: 14px; outline: none;
-      transition: border-color 0.2s; margin-bottom: 20px;
+      transition: border-color 0.2s; background: #fafafa;
     }
-    input:focus { border-color: #0ea5e9; }
-    .hint { font-size: 11px; color: #94a3b8; margin-top: -16px; margin-bottom: 20px; }
-    button {
-      width: 100%; padding: 13px; background: #0ea5e9;
-      color: white; border: none; border-radius: 10px;
-      font-size: 15px; font-weight: 600; cursor: pointer;
-      transition: background 0.2s;
+    input:focus { border-color: #0ea5e9; background: white; }
+    .hint { font-size: 11px; color: #94a3b8; margin-top: 5px; line-height: 1.5; }
+    .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    /* 섹션 구분 */
+    .section-title {
+      font-size: 13px; font-weight: 700; color: #1e293b;
+      padding: 10px 0 8px; margin-top: 8px;
+      display: flex; align-items: center; gap: 8px;
+      border-bottom: 1px solid #f1f5f9; margin-bottom: 16px;
     }
-    button:hover { background: #0284c7; }
-    button:disabled { background: #94a3b8; cursor: not-allowed; }
-    .error { color: #ef4444; font-size: 13px; margin-top: 12px; display: none; }
-    .success { color: #10b981; font-size: 13px; margin-top: 12px; display: none; }
-    .divider { border: none; border-top: 1px solid #f1f5f9; margin: 24px 0; }
+
+    /* 버튼 */
+    .btn-row { display: flex; gap: 10px; margin-top: 24px; }
+    .btn {
+      flex: 1; padding: 12px; border: none; border-radius: 10px;
+      font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-primary { background: #0ea5e9; color: white; }
+    .btn-primary:hover { background: #0284c7; }
+    .btn-primary:disabled { background: #94a3b8; cursor: not-allowed; }
+    .btn-secondary { background: #f1f5f9; color: #64748b; }
+    .btn-secondary:hover { background: #e2e8f0; }
+    .btn-skip { font-size: 12px; color: #94a3b8; background: none; border: none;
+      cursor: pointer; text-decoration: underline; width: 100%;
+      text-align: center; margin-top: 10px; }
+    .btn-skip:hover { color: #64748b; }
+
+    /* 알림 박스 */
     .info-box {
       background: #f0f9ff; border: 1px solid #bae6fd;
-      border-radius: 10px; padding: 14px 16px;
-      font-size: 12px; color: #0369a1; margin-bottom: 24px; line-height: 1.6;
+      border-radius: 10px; padding: 12px 14px;
+      font-size: 12px; color: #0369a1; line-height: 1.6; margin-bottom: 20px;
     }
+    .warn-box {
+      background: #fff7ed; border: 1px solid #fed7aa;
+      border-radius: 10px; padding: 12px 14px;
+      font-size: 12px; color: #9a3412; line-height: 1.6; margin-bottom: 20px;
+    }
+    .error { color: #ef4444; font-size: 12px; margin-top: 10px; display: none; }
+
+    /* 완료 화면 */
+    .done-icon { font-size: 52px; text-align: center; margin: 8px 0 16px; }
+    .done-title { font-size: 20px; font-weight: 700; text-align: center; color: #1e293b; margin-bottom: 8px; }
+    .done-desc { font-size: 13px; color: #64748b; text-align: center; line-height: 1.7; margin-bottom: 24px; }
+    .done-list {
+      background: #f8fafc; border-radius: 10px; padding: 14px 16px;
+      font-size: 12px; color: #475569; line-height: 2; margin-bottom: 20px;
+    }
+    .done-list span { color: #10b981; font-weight: 600; }
   </style>
 </head>
 <body>
   <div class="card">
-    <div class="logo">🏠 부동산 AI OS</div>
-    <div class="subtitle">로컬 자동화 에이전트 초기 설정</div>
-
-    <div class="info-box">
-      Supabase URL과 키는 웹 관리자가 제공합니다.<br>
-      한 번만 입력하면 이후 자동으로 연결됩니다.
+    <div class="card-header">
+      <div class="logo">🏠 부동산 AI OS</div>
+      <div class="tagline">공인중개사를 위한 자동화 에이전트 설정</div>
     </div>
 
-    <label>Supabase URL</label>
-    <input type="text" id="url" placeholder="https://xxxx.supabase.co" />
+    <div class="card-body">
+      <!-- 단계 표시기 -->
+      <div class="steps" id="stepsBar">
+        <div class="step-item active" id="stepItem1">
+          <div class="step-circle" id="stepCircle1">1</div>
+          <div class="step-label">연결 설정</div>
+        </div>
+        <div class="step-item" id="stepItem2">
+          <div class="step-circle" id="stepCircle2">2</div>
+          <div class="step-label">SNS 계정</div>
+        </div>
+        <div class="step-item" id="stepItem3">
+          <div class="step-circle" id="stepCircle3">3</div>
+          <div class="step-label">완료</div>
+        </div>
+      </div>
 
-    <label>Supabase Anon Key</label>
-    <input type="text" id="anon_key" placeholder="sb_publishable_..." />
-    <p class="hint">※ 비밀번호가 아닌 공개 키입니다</p>
+      <!-- STEP 1: 연결 설정 -->
+      <div class="panel active" id="panel1">
+        <div class="info-box">
+          관리자(또는 서비스 담당자)가 제공한 연결 정보를 입력해 주세요.<br>
+          이 정보는 이 PC에만 저장되며 외부로 전송되지 않습니다.
+        </div>
 
-    <label>에이전트 연결키 (Agent Key)</label>
-    <input type="text" id="agent_key" placeholder="agent-..." />
-    <p class="hint">※ 관리자 설정에서 발급받은 키를 입력하세요</p>
+        <div class="field">
+          <div class="label-row">
+            <label>서버 주소 (Supabase URL)</label>
+            <span class="badge">필수</span>
+          </div>
+          <input type="text" id="url" placeholder="https://xxxx.supabase.co" autocomplete="off" />
+          <p class="hint">관리자에게 받은 서버 주소를 입력하세요.</p>
+        </div>
 
-    <label>에이전트 이름 (선택)</label>
-    <input type="text" id="agent_name" placeholder="예: 홍길동 중개사무소" />
+        <div class="field">
+          <div class="label-row">
+            <label>서버 공개키 (Anon Key)</label>
+            <span class="badge">필수</span>
+          </div>
+          <input type="text" id="anon_key" placeholder="eyJhbGci..." autocomplete="off" />
+          <p class="hint">비밀번호가 아닌 공개 키입니다. 관리자에게 받은 키를 입력하세요.</p>
+        </div>
 
-    <hr class="divider">
+        <div class="field">
+          <div class="label-row">
+            <label>에이전트 연결키 (Agent Key)</label>
+            <span class="badge">필수</span>
+          </div>
+          <input type="text" id="agent_key" placeholder="agent-..." autocomplete="off" />
+          <p class="hint">웹사이트 [설정 &gt; 로컬 에이전트]에서 발급받은 키입니다.</p>
+        </div>
 
-    <button id="saveBtn" onclick="save()">설정 저장 및 시작</button>
-    <div class="error" id="errMsg"></div>
-    <div class="success" id="okMsg">✓ 설정 완료! 에이전트를 시작합니다...</div>
+        <div class="field">
+          <div class="label-row">
+            <label>에이전트 이름</label>
+            <span class="badge optional">선택</span>
+          </div>
+          <input type="text" id="agent_name" placeholder="예: 홍길동 중개사무소" autocomplete="off" />
+          <p class="hint">여러 PC를 사용할 경우 구분을 위해 입력하세요.</p>
+        </div>
+
+        <div class="error" id="err1"></div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="goStep2()">다음 단계 &rarr;</button>
+        </div>
+      </div>
+
+      <!-- STEP 2: SNS 계정 -->
+      <div class="panel" id="panel2">
+        <div class="warn-box">
+          아이디/비밀번호는 이 PC에만 저장됩니다.<br>
+          네이버 블로그 자동 업로드에 필요합니다. 나중에 변경할 수 있습니다.
+        </div>
+
+        <div class="section-title">🟢 네이버 계정</div>
+        <div class="input-row field">
+          <div>
+            <label>아이디</label>
+            <input type="text" id="naver_id" placeholder="네이버 아이디" autocomplete="off" />
+          </div>
+          <div>
+            <label>비밀번호</label>
+            <input type="password" id="naver_pw" placeholder="비밀번호" autocomplete="off" />
+          </div>
+        </div>
+
+        <div class="section-title">▶️ 유튜브(구글) 계정 <span style="font-size:11px;font-weight:400;color:#94a3b8">선택</span></div>
+        <div class="input-row field">
+          <div>
+            <label>구글 이메일</label>
+            <input type="email" id="google_email" placeholder="example@gmail.com" autocomplete="off" />
+          </div>
+          <div>
+            <label>비밀번호</label>
+            <input type="password" id="google_pw" placeholder="비밀번호" autocomplete="off" />
+          </div>
+        </div>
+
+        <div class="section-title">📸 인스타그램 계정 <span style="font-size:11px;font-weight:400;color:#94a3b8">선택</span></div>
+        <div class="input-row field">
+          <div>
+            <label>아이디</label>
+            <input type="text" id="instagram_id" placeholder="인스타 아이디" autocomplete="off" />
+          </div>
+          <div>
+            <label>비밀번호</label>
+            <input type="password" id="instagram_pw" placeholder="비밀번호" autocomplete="off" />
+          </div>
+        </div>
+
+        <div class="error" id="err2"></div>
+        <div class="btn-row">
+          <button class="btn btn-secondary" onclick="goPanel(1)">이전</button>
+          <button class="btn btn-primary" id="saveBtn" onclick="saveAll()">설정 완료 및 시작</button>
+        </div>
+        <button class="btn-skip" onclick="saveAll(true)">SNS 계정은 나중에 설정할게요</button>
+      </div>
+
+      <!-- STEP 3: 완료 -->
+      <div class="panel" id="panel3">
+        <div class="done-icon">🎉</div>
+        <div class="done-title">설정 완료!</div>
+        <div class="done-desc">
+          에이전트가 백그라운드에서 실행됩니다.<br>
+          화면 우하단 <strong>트레이 아이콘(🏠)</strong>에서 언제든 열 수 있어요.
+        </div>
+        <div class="done-list">
+          <span>✓</span> 서버 연결 설정 저장됨<br>
+          <span id="naverStatus">✓</span> 네이버 계정 <span id="naverStatusText">저장됨</span><br>
+          <span>✓</span> 에이전트 시작 중...
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
     const { ipcRenderer } = require('electron');
 
-    async function save() {
+    function goPanel(n) {
+      document.querySelectorAll('.panel').forEach((p, i) => {
+        p.classList.toggle('active', i + 1 === n);
+      });
+      // 단계 표시기 업데이트
+      for (let i = 1; i <= 3; i++) {
+        const item = document.getElementById('stepItem' + i);
+        const circle = document.getElementById('stepCircle' + i);
+        if (i < n) {
+          item.className = 'step-item done';
+          circle.textContent = '';
+        } else if (i === n) {
+          item.className = 'step-item active';
+          circle.textContent = i;
+        } else {
+          item.className = 'step-item';
+          circle.textContent = i;
+        }
+      }
+    }
+
+    function showError(id, msg) {
+      const el = document.getElementById(id);
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+    function hideError(id) {
+      document.getElementById(id).style.display = 'none';
+    }
+
+    function goStep2() {
+      hideError('err1');
       const url = document.getElementById('url').value.trim();
       const anon_key = document.getElementById('anon_key').value.trim();
-      const agent_name = document.getElementById('agent_name').value.trim();
       const agent_key = document.getElementById('agent_key').value.trim();
 
-      const errEl = document.getElementById('errMsg');
-      errEl.style.display = 'none';
-
       if (!url || !anon_key || !agent_key) {
-        errEl.textContent = 'Supabase URL, Anon Key, 그리고 연결키(Agent Key)는 필수입니다.';
-        errEl.style.display = 'block';
+        showError('err1', '서버 주소, 공개키, 연결키는 모두 필수입니다.');
         return;
       }
       if (!url.startsWith('https://')) {
-        errEl.textContent = 'URL은 https://로 시작해야 합니다.';
-        errEl.style.display = 'block';
+        showError('err1', '서버 주소는 https://로 시작해야 합니다.');
         return;
       }
+      goPanel(2);
+    }
 
+    async function saveAll(skipSns = false) {
+      hideError('err2');
       const btn = document.getElementById('saveBtn');
       btn.disabled = true;
       btn.textContent = '저장 중...';
 
-      const result = await ipcRenderer.invoke('save-config', { url, anon_key, agent_name, agent_key });
-      if (result.ok) {
-        document.getElementById('okMsg').style.display = 'block';
+      try {
+        const url = document.getElementById('url').value.trim();
+        const anon_key = document.getElementById('anon_key').value.trim();
+        const agent_key = document.getElementById('agent_key').value.trim();
+        const agent_name = document.getElementById('agent_name').value.trim();
+
+        // 1. 서버 설정 저장
+        const cfgResult = await ipcRenderer.invoke('save-config', {
+          url, anon_key, agent_key, agent_name
+        });
+        if (!cfgResult.ok) throw new Error(cfgResult.error);
+
+        // 2. SNS 계정 저장
+        if (!skipSns) {
+          const naver_id = document.getElementById('naver_id').value.trim();
+          const naver_pw = document.getElementById('naver_pw').value.trim();
+          if (naver_id && !naver_pw) {
+            showError('err2', '네이버 비밀번호를 입력해 주세요.');
+            btn.disabled = false;
+            btn.textContent = '설정 완료 및 시작';
+            return;
+          }
+          const credsResult = await ipcRenderer.invoke('save-credentials', {
+            naver: { id: naver_id, pw: naver_pw },
+            google: {
+              email: document.getElementById('google_email').value.trim(),
+              pw: document.getElementById('google_pw').value.trim()
+            },
+            instagram: {
+              id: document.getElementById('instagram_id').value.trim(),
+              pw: document.getElementById('instagram_pw').value.trim()
+            },
+          });
+          if (!credsResult.ok) throw new Error(credsResult.error);
+
+          // 완료 화면에 네이버 상태 표시
+          const hasNaver = naver_id && naver_pw;
+          document.getElementById('naverStatus').textContent = hasNaver ? '✓' : '○';
+          document.getElementById('naverStatusText').textContent = hasNaver ? '저장됨' : '미입력 (나중에 설정 가능)';
+          document.getElementById('naverStatus').style.color = hasNaver ? '#10b981' : '#94a3b8';
+        } else {
+          document.getElementById('naverStatus').textContent = '○';
+          document.getElementById('naverStatusText').textContent = '미입력 (나중에 설정 가능)';
+          document.getElementById('naverStatus').style.color = '#94a3b8';
+        }
+
+        // 3. 완료 화면 표시
+        goPanel(3);
+
+        // 4. 에이전트 시작
         setTimeout(() => ipcRenderer.invoke('config-saved'), 1500);
-      } else {
-        errEl.textContent = '저장 실패: ' + result.error;
-        errEl.style.display = 'block';
+
+      } catch (e) {
+        showError('err2', '저장 실패: ' + e.message);
         btn.disabled = false;
-        btn.textContent = '설정 저장 및 시작';
+        btn.textContent = '설정 완료 및 시작';
       }
     }
   </script>
