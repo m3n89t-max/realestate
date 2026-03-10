@@ -221,8 +221,19 @@ export default function NewProjectPage() {
           .single()
 
         if (error) throw error
-        setProjectId(data.id)
-        toast.success('기본 정보가 저장되었습니다')
+        const newProjectId = data.id
+        setProjectId(newProjectId)
+
+        // normalize-parcel: 주소 정규화 + POI + 토지이용규제 + 실거래가 수집
+        try {
+          await supabase.functions.invoke('normalize-parcel', {
+            body: { parcel_input: form.address, project_id: newProjectId },
+          })
+        } catch (normErr) {
+          console.warn('[normalize-parcel] 비필수 오류 (계속 진행):', normErr)
+        }
+
+        toast.success('기본 정보 및 주변 데이터 수집이 완료되었습니다')
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         toast.error(`저장 실패: ${msg}`)
@@ -250,21 +261,17 @@ export default function NewProjectPage() {
 
       if (!membership) return
 
-      // 입지 분석 작업을 큐에 삽입 (Webhook이 자동으로 Edge Function 호출)
-      await supabase.from('tasks').insert({
-        project_id: projectId,
-        org_id: membership.org_id,
-        type: 'location_analyze',
-        status: 'pending'
+      // 상태 active로 업데이트
+      await supabase.from('projects').update({ status: 'active' }).eq('id', projectId)
+
+      // analyze-location 직접 호출 (실제 POI/토지이용/실거래가 데이터 활용)
+      toast('AI 입지 분석 중... 잠시 기다려주세요', { duration: 8000 })
+      const { error: analyzeErr } = await supabase.functions.invoke('analyze-location', {
+        body: { project_id: projectId },
       })
+      if (analyzeErr) console.warn('[analyze-location] 오류:', analyzeErr)
 
-      // 상태를 active로 업데이트
-      await supabase
-        .from('projects')
-        .update({ status: 'active' })
-        .eq('id', projectId)
-
-      toast.success('매물이 등록되었습니다! 입지 분석은 대시보드에서 진행됩니다.')
+      toast.success('매물 등록 및 입지 분석이 완료되었습니다!')
       router.push(`/projects/${projectId}`)
     } catch (err) {
       toast.error('완료 처리에 실패했습니다')

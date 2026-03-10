@@ -49,6 +49,32 @@ export interface Membership {
   organization?: Organization
 }
 
+export interface POIItem {
+  name: string
+  address?: string
+  distance_m: number
+  category?: string
+  phone?: string | null
+}
+
+export interface LandUseItem {
+  zone_name:  string | null
+  zone_code:  string | null
+  reg_date:   string | null
+  law_name:   string | null
+  group_name: string | null
+}
+
+export interface RealPriceItem {
+  deal_ym:  string
+  amount:   number | null
+  area:     number | null
+  floor:    string | null
+  name:     string | null
+  dong:     string | null
+  type:     string
+}
+
 export interface Project {
   id: string
   org_id: string
@@ -57,6 +83,11 @@ export interface Project {
   jibun_address?: string
   lat?: number
   lng?: number
+  sigungu_code?: string
+  bjdong_code?: string
+  bun?: string
+  ji?: string
+  legal_dong?: string
   property_type?: PropertyType
   price?: number
   monthly_rent?: number
@@ -68,6 +99,9 @@ export interface Project {
   status: ProjectStatus
   cover_image_url?: string
   note?: string
+  poi_data?: Record<string, POIItem[]> | null
+  land_use_data?: LandUseItem[] | null
+  real_price_data?: RealPriceItem[] | null
   created_at: string
   updated_at: string
 }

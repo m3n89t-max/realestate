@@ -15,6 +15,7 @@ import DocsTab from './components/DocsTab'
 import ShortsTab from './components/ShortsTab'
 import TasksTab from './components/TasksTab'
 import ProjectActions from './components/ProjectActions'
+import { POICards, LandUseCard, RealPriceCard } from './components/LocationDataCards'
 
 interface Params {
   id: string
@@ -200,7 +201,34 @@ export default async function ProjectDetailPage({
                       </li>
                     ))}
                   </ul>
+                  {locationAnalysis.land_use_summary && (
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <p className="text-xs text-gray-400 mb-1">토지이용 요약</p>
+                      <p className="text-sm text-gray-700">{locationAnalysis.land_use_summary}</p>
+                    </div>
+                  )}
+                  {locationAnalysis.price_trend && (
+                    <div className="mt-2">
+                      <p className="text-xs text-gray-400 mb-1">실거래가 동향</p>
+                      <p className="text-sm text-gray-700">{locationAnalysis.price_trend}</p>
+                    </div>
+                  )}
                 </div>
+              )}
+
+              {/* POI 주변 시설 */}
+              {project.poi_data && (
+                <POICards poi_data={project.poi_data} />
+              )}
+
+              {/* 토지이용규제 */}
+              {project.land_use_data && project.land_use_data.length > 0 && (
+                <LandUseCard land_use_data={project.land_use_data} />
+              )}
+
+              {/* 실거래가 */}
+              {project.real_price_data && project.real_price_data.length > 0 && (
+                <RealPriceCard real_price_data={project.real_price_data} />
               )}
             </div>
 
