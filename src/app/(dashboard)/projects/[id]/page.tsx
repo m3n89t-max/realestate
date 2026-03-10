@@ -280,7 +280,7 @@ export default async function ProjectDetailPage({
       )}
 
       {tab === 'blog' && (
-        <BlogTab projectId={id} contents={blogContents} />
+        <BlogTab projectId={id} orgId={project.org_id} contents={blogContents} />
       )}
 
       {tab === 'card_news' && (

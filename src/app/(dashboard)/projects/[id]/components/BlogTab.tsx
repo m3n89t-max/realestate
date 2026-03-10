@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Wand2, Copy, Check, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react'
+import { Wand2, Copy, Check, ChevronDown, ChevronUp, AlertCircle, Upload, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { GeneratedContent, SeoScore } from '@/lib/types'
 import toast from 'react-hot-toast'
@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 
 interface BlogTabProps {
   projectId: string
+  orgId: string
   contents: GeneratedContent[]
 }
 
@@ -66,9 +67,10 @@ function SeoScorePanel({ score }: { score: SeoScore }) {
   )
 }
 
-export default function BlogTab({ projectId, contents }: BlogTabProps) {
+export default function BlogTab({ projectId, orgId, contents }: BlogTabProps) {
   const supabase = createClient()
   const [generating, setGenerating] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [style, setStyle] = useState<'informative' | 'investment' | 'lifestyle'>('informative')
   const [selectedId, setSelectedId] = useState<string | null>(contents[0]?.id ?? null)
   const [editContent, setEditContent] = useState<string>(contents[0]?.content ?? '')
@@ -80,7 +82,7 @@ export default function BlogTab({ projectId, contents }: BlogTabProps) {
   const handleGenerate = async () => {
     setGenerating(true)
     try {
-      const { data, error } = await supabase.functions.invoke('generate-blog', {
+      const { error } = await supabase.functions.invoke('generate-blog', {
         body: { project_id: projectId, style },
       })
       if (error) throw error
@@ -92,6 +94,27 @@ export default function BlogTab({ projectId, contents }: BlogTabProps) {
       console.error(err)
     } finally {
       setGenerating(false)
+    }
+  }
+
+  const handleNaverUpload = async () => {
+    if (!selectedId) return
+    setUploading(true)
+    try {
+      const { error } = await supabase.from('tasks').insert({
+        org_id: orgId,
+        project_id: projectId,
+        type: 'upload_naver_blog',
+        status: 'pending',
+        payload: { content_id: selectedId, project_id: projectId },
+      })
+      if (error) throw error
+      toast.success('네이버 블로그 업로드 작업이 등록되었습니다. 에이전트가 실행하면 자동 업로드됩니다.')
+    } catch (err) {
+      toast.error('작업 등록에 실패했습니다')
+      console.error(err)
+    } finally {
+      setUploading(false)
     }
   }
 
@@ -156,6 +179,36 @@ export default function BlogTab({ projectId, contents }: BlogTabProps) {
             SEO 최적화 · 1,500자 이상 · FAQ 포함
           </p>
         </div>
+
+        {/* 네이버 업로드 */}
+        {selectedId && (
+          <div className="card p-4">
+            <h3 className="text-sm font-semibold text-gray-700 mb-2">자동 업로드</h3>
+            <p className="text-xs text-gray-400 mb-3">
+              로컬 에이전트가 실행 중이어야 합니다
+            </p>
+            <button
+              onClick={handleNaverUpload}
+              disabled={uploading}
+              className="btn-secondary w-full justify-center text-green-700 border-green-200 hover:bg-green-50"
+            >
+              {uploading
+                ? <><Loader2 size={14} className="animate-spin" /> 등록 중...</>
+                : <><Upload size={14} /> 네이버 블로그 업로드</>
+              }
+            </button>
+            {selected?.is_published && selected.published_url && (
+              <a
+                href={selected.published_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 flex items-center gap-1 text-xs text-brand-600 hover:underline"
+              >
+                발행된 글 보기 →
+              </a>
+            )}
+          </div>
+        )}
 
         {/* 버전 목록 */}
         {contents.length > 0 && (
