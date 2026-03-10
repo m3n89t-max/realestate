@@ -263,65 +263,50 @@ function MapSection({
   const maxPrice = amounts.length ? Math.max(...amounts) : null
 
   return (
-    <div className="space-y-3">
-      {/* 지도 이미지 */}
-      <div className="relative rounded-lg overflow-hidden border border-gray-100 bg-gray-100" style={{ height: 200 }}>
-        <img
-          src={`/api/map?lat=${lat}&lng=${lng}&w=600&h=400&level=4`}
-          alt="매물 위치 지도"
-          className="w-full h-full object-cover"
-        />
-        <a
-          href={`https://map.kakao.com/link/map/${lat},${lng}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="absolute bottom-2 right-2 flex items-center gap-1 bg-white/90 backdrop-blur-sm text-xs text-gray-600 px-2 py-1 rounded-full shadow hover:bg-white"
-        >
-          <ExternalLink size={10} />
-          카카오지도
-        </a>
-      </div>
+    <div className="relative rounded-xl overflow-hidden border border-gray-100 bg-gray-100" style={{ minHeight: 340 }}>
+      {/* 지도 배경 이미지 */}
+      <img
+        src={`/api/map?lat=${lat}&lng=${lng}&w=800&h=680&level=4`}
+        alt="매물 위치 지도"
+        className="absolute inset-0 w-full h-full object-cover"
+      />
 
-      {/* POI 요약 */}
-      {poiSummary.length > 0 && (
-        <div>
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1">
-            <Navigation size={10} /> 주변시설
-          </p>
-          <div className="grid grid-cols-2 gap-1.5">
+      {/* 카카오지도 링크 (우상단) */}
+      <a
+        href={`https://map.kakao.com/link/map/${lat},${lng}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="absolute top-2 right-2 flex items-center gap-1 bg-white/90 backdrop-blur-sm text-xs text-gray-600 px-2 py-1 rounded-full shadow hover:bg-white z-10"
+      >
+        <ExternalLink size={10} />
+        카카오지도
+      </a>
+
+      {/* 하단 오버레이 패널 */}
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/60 to-transparent pt-8 pb-3 px-3">
+        {/* POI 행 */}
+        {poiSummary.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-2">
             {poiSummary.map(({ key, cfg, nearest }) => (
-              <div key={key} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
-                <span className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${cfg.color}`}>
-                  {cfg.icon}
-                </span>
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-gray-700 truncate">{nearest.name}</p>
-                  <p className="text-xs text-gray-400">{distanceLabel(nearest.distance_m)}</p>
-                </div>
+              <div key={key} className="flex items-center gap-1 bg-white/15 backdrop-blur-sm rounded-full px-2 py-1">
+                <span className="opacity-90 text-white" style={{ fontSize: 10 }}>{cfg.icon}</span>
+                <span className="text-white text-xs font-medium">{distanceLabel(nearest.distance_m)}</span>
+                <span className="text-white/60 text-xs hidden sm:inline truncate max-w-[60px]">{nearest.name}</span>
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* 주변 시세 요약 */}
-      {avgPrice && (
-        <div className="p-3 bg-brand-50 rounded-lg border border-brand-100">
-          <p className="text-xs font-semibold text-brand-600 mb-2 flex items-center gap-1">
-            <TrendingUp size={10} /> 주변 시세 ({amounts.length}건)
-          </p>
-          <div className="flex gap-4">
-            <div>
-              <p className="text-xs text-gray-400">평균</p>
-              <p className="text-sm font-bold text-brand-700">{formatAmount(avgPrice)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400">최고</p>
-              <p className="text-sm font-bold text-red-600">{formatAmount(maxPrice)}</p>
-            </div>
+        {/* 시세 행 */}
+        {avgPrice && (
+          <div className="flex items-center gap-3">
+            <TrendingUp size={11} className="text-white/70 flex-shrink-0" />
+            <span className="text-white/70 text-xs">주변 시세 {amounts.length}건</span>
+            <span className="text-white text-sm font-bold">평균 {formatAmount(avgPrice)}</span>
+            <span className="text-red-300 text-sm font-bold">최고 {formatAmount(maxPrice)}</span>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
