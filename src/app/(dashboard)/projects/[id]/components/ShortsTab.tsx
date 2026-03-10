@@ -34,8 +34,10 @@ export default function ShortsTab({ projectId }: ShortsTabProps) {
   const handleGenerate = async () => {
     setGenerating(true)
     try {
+      const { data: { session } } = await supabase.auth.getSession()
       const { data, error } = await supabase.functions.invoke('generate-shorts-script', {
         body: { project_id: projectId },
+        headers: { Authorization: `Bearer ${session?.access_token}` },
       })
       if (error) throw error
       setScript(data?.data ?? data)

@@ -82,8 +82,10 @@ export default function BlogTab({ projectId, orgId, contents }: BlogTabProps) {
   const handleGenerate = async () => {
     setGenerating(true)
     try {
+      const { data: { session } } = await supabase.auth.getSession()
       const { error } = await supabase.functions.invoke('generate-blog', {
         body: { project_id: projectId, style },
+        headers: { Authorization: `Bearer ${session?.access_token}` },
       })
       if (error) throw error
 

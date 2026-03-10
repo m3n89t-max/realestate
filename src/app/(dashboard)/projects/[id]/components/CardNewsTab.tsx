@@ -63,8 +63,10 @@ export default function CardNewsTab({ projectId, contents }: CardNewsTabProps) {
   const handleGenerate = async () => {
     setGenerating(true)
     try {
+      const { data: { session } } = await supabase.auth.getSession()
       const { data, error } = await supabase.functions.invoke('generate-card-news', {
         body: { project_id: projectId, card_count: cardCount, color_theme: colorTheme },
+        headers: { Authorization: `Bearer ${session?.access_token}` },
       })
       if (error) throw error
       toast.success('카드뉴스가 생성되었습니다!')
