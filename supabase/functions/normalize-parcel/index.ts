@@ -56,6 +56,11 @@ async function collectPOI(lat: number, lng: number, kakaoKey: string): Promise<R
 }
 
 // ── 토지이용규제 API 수집 (국토교통부_토지이용규제정보서비스) ──
+function xmlTagValue(xml: string, tag: string): string | null {
+  const m = xml.match(new RegExp(`<${tag}>([^<]*)</${tag}>`))
+  return m ? m[1].trim() || null : null
+}
+
 async function collectLandUse(
   sigunguCd: string,
   bjdongCd: string,
@@ -63,29 +68,39 @@ async function collectLandUse(
   ji: string,
   apiKey: string
 ): Promise<any[]> {
-  const url = new URL('https://apis.data.go.kr/1613000/arLandUseInfoService/DTarLandUseInfo')
-  url.searchParams.set('serviceKey', apiKey)
-  url.searchParams.set('sigunguCd', sigunguCd)
-  url.searchParams.set('bjdongCd', bjdongCd)
-  url.searchParams.set('bun', bun)
-  url.searchParams.set('ji', ji)
-  url.searchParams.set('numOfRows', '20')
-  url.searchParams.set('pageNo', '1')
-  url.searchParams.set('_type', 'json')
+  // 이 API는 XML만 지원 (JSON 미지원)
+  const params = new URLSearchParams({
+    serviceKey: apiKey,
+    sigunguCd,
+    bjdongCd,
+    bun,
+    ji,
+    numOfRows: '20',
+    pageNo: '1',
+  })
+  const url = `https://apis.data.go.kr/1613000/arLandUseInfoService/DTarLandUseInfo?${params}`
 
-  const res = await fetch(url.toString())
+  const res = await fetch(url)
   if (!res.ok) throw new Error(`토지이용규제 API 오류: ${res.status}`)
 
-  const json = await res.json()
-  const items = json?.response?.body?.items?.item ?? []
-  const arr = Array.isArray(items) ? items : (items ? [items] : [])
+  const text = await res.text()
 
-  return arr.map((item: any) => ({
-    zone_name:   item.prposAreaDstrcNm   ?? item.lndcgrCodeNm ?? null,
-    zone_code:   item.prposAreaDstrcCdNm ?? item.lndcgrCode   ?? null,
-    reg_date:    item.regStrDate         ?? null,
-    law_name:    item.refLawNm           ?? null,
-    group_name:  item.manageGroupNm      ?? null,
+  // 에러 응답 체크
+  const resultCode = xmlTagValue(text, 'resultCode')
+  if (resultCode && resultCode !== '00' && resultCode !== '0000') {
+    const msg = xmlTagValue(text, 'resultMsg') ?? resultCode
+    throw new Error(`토지이용규제 API 오류: ${msg}`)
+  }
+
+  // <item> 블록 추출
+  const itemBlocks = [...text.matchAll(/<item>([\s\S]*?)<\/item>/g)].map(m => m[1])
+
+  return itemBlocks.map(block => ({
+    zone_name:  xmlTagValue(block, 'prposAreaDstrcNm')   ?? xmlTagValue(block, 'lndcgrCodeNm') ?? null,
+    zone_code:  xmlTagValue(block, 'prposAreaDstrcCdNm') ?? xmlTagValue(block, 'lndcgrCode')   ?? null,
+    reg_date:   xmlTagValue(block, 'regStrDate')         ?? null,
+    law_name:   xmlTagValue(block, 'refLawNm')           ?? null,
+    group_name: xmlTagValue(block, 'manageGroupNm')      ?? null,
   }))
 }
 
@@ -181,37 +196,87 @@ Deno.serve(async (req) => {
     const kakaoKey = Deno.env.get('KAKAO_REST_API_KEY')
     if (!kakaoKey) throw new Error('KAKAO_REST_API_KEY가 설정되지 않았습니다')
 
-    // ── 1. 카카오 주소 정규화 ────────────────────────────────
-    const kakaoRes = await fetch(
-      `https://dapi.kakao.com/v2/local/search/address.json?query=${encodeURIComponent(parcel_input)}`,
-      { headers: { Authorization: `KakaoAK ${kakaoKey}` } }
-    )
-    if (!kakaoRes.ok) throw new Error(`카카오 API 오류: ${kakaoRes.status}`)
+    // ── 1. 카카오 주소 정규화 (실패해도 계속 진행) ──────────
+    let address_name: string = parcel_input
+    let lat: number = 0
+    let lng: number = 0
+    let region_1depth_name = '', region_2depth_name = '', region_3depth_name = ''
+    let bCode = '', sigungu_code = '', bjdong_code = '', bun = '0000', ji = '0000', legal_dong = ''
+    let normalized_address: string = parcel_input
 
-    const kakaoData = await kakaoRes.json()
-    if (!kakaoData.documents?.length) {
-      throw new Error('주소를 찾을 수 없습니다. 지번 또는 도로명주소를 확인해주세요.')
+    try {
+      const kakaoRes = await fetch(
+        `https://dapi.kakao.com/v2/local/search/address.json?query=${encodeURIComponent(parcel_input)}`,
+        { headers: { Authorization: `KakaoAK ${kakaoKey}` } }
+      )
+      if (!kakaoRes.ok) {
+        console.error(`[normalize-parcel] Kakao API HTTP error: ${kakaoRes.status}`)
+      } else {
+        const kakaoData = await kakaoRes.json()
+        if (!kakaoData.documents?.length) {
+          console.error('[normalize-parcel] Kakao: 주소 검색 결과 없음:', parcel_input)
+        } else {
+          const doc  = kakaoData.documents[0]
+          const addr = doc.address ?? doc.road_address
+          const roadAddr = doc.road_address
+
+          address_name       = doc.address_name ?? parcel_input
+          lat                = parseFloat(doc.y)
+          lng                = parseFloat(doc.x)
+          region_1depth_name = addr?.region_1depth_name ?? roadAddr?.region_1depth_name ?? ''
+          region_2depth_name = addr?.region_2depth_name ?? roadAddr?.region_2depth_name ?? ''
+          region_3depth_name = addr?.region_3depth_name ?? roadAddr?.region_3depth_name ?? ''
+          bCode              = addr?.b_code ?? ''
+          sigungu_code       = extractSigunguCode(bCode)
+          bjdong_code        = bCode.slice(5, 10)
+          bun                = (addr?.main_address_no ?? '0').padStart(4, '0')
+          ji                 = (addr?.sub_address_no  ?? '0').padStart(4, '0')
+          legal_dong         = region_3depth_name
+          normalized_address = roadAddr?.address_name ?? addr?.address_name ?? address_name
+        }
+      }
+    } catch (kakaoErr) {
+      console.error('[normalize-parcel] Kakao 주소 정규화 실패 (계속 진행):', kakaoErr)
     }
 
-    const doc      = kakaoData.documents[0]
-    const addr     = doc.address ?? doc.road_address
-    const roadAddr = doc.road_address
+    // lat/lng 없으면 프로젝트에 저장된 좌표 사용
+    if (!lat || !lng) {
+      const { data: existingProject } = await supabaseClient
+        .from('projects')
+        .select('lat, lng')
+        .eq('id', project_id)
+        .single()
+      if (existingProject?.lat) lat = existingProject.lat
+      if (existingProject?.lng) lng = existingProject.lng
+    }
 
-    const address_name: string = doc.address_name ?? parcel_input
-    const lat: number          = parseFloat(doc.y)
-    const lng: number          = parseFloat(doc.x)
-
-    const region_1depth_name: string = addr?.region_1depth_name ?? roadAddr?.region_1depth_name ?? ''
-    const region_2depth_name: string = addr?.region_2depth_name ?? roadAddr?.region_2depth_name ?? ''
-    const region_3depth_name: string = addr?.region_3depth_name ?? roadAddr?.region_3depth_name ?? ''
-
-    const bCode: string        = addr?.b_code ?? ''
-    const sigungu_code: string = extractSigunguCode(bCode)
-    const bjdong_code: string  = bCode.slice(5, 10)
-    const bun: string          = (addr?.main_address_no ?? '0').padStart(4, '0')
-    const ji: string           = (addr?.sub_address_no  ?? '0').padStart(4, '0')
-    const legal_dong: string   = region_3depth_name
-    const normalized_address: string = roadAddr?.address_name ?? addr?.address_name ?? address_name
+    // b_code가 없으면 좌표→행정구역 코드 API로 보완
+    if ((!sigungu_code || !bjdong_code) && lat && lng) {
+      try {
+        const regionRes = await fetch(
+          `https://dapi.kakao.com/v2/local/geo/coord2regioncode.json?x=${lng}&y=${lat}`,
+          { headers: { Authorization: `KakaoAK ${kakaoKey}` } }
+        )
+        if (regionRes.ok) {
+          const regionData = await regionRes.json()
+          // B (법정동) 타입 우선
+          const region = regionData.documents?.find((d: any) => d.region_type === 'B')
+            ?? regionData.documents?.[0]
+          if (region?.code && region.code.length >= 10) {
+            bCode        = region.code
+            sigungu_code = bCode.slice(0, 5)
+            bjdong_code  = bCode.slice(5, 10)
+            legal_dong   = legal_dong || region.region_3depth_name || ''
+            region_1depth_name = region_1depth_name || region.region_1depth_name || ''
+            region_2depth_name = region_2depth_name || region.region_2depth_name || ''
+            region_3depth_name = region_3depth_name || region.region_3depth_name || ''
+            console.log('[normalize-parcel] coord2regioncode fallback:', { sigungu_code, bjdong_code })
+          }
+        }
+      } catch (regionErr) {
+        console.error('[normalize-parcel] coord2regioncode 실패:', regionErr)
+      }
+    }
 
     // ── 2. 데이터 수집 (병렬) ────────────────────────────────
     const publicApiKey = Deno.env.get('PUBLIC_DATA_API_KEY') ?? Deno.env.get('BUILDING_API_KEY') ?? ''
@@ -230,18 +295,32 @@ Deno.serve(async (req) => {
     if (landUseResult.status === 'rejected')    console.error('[LandUse]',   landUseResult.reason)
     if (realPriceResult.status === 'rejected')  console.error('[RealPrice]', realPriceResult.reason)
 
+    console.log('[normalize-parcel] collected:', {
+      poi: poiResult.status,
+      land: landUseResult.status,
+      price: realPriceResult.status,
+      poiCount: poi_data ? Object.keys(poi_data).length : 0,
+      sigungu_code,
+      bjdong_code,
+      lat, lng,
+    })
+
     // ── 3. 프로젝트 업데이트 ─────────────────────────────────
-    await supabaseClient
+    const updatePayload: Record<string, unknown> = {
+      address: normalized_address,
+      lat, lng,
+      sigungu_code, bjdong_code, bun, ji, legal_dong,
+    }
+    if (poi_data        !== null) updatePayload.poi_data        = poi_data
+    if (land_use_data   !== null) updatePayload.land_use_data   = land_use_data
+    if (real_price_data !== null) updatePayload.real_price_data = real_price_data
+
+    const { error: updateError } = await supabaseClient
       .from('projects')
-      .update({
-        address: normalized_address,
-        lat, lng,
-        sigungu_code, bjdong_code, bun, ji, legal_dong,
-        ...(poi_data        !== null && { poi_data }),
-        ...(land_use_data   !== null && { land_use_data }),
-        ...(real_price_data !== null && { real_price_data }),
-      })
+      .update(updatePayload)
       .eq('id', project_id)
+
+    if (updateError) console.error('[normalize-parcel] update error:', updateError)
 
     // ── 4. 건축물대장 task 생성 ──────────────────────────────
     const adminClient = createClient(

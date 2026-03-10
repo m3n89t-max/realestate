@@ -322,9 +322,10 @@ interface AnalysisTabProps {
 }
 
 export default function AnalysisTab({ projectId, project, locationAnalysis }: AnalysisTabProps) {
-  const hasPOI       = project.poi_data && Object.keys(project.poi_data).length > 0
-  const hasLandUse   = project.land_use_data && project.land_use_data.length > 0
-  const hasRealPrice = project.real_price_data && project.real_price_data.length > 0
+  const hasPOI       = project.poi_data != null && Object.keys(project.poi_data).length > 0
+  // 빈 배열이어도 수집 시도된 것으로 간주 (해당 지역 데이터 없음)
+  const hasLandUse   = project.land_use_data != null
+  const hasRealPrice = project.real_price_data != null
   const hasAnalysis  = !!locationAnalysis
 
   const workflowSteps = [
