@@ -128,22 +128,14 @@ class LocalAgent {
             }
             log('[Agent] ✅ agent_key 검증 완료');
 
-            // org_id는 agent_connections 테이블에서 조회
-            const { data, error } = await this.supabase
-                .from('agent_connections')
-                .select('id, org_id')
-                .eq('agent_key', this.config.agent_key)
-                .single();
-
-            if (error) {
-                log(`[Agent] DB 조회 에러: ${error.message}`);
-                throw error;
-            }
-
-            if (data) {
-                this.orgId = data.org_id;
-                this.agentConnectionId = data.id;
+            // org_id & agent_id는 heartbeat 응답에서 직접 추출 (RLS 우회)
+            if (res?.org_id) {
+                this.orgId = res.org_id;
+                this.agentConnectionId = res.agent_id ?? '';
                 log(`[Agent] org_id: ${this.orgId}`);
+            } else {
+                log('[Agent] heartbeat 응답에 org_id 없음. 폴백 폴링 모드.');
+                this.startFallbackPolling();
             }
         } catch (err: any) {
             log(`[Agent] 검증 실패: ${err.message}`);

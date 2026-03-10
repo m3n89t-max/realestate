@@ -28,13 +28,20 @@ Deno.serve(async (req) => {
 
     switch (event) {
       case 'heartbeat': {
-        // 에이전트 상태 업데이트
-        await adminClient.rpc('agent_heartbeat', {
+        // 에이전트 상태 업데이트 + org_id 반환
+        const { data: heartbeatResult } = await adminClient.rpc('agent_heartbeat', {
           p_agent_key: agent_key,
           p_status: data.status ?? 'online',
           p_version: data.version,
         })
-        break
+        return new Response(JSON.stringify({
+          success: true,
+          event: 'heartbeat',
+          agent_id: heartbeatResult?.agent_id ?? agent.id,
+          org_id: heartbeatResult?.org_id ?? agent.org_id,
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
       }
 
       case 'task_started': {
