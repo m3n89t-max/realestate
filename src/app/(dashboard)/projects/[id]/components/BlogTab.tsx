@@ -83,16 +83,21 @@ export default function BlogTab({ projectId, orgId, contents }: BlogTabProps) {
     setGenerating(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const { error } = await supabase.functions.invoke('generate-blog', {
-        body: { project_id: projectId, style },
-        headers: { Authorization: `Bearer ${session?.access_token}` },
+      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/generate-blog`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token ?? ''}`,
+        },
+        body: JSON.stringify({ project_id: projectId, style }),
       })
-      if (error) throw error
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? '생성 실패')
 
       toast.success('블로그 글이 생성되었습니다!')
       window.location.reload()
-    } catch (err) {
-      toast.error('생성에 실패했습니다. 잠시 후 다시 시도해주세요.')
+    } catch (err: any) {
+      toast.error(err.message || '생성에 실패했습니다.')
       console.error(err)
     } finally {
       setGenerating(false)
