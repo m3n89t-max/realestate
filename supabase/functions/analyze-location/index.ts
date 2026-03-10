@@ -32,12 +32,6 @@ function formatPOI(poi_data: Record<string, any[]> | null): string {
   return lines.join('\n') || '(근처 시설 없음)'
 }
 
-function formatLandUse(land_use_data: any[] | null): string {
-  if (!land_use_data || land_use_data.length === 0) return '(토지이용규제 데이터 없음)'
-  return land_use_data.map(z =>
-    `${z.zone_name ?? '-'}${z.law_name ? ` [${z.law_name}]` : ''}`
-  ).join(', ')
-}
 
 function formatRealPrice(real_price_data: any[] | null): string {
   if (!real_price_data || real_price_data.length === 0) return '(실거래가 데이터 없음)'
@@ -88,11 +82,10 @@ Deno.serve(async (req) => {
         .eq('id', task_id)
     }
 
-    const { data: project } = await supabaseClient
-      .from('projects')
-      .select('*')
-      .eq('id', project_id)
-      .single()
+    const [{ data: project }, { count: photoCount }] = await Promise.all([
+      supabaseClient.from('projects').select('*').eq('id', project_id).single(),
+      supabaseClient.from('assets').select('id', { count: 'exact', head: true }).eq('project_id', project_id),
+    ])
     if (!project) throw new Error('프로젝트를 찾을 수 없습니다')
 
     if (!orgId) orgId = project.org_id
@@ -119,7 +112,6 @@ Deno.serve(async (req) => {
 
     // ── 실제 수집 데이터 포맷팅 ──────────────────────────────
     const poiText       = formatPOI(project.poi_data)
-    const landUseText   = formatLandUse(project.land_use_data)
     const realPriceText = formatRealPrice(project.real_price_data)
 
     const systemPrompt = `당신은 대한민국 부동산 입지 분석 전문가입니다.
@@ -145,23 +137,33 @@ Deno.serve(async (req) => {
   "analysis_text": "종합 분석 문장 (150자 내외)"
 }`
 
+    const priceStr = project.price ? `${Math.round(project.price / 10000)}억` : null
+    const areaStr  = project.area  ? `${project.area}㎡ (약 ${Math.round(project.area / 3.3)}평)` : null
+
     const userPrompt = `다음 매물의 입지를 분석하세요.
 
+[매물 기본 정보]
 주소: ${project.address}
 매물 유형: ${project.property_type ?? '미분류'}
-특징: ${(project.features ?? []).join(', ') || '없음'}
-${lat && lng ? `좌표: 위도 ${lat}, 경도 ${lng}` : ''}
+${priceStr              ? `매매가: ${priceStr}` : ''}
+${areaStr               ? `전용면적: ${areaStr}` : ''}
+${project.floor         ? `층수: ${project.floor}층 / 전체 ${project.total_floors ?? '?'}층` : ''}
+${project.direction     ? `방향: ${project.direction}` : ''}
+${(project.features ?? []).length > 0 ? `특징: ${project.features.join(', ')}` : ''}
+${photoCount            ? `등록 사진: ${photoCount}장` : ''}
+${lat && lng            ? `좌표: 위도 ${lat}, 경도 ${lng}` : ''}
+
+[중개사 메모 / 특이사항]
+${project.note || '(없음)'}
 
 [실제 수집된 POI 데이터]
 ${poiText}
 
-[토지이용규제]
-${landUseText}
-
-[최근 3개월 실거래가]
+[최근 실거래가]
 ${realPriceText}
 
-위 실제 데이터를 적극 활용하여 분석하세요. 장점은 "도보/차량 N분" 등 구체적 수치 표현을 사용하세요.`
+위 실제 데이터를 적극 활용하여 분석하세요. 장점은 "도보/차량 N분" 등 구체적 수치 표현을 사용하세요.
+중개사 메모에 특이사항이 있으면 분석에 반드시 반영하세요.`
 
     const responseText = await callOpenAI(
       [
