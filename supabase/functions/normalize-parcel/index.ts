@@ -73,10 +73,14 @@ async function collectLandUse(
 ): Promise<any[]> {
   // PNU 19자리: 시군구(5) + 법정동(5) + 산구분(1,0=대지) + 본번(4) + 부번(4)
   const pnu = `${sigunguCd}${bjdongCd}0${bun}${ji}`
-  const url = `https://api.vworld.kr/req/data?service=data&request=GetFeature&data=LT_C_LHBLPN&key=${vworldKey}&attrFilter=pnu:=:${pnu}&format=json&geometry=false&pagenum=1&pagesize=20`
+  // domain 파라미터 필수: 서버사이드 호출 시 Origin 헤더 없으므로 명시 필요
+  const domain = 'realestate-eosin-alpha.vercel.app'
+  const url = `https://api.vworld.kr/req/data?service=data&request=GetFeature&data=LT_C_LHBLPN&key=${vworldKey}&domain=${domain}&attrFilter=pnu:=:${pnu}&format=json&geometry=false&pagenum=1&pagesize=20`
 
   console.log('[LandUse] VWorld PNU:', pnu)
-  const res = await fetch(url)
+  const res = await fetch(url, {
+    headers: { Origin: `https://${domain}` },
+  })
   if (!res.ok) {
     console.error('[LandUse] VWorld HTTP error:', res.status)
     return []
