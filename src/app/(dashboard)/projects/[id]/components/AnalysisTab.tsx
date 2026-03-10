@@ -5,11 +5,12 @@ import {
   MapPin, TrendingUp, Building2, Target, FileText,
   Loader2, CheckCircle2, AlertCircle, RefreshCw, ChevronDown, ChevronUp,
   Train, ShoppingCart, Hospital, GraduationCap, Coffee, Pill, Landmark,
-  ExternalLink, Navigation
+  ExternalLink
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
 import type { POIItem, RealPriceItem } from '@/lib/types'
+import KakaoMap from '@/components/KakaoMap'
 
 // ── POI 아이콘 맵 ─────────────────────────────────────────────
 const POI_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
@@ -263,50 +264,48 @@ function MapSection({
   const maxPrice = amounts.length ? Math.max(...amounts) : null
 
   return (
-    <div className="relative rounded-xl overflow-hidden border border-gray-100 bg-gray-100" style={{ minHeight: 340 }}>
-      {/* 지도 배경 이미지 */}
-      <img
-        src={`/api/map?lat=${lat}&lng=${lng}&w=800&h=680&level=4`}
-        alt="매물 위치 지도"
-        className="absolute inset-0 w-full h-full object-cover"
-      />
-
-      {/* 카카오지도 링크 (우상단) */}
-      <a
-        href={`https://map.kakao.com/link/map/${lat},${lng}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="absolute top-2 right-2 flex items-center gap-1 bg-white/90 backdrop-blur-sm text-xs text-gray-600 px-2 py-1 rounded-full shadow hover:bg-white z-10"
-      >
-        <ExternalLink size={10} />
-        카카오지도
-      </a>
-
-      {/* 하단 오버레이 패널 */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/60 to-transparent pt-8 pb-3 px-3">
-        {/* POI 행 */}
-        {poiSummary.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-2">
-            {poiSummary.map(({ key, cfg, nearest }) => (
-              <div key={key} className="flex items-center gap-1 bg-white/15 backdrop-blur-sm rounded-full px-2 py-1">
-                <span className="opacity-90 text-white" style={{ fontSize: 10 }}>{cfg.icon}</span>
-                <span className="text-white text-xs font-medium">{distanceLabel(nearest.distance_m)}</span>
-                <span className="text-white/60 text-xs hidden sm:inline truncate max-w-[60px]">{nearest.name}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* 시세 행 */}
-        {avgPrice && (
-          <div className="flex items-center gap-3">
-            <TrendingUp size={11} className="text-white/70 flex-shrink-0" />
-            <span className="text-white/70 text-xs">주변 시세 {amounts.length}건</span>
-            <span className="text-white text-sm font-bold">평균 {formatAmount(avgPrice)}</span>
-            <span className="text-red-300 text-sm font-bold">최고 {formatAmount(maxPrice)}</span>
-          </div>
-        )}
+    <div className="space-y-3">
+      {/* 카카오 지도 (JS SDK, 핀 표시) */}
+      <div className="rounded-xl overflow-hidden border border-gray-100 relative">
+        <KakaoMap lat={lat} lng={lng} level={4} style={{ width: '100%', height: 260 }} />
+        <a
+          href={`https://map.kakao.com/link/map/${lat},${lng}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="absolute bottom-2 right-2 flex items-center gap-1 bg-white/90 backdrop-blur-sm text-xs text-gray-600 px-2 py-1 rounded-full shadow hover:bg-white z-10"
+        >
+          <ExternalLink size={10} />
+          카카오지도
+        </a>
       </div>
+
+      {/* POI 요약 */}
+      {poiSummary.length > 0 && (
+        <div className="grid grid-cols-2 gap-1.5">
+          {poiSummary.map(({ key, cfg, nearest }) => (
+            <div key={key} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+              <span className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${cfg.color}`}>
+                {cfg.icon}
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs text-gray-400">{cfg.label}</p>
+                <p className="text-xs font-semibold text-gray-700">{distanceLabel(nearest.distance_m)}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 주변 시세 */}
+      {avgPrice && (
+        <div className="flex items-center gap-2 p-2.5 bg-brand-50 rounded-lg border border-brand-100">
+          <TrendingUp size={12} className="text-brand-500 flex-shrink-0" />
+          <span className="text-xs text-gray-500">주변 시세 {amounts.length}건</span>
+          <span className="ml-auto text-sm font-bold text-brand-700">{formatAmount(avgPrice)}</span>
+          <span className="text-xs text-gray-400">·</span>
+          <span className="text-sm font-bold text-red-600">{formatAmount(maxPrice)}</span>
+        </div>
+      )}
     </div>
   )
 }
