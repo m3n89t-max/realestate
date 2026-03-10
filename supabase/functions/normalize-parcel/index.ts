@@ -68,9 +68,9 @@ async function collectLandUse(
   ji: string,
   apiKey: string
 ): Promise<any[]> {
-  // 이 API는 XML만 지원 (JSON 미지원)
+  // serviceKey를 URLSearchParams에 넣으면 이중 인코딩 → 인증 실패
+  // 공공데이터포털 키는 이미 URL-encoded이므로 raw로 연결
   const params = new URLSearchParams({
-    serviceKey: apiKey,
     sigunguCd,
     bjdongCd,
     bun,
@@ -78,22 +78,26 @@ async function collectLandUse(
     numOfRows: '20',
     pageNo: '1',
   })
-  const url = `https://apis.data.go.kr/1613000/arLandUseInfoService/DTarLandUseInfo?${params}`
+  const url = `https://apis.data.go.kr/1613000/arLandUseInfoService/DTarLandUseInfo?serviceKey=${apiKey}&${params}`
 
+  console.log('[LandUse] request:', { sigunguCd, bjdongCd, bun, ji })
   const res = await fetch(url)
-  if (!res.ok) throw new Error(`토지이용규제 API 오류: ${res.status}`)
+  if (!res.ok) throw new Error(`토지이용규제 API HTTP 오류: ${res.status}`)
 
   const text = await res.text()
+  console.log('[LandUse] response preview:', text.slice(0, 300))
 
   // 에러 응답 체크
   const resultCode = xmlTagValue(text, 'resultCode')
   if (resultCode && resultCode !== '00' && resultCode !== '0000') {
     const msg = xmlTagValue(text, 'resultMsg') ?? resultCode
-    throw new Error(`토지이용규제 API 오류: ${msg}`)
+    console.error('[LandUse] API 오류 코드:', resultCode, msg)
+    return []  // 에러 시 빈 배열 (throw 아님 - null로 저장되지 않도록)
   }
 
   // <item> 블록 추출
   const itemBlocks = [...text.matchAll(/<item>([\s\S]*?)<\/item>/g)].map(m => m[1])
+  console.log('[LandUse] items found:', itemBlocks.length)
 
   return itemBlocks.map(block => ({
     zone_name:  xmlTagValue(block, 'prposAreaDstrcNm')   ?? xmlTagValue(block, 'lndcgrCodeNm') ?? null,
@@ -137,27 +141,38 @@ async function collectRealPrice(
   await Promise.allSettled(
     [...svcNames].flatMap(svcName =>
       months.map(async ym => {
+        // serviceKey raw 연결 (이중 인코딩 방지)
         const params = new URLSearchParams({
-          serviceKey: apiKey,
-          LAWD_CD:    sigungu_code,
-          DEAL_YMD:   ym,
-          pageNo:     '1',
-          numOfRows:  '30',
+          LAWD_CD:   sigungu_code,
+          DEAL_YMD:  ym,
+          pageNo:    '1',
+          numOfRows: '30',
         })
-        const url = `https://apis.data.go.kr/1613000/${svcName}/get${svcName}?${params}`
+        const url = `https://apis.data.go.kr/1613000/${svcName}/get${svcName}?serviceKey=${apiKey}&${params}`
 
         const res = await fetch(url)
-        if (!res.ok) return
+        if (!res.ok) {
+          console.error('[RealPrice] HTTP 오류:', svcName, ym, res.status)
+          return
+        }
 
         const text = await res.text()
-        if (!text.trimStart().startsWith('<')) return // XML이 아니면 무시
+        if (!text.trimStart().startsWith('<')) {
+          console.error('[RealPrice] XML 아님:', text.slice(0, 100))
+          return
+        }
 
         // 에러 코드 체크
         const resultCode = xmlTagValue(text, 'resultCode')
-        if (resultCode && resultCode !== '00' && resultCode !== '0000') return
+        if (resultCode && resultCode !== '00' && resultCode !== '0000') {
+          const msg = xmlTagValue(text, 'returnReasonCode') ?? xmlTagValue(text, 'resultMsg') ?? resultCode
+          console.error('[RealPrice] API 오류:', svcName, ym, resultCode, msg)
+          return
+        }
 
         // <item> 블록 파싱
         const itemBlocks = [...text.matchAll(/<item>([\s\S]*?)<\/item>/g)].map(m => m[1])
+        console.log('[RealPrice]', svcName, ym, 'items:', itemBlocks.length)
         for (const block of itemBlocks) {
           const amountStr = xmlTagValue(block, '거래금액')
           const amount = amountStr ? parseInt(amountStr.replace(/,/g, '').trim()) : null
