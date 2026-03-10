@@ -55,12 +55,20 @@ async function collectPOI(lat: number, lng: number, kakaoKey: string): Promise<R
   return results
 }
 
-// ── 토지이용규제 API 수집 ─────────────────────────────────────
-async function collectLandUse(lat: number, lng: number, apiKey: string): Promise<any[]> {
-  const url = new URL('https://apis.data.go.kr/1611000/nsdi/LandUseService/wgs84/getLandUseAttr')
+// ── 토지이용규제 API 수집 (국토교통부_토지이용규제정보서비스) ──
+async function collectLandUse(
+  sigunguCd: string,
+  bjdongCd: string,
+  bun: string,
+  ji: string,
+  apiKey: string
+): Promise<any[]> {
+  const url = new URL('https://apis.data.go.kr/1613000/arLandUseInfoService/DTarLandUseInfo')
   url.searchParams.set('serviceKey', apiKey)
-  url.searchParams.set('x', String(lng))
-  url.searchParams.set('y', String(lat))
+  url.searchParams.set('sigunguCd', sigunguCd)
+  url.searchParams.set('bjdongCd', bjdongCd)
+  url.searchParams.set('bun', bun)
+  url.searchParams.set('ji', ji)
   url.searchParams.set('numOfRows', '20')
   url.searchParams.set('pageNo', '1')
   url.searchParams.set('_type', 'json')
@@ -73,11 +81,11 @@ async function collectLandUse(lat: number, lng: number, apiKey: string): Promise
   const arr = Array.isArray(items) ? items : (items ? [items] : [])
 
   return arr.map((item: any) => ({
-    zone_name:   item.prposAreaDstrcNm   ?? null,
-    zone_code:   item.prposAreaDstrcCdNm ?? null,
-    reg_date:    item.regStrDate          ?? null,
-    law_name:    item.refLawNm            ?? null,
-    group_name:  item.manageGroupNm       ?? null,
+    zone_name:   item.prposAreaDstrcNm   ?? item.lndcgrCodeNm ?? null,
+    zone_code:   item.prposAreaDstrcCdNm ?? item.lndcgrCode   ?? null,
+    reg_date:    item.regStrDate         ?? null,
+    law_name:    item.refLawNm           ?? null,
+    group_name:  item.manageGroupNm      ?? null,
   }))
 }
 
@@ -210,7 +218,7 @@ Deno.serve(async (req) => {
 
     const [poiResult, landUseResult, realPriceResult] = await Promise.allSettled([
       collectPOI(lat, lng, kakaoKey),
-      publicApiKey ? collectLandUse(lat, lng, publicApiKey) : Promise.resolve(null),
+      (publicApiKey && sigungu_code && bjdong_code) ? collectLandUse(sigungu_code, bjdong_code, bun, ji, publicApiKey) : Promise.resolve(null),
       (publicApiKey && sigungu_code) ? collectRealPrice(sigungu_code, project.property_type ?? null, publicApiKey) : Promise.resolve(null),
     ])
 

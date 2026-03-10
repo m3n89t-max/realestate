@@ -15,20 +15,21 @@ import DocsTab from './components/DocsTab'
 import ShortsTab from './components/ShortsTab'
 import TasksTab from './components/TasksTab'
 import ProjectActions from './components/ProjectActions'
-import { POICards, LandUseCard, RealPriceCard } from './components/LocationDataCards'
+import AnalysisTab from './components/AnalysisTab'
 
 interface Params {
   id: string
 }
 
 const TABS = [
-  { id: 'overview', label: '개요' },
-  { id: 'blog', label: '블로그 글' },
+  { id: 'overview',  label: '개요' },
+  { id: 'analysis',  label: '입지분석' },
+  { id: 'blog',      label: '블로그 글' },
   { id: 'card_news', label: '카드뉴스' },
-  { id: 'shorts', label: '쇼츠' },
-  { id: 'docs', label: '서류' },
-  { id: 'tasks', label: '작업 현황' },
-  { id: 'package', label: '패키지' },
+  { id: 'shorts',    label: '쇼츠' },
+  { id: 'docs',      label: '서류' },
+  { id: 'tasks',     label: '작업 현황' },
+  { id: 'package',   label: '패키지' },
 ]
 
 export default async function ProjectDetailPage({
@@ -184,52 +185,28 @@ export default async function ProjectDetailPage({
                 )}
               </div>
 
-              {/* 입지 분석 */}
-              {locationAnalysis?.advantages && (
-                <div className="card p-5">
-                  <h3 className="section-title mb-4 flex items-center gap-2">
-                    <MapPin size={16} className="text-brand-500" />
-                    입지 분석
-                  </h3>
-                  <ul className="space-y-2">
-                    {locationAnalysis.advantages.map((adv: string, i: number) => (
-                      <li key={i} className="flex items-start gap-2 text-sm">
-                        <span className="w-5 h-5 bg-green-100 text-green-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
-                          {i + 1}
-                        </span>
-                        <span className="text-gray-700">{adv}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  {locationAnalysis.land_use_summary && (
-                    <div className="mt-3 pt-3 border-t border-gray-100">
-                      <p className="text-xs text-gray-400 mb-1">토지이용 요약</p>
-                      <p className="text-sm text-gray-700">{locationAnalysis.land_use_summary}</p>
-                    </div>
-                  )}
-                  {locationAnalysis.price_trend && (
-                    <div className="mt-2">
-                      <p className="text-xs text-gray-400 mb-1">실거래가 동향</p>
-                      <p className="text-sm text-gray-700">{locationAnalysis.price_trend}</p>
-                    </div>
-                  )}
+              {/* 입지분석 바로가기 */}
+              <div className="card p-4 border border-brand-100 bg-brand-50/40">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                      <MapPin size={15} className="text-brand-500" />
+                      입지 분석
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {locationAnalysis
+                        ? `AI 분석 완료 · 장점 ${locationAnalysis.advantages?.length ?? 0}개`
+                        : 'POI · 토지이용규제 · 실거래가 · AI 분석'}
+                    </p>
+                  </div>
+                  <Link
+                    href={`/projects/${id}?tab=analysis`}
+                    className="btn-primary text-xs py-1.5"
+                  >
+                    상세 보기
+                  </Link>
                 </div>
-              )}
-
-              {/* POI 주변 시설 */}
-              {project.poi_data && (
-                <POICards poi_data={project.poi_data} />
-              )}
-
-              {/* 토지이용규제 */}
-              {project.land_use_data && project.land_use_data.length > 0 && (
-                <LandUseCard land_use_data={project.land_use_data} />
-              )}
-
-              {/* 실거래가 */}
-              {project.real_price_data && project.real_price_data.length > 0 && (
-                <RealPriceCard real_price_data={project.real_price_data} />
-              )}
+              </div>
             </div>
 
             {/* 우측: 생성 현황 */}
@@ -292,6 +269,14 @@ export default async function ProjectDetailPage({
             )}
           </div>
         </div>
+      )}
+
+      {tab === 'analysis' && (
+        <AnalysisTab
+          projectId={id}
+          project={project}
+          locationAnalysis={locationAnalysis}
+        />
       )}
 
       {tab === 'blog' && (
