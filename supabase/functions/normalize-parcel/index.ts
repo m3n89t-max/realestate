@@ -104,9 +104,10 @@ async function collectLandUse(
   }))
 }
 
-// ── 국토부 실거래가 API 수집 ──────────────────────────────────
+// ── 국토부 실거래가 API 수집 (XML 전용) ──────────────────────
+// 아파트: RTMSDataSvcAptTrade, 빌라: RTMSDataSvcRHTrade (모두 XML)
 const DEAL_SERVICE_MAP: Record<string, string> = {
-  apartment:  'RTMSDataSvcAptTradeDev',
+  apartment:  'RTMSDataSvcAptTrade',
   officetel:  'RTMSDataSvcOffiTrade',
   villa:      'RTMSDataSvcRHTrade',
   house:      'RTMSDataSvcSHTrade',
@@ -119,7 +120,6 @@ async function collectRealPrice(
   property_type: string | null,
   apiKey: string
 ): Promise<any[]> {
-  // 최근 3개월
   const now = new Date()
   const months: string[] = []
   for (let i = 0; i < 3; i++) {
@@ -127,7 +127,7 @@ async function collectRealPrice(
     months.push(`${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}`)
   }
 
-  const svcNames = new Set<string>(['RTMSDataSvcAptTradeDev'])
+  const svcNames = new Set<string>(['RTMSDataSvcAptTrade'])
   if (property_type && DEAL_SERVICE_MAP[property_type]) {
     svcNames.add(DEAL_SERVICE_MAP[property_type])
   }
@@ -137,38 +137,44 @@ async function collectRealPrice(
   await Promise.allSettled(
     [...svcNames].flatMap(svcName =>
       months.map(async ym => {
-        const url = new URL(`https://apis.data.go.kr/1613000/${svcName}/get${svcName}`)
-        url.searchParams.set('serviceKey', apiKey)
-        url.searchParams.set('LAWD_CD', sigungu_code)
-        url.searchParams.set('DEAL_YMD', ym)
-        url.searchParams.set('pageNo', '1')
-        url.searchParams.set('numOfRows', '30')
-        url.searchParams.set('_type', 'json')
+        const params = new URLSearchParams({
+          serviceKey: apiKey,
+          LAWD_CD:    sigungu_code,
+          DEAL_YMD:   ym,
+          pageNo:     '1',
+          numOfRows:  '30',
+        })
+        const url = `https://apis.data.go.kr/1613000/${svcName}/get${svcName}?${params}`
 
-        const res = await fetch(url.toString())
+        const res = await fetch(url)
         if (!res.ok) return
 
-        const json = await res.json()
-        const items = json?.response?.body?.items?.item ?? []
-        const arr = (Array.isArray(items) ? items : (items ? [items] : [])).filter(Boolean)
+        const text = await res.text()
+        if (!text.trimStart().startsWith('<')) return // XML이 아니면 무시
 
-        for (const item of arr) {
-          const amount = item['거래금액'] ?? item.dealAmount ?? null
+        // 에러 코드 체크
+        const resultCode = xmlTagValue(text, 'resultCode')
+        if (resultCode && resultCode !== '00' && resultCode !== '0000') return
+
+        // <item> 블록 파싱
+        const itemBlocks = [...text.matchAll(/<item>([\s\S]*?)<\/item>/g)].map(m => m[1])
+        for (const block of itemBlocks) {
+          const amountStr = xmlTagValue(block, '거래금액')
+          const amount = amountStr ? parseInt(amountStr.replace(/,/g, '').trim()) : null
           allItems.push({
-            deal_ym:   ym,
-            amount:    typeof amount === 'string' ? parseInt(amount.replace(/,/g, '')) : amount,
-            area:      parseFloat(item['전용면적'] ?? item.excluUseAr ?? '0') || null,
-            floor:     item['층']    ?? item.floor     ?? null,
-            name:      item['아파트'] ?? item.aptNm     ?? item['건물명'] ?? null,
-            dong:      item['법정동'] ?? item.umdNm     ?? null,
-            type:      svcName,
+            deal_ym: ym,
+            amount,
+            area:    parseFloat(xmlTagValue(block, '전용면적') ?? '0') || null,
+            floor:   xmlTagValue(block, '층'),
+            name:    xmlTagValue(block, '아파트') ?? xmlTagValue(block, '건물명'),
+            dong:    xmlTagValue(block, '법정동') ?? xmlTagValue(block, '법정동명'),
+            type:    svcName,
           })
         }
       })
     )
   )
 
-  // 금액 내림차순 정렬
   allItems.sort((a, b) => (b.amount ?? 0) - (a.amount ?? 0))
   return allItems.slice(0, 60)
 }
