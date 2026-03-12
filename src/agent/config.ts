@@ -7,6 +7,13 @@ import os from 'os';
 dotenv.config({ path: path.resolve(__dirname, '../../.env.local') });
 
 // ============================================================
+// 서비스 기본값 (하드코딩) - 사용자가 입력할 필요 없음
+// ============================================================
+const DEFAULT_SUPABASE_URL = 'https://mlluhuiwtsjndkztomjx.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1sbHVodWl3dHNqbmRrenRvbWp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkxMjUxMzcsImV4cCI6MjA4NDcwMTEzN30.zExaSeZL3TnlBHfE6TnWQm-Za3VVjkHqYLKAGfQlTog';
+const DEFAULT_WEBHOOK_URL = 'https://mlluhuiwtsjndkztomjx.supabase.co/functions/v1/webhook-agent';
+
+// ============================================================
 // 에이전트 설정 타입
 // ============================================================
 export interface AgentConfig {
@@ -51,9 +58,11 @@ export function getConfig(): AgentConfig {
     const fileConfig = loadConfigFromFile();
 
     const supabaseUrl = fileConfig?.supabase_url
-        || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+        || process.env.NEXT_PUBLIC_SUPABASE_URL
+        || DEFAULT_SUPABASE_URL;
     const supabaseAnonKey = fileConfig?.supabase_anon_key
-        || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+        || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+        || DEFAULT_SUPABASE_ANON_KEY;
 
     const config: AgentConfig = {
         agent_key: fileConfig?.agent_key
@@ -61,7 +70,8 @@ export function getConfig(): AgentConfig {
         supabase_url: supabaseUrl,
         supabase_anon_key: supabaseAnonKey,
         webhook_url: fileConfig?.webhook_url
-            || `${supabaseUrl}/functions/v1/webhook-agent`,
+            || process.env.WEBHOOK_URL
+            || DEFAULT_WEBHOOK_URL,
         agent_name: fileConfig?.agent_name
             || process.env.AGENT_NAME || `Agent-${os.hostname()}`,
         version: fileConfig?.version || '1.0.0',
@@ -70,10 +80,7 @@ export function getConfig(): AgentConfig {
             || process.env.BUILDING_API_KEY || '',
     };
 
-    if (!config.supabase_url) {
-        throw new Error('[Config] SUPABASE_URL이 설정되지 않았습니다.');
-    }
-
+    // supabase_url은 항상 기본값이 있으므로 에러 발생 안 함
     return config;
 }
 

@@ -101,6 +101,14 @@ export function startUIServer() {
         res.end('Not Found');
     });
 
+    server.on('error', (err: any) => {
+        if (err.code === 'EADDRINUSE') {
+            console.log(`[Agent UI] 포트 ${PORT}이 이미 사용 중입니다. UI 서버를 건너뜁니다.`);
+        } else {
+            console.error('[Agent UI] 서버 에러:', err.message);
+        }
+    });
+
     server.listen(PORT, () => {
         console.log(`[Agent UI] 로컬 환경설정 서버가 시작되었습니다: http://localhost:${PORT}`);
     });
