@@ -28,17 +28,23 @@ Deno.serve(async (req) => {
 
     switch (event) {
       case 'heartbeat': {
-        // 에이전트 상태 업데이트 + org_id 반환
-        const { data: heartbeatResult } = await adminClient.rpc('agent_heartbeat', {
-          p_agent_key: agent_key,
-          p_status: data.status ?? 'online',
-          p_version: data.version,
-        })
+        // 에이전트 상태 업데이트 + org_id 반환 (직접 UPDATE)
+        const { error: updateError } = await adminClient
+          .from('agent_connections')
+          .update({
+            status: data.status ?? 'online',
+            last_seen_at: new Date().toISOString(),
+            version: data.version ?? agent.id,
+          })
+          .eq('agent_key', agent_key)
+
+        if (updateError) console.error('[heartbeat] update error:', updateError.message)
+
         return new Response(JSON.stringify({
           success: true,
           event: 'heartbeat',
-          agent_id: heartbeatResult?.agent_id ?? agent.id,
-          org_id: heartbeatResult?.org_id ?? agent.org_id,
+          agent_id: agent.id,
+          org_id: agent.org_id,
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })

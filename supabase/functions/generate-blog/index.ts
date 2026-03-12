@@ -36,6 +36,16 @@ Deno.serve(async (req) => {
       .eq('project_id', project_id)
       .single()
 
+    // 매물 사진 조회
+    const { data: assets } = await supabaseClient
+      .from('assets')
+      .select('file_url, alt_text, category, is_cover')
+      .eq('project_id', project_id)
+      .eq('type', 'image')
+      .order('is_cover', { ascending: false })
+      .order('sort_order', { ascending: true })
+      .limit(10)
+
     // 기존 버전 번호 조회
     const { data: existing } = await supabaseClient
       .from('generated_contents')
@@ -61,6 +71,11 @@ Deno.serve(async (req) => {
       location_advantages: location?.advantages,
       nearby_facilities: location?.nearby_facilities,
       style,
+      photo_urls: (assets ?? []).map((a: any) => ({
+        url: a.file_url,
+        alt: a.alt_text || a.category || '매물사진',
+        category: a.category,
+      })),
     }
 
     // OpenAI API 호출

@@ -318,8 +318,13 @@ export default function NewProjectPage() {
         .upload(filePath, file)
 
       if (uploadError) {
-        console.error('File upload failed:', uploadError)
-        toast.error(`${file.name} 업로드 실패: ${uploadError.message}`)
+        console.error('File upload failed detailed error:', {
+          error: uploadError,
+          path: filePath,
+          fileName: file.name,
+          bucket: 'project-assets'
+        })
+        toast.error(`${file.name} 업로드 실패: ${uploadError.message} (권한 또는 스토리지 설정을 확인하세요)`)
         continue
       }
 

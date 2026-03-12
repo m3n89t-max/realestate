@@ -12,6 +12,7 @@ export interface BlogPromptContext {
   location_advantages?: string[]
   nearby_facilities?: Record<string, unknown>
   style: 'informative' | 'investment' | 'lifestyle'
+  photo_urls?: { url: string; alt: string; category?: string }[]
 }
 
 export function buildBlogSystemPrompt(): string {
@@ -41,7 +42,11 @@ export function buildBlogSystemPrompt(): string {
 5. FAQ 5개 필수 포함 (실제 검색자의 궁금증 반영):
    - 가격 관련, 입지 관련, 학군 관련, 관리비 관련, 주변환경 관련
 
-6. 이미지 ALT 태그 제안: 각 섹션에 어울리는 이미지 ALT 텍스트 3개 이상 제안
+6. 사진 삽입 규칙 (매물 사진이 제공된 경우 반드시 준수):
+   - 제공된 사진 마크다운(![alt](url))을 H2 섹션 직후에 삽입
+   - 각 사진 바로 아래에 이탤릭 캡션 추가: *▲ 사진에 대한 1~2줄 설명*
+   - 사진은 글 전체에 고르게 분산 배치 (초반/중반/후반 각 1~2장씩)
+   - 사진이 없는 경우 이미지 ALT 태그 텍스트 3개 이상 제안
 
 7. CTA(Call to Action) 필수: 마지막에 문의 유도 문단 포함
 
@@ -88,6 +93,12 @@ export function buildBlogUserPrompt(ctx: BlogPromptContext): string {
 - 층수: ${ctx.floor && ctx.total_floors ? `${ctx.floor}층 / 전체 ${ctx.total_floors}층` : '정보 없음'}
 - 방향: ${ctx.direction ?? '정보 없음'}
 - 특징: ${ctx.features?.join(', ') ?? '없음'}
+
+[매물 사진 - 본문에 반드시 삽입]
+${ctx.photo_urls && ctx.photo_urls.length > 0
+  ? ctx.photo_urls.map((p, i) => `사진${i + 1}(${p.category ?? '매물'}): ![${p.alt}](${p.url})\n  → 이 사진 아래에 *▲ ${p.category ?? '매물'} 사진 - 실제 현장 모습입니다* 형태의 캡션을 추가하세요`).join('\n')
+  : '(등록된 사진 없음)'}
+※ 각 사진은 관련 섹션(거실→실내구조, 외관→매물개요, 뷰→입지장점 등) 바로 다음에 배치하고, 사진 아래에 해당 공간을 설명하는 1~2문장 캡션을 이탤릭체(*▲ ...*)로 작성하세요.
 
 [입지 분석 결과]
 ${ctx.location_advantages?.map((a, i) => `${i + 1}. ${a}`).join('\n') ?? '입지 분석 결과 없음 (주소 기반으로 추론하여 작성)'}
