@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Wand2, Download, Share2 } from 'lucide-react'
+import { Wand2, Download, Share2, Image as ImageIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { GeneratedContent } from '@/lib/types'
 import toast from 'react-hot-toast'
@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 interface CardNewsTabProps {
   projectId: string
   contents: GeneratedContent[]
+  assets: any[]
 }
 
 interface CardSlide {
@@ -18,42 +19,120 @@ interface CardSlide {
   body: string
   highlight?: string
   emoji?: string
-  background?: string
+  subtitle?: string
+  hashtags?: string[]
+  points?: string[]
+  cta?: string
 }
 
-const CARD_COUNT_OPTIONS = [6, 8] as const
 const COLOR_THEMES = [
-  { id: 'blue', label: '블루', colors: ['from-blue-600', 'to-blue-400'] },
-  { id: 'green', label: '그린', colors: ['from-emerald-600', 'to-emerald-400'] },
-  { id: 'purple', label: '퍼플', colors: ['from-purple-600', 'to-purple-400'] },
-  { id: 'orange', label: '오렌지', colors: ['from-orange-500', 'to-orange-400'] },
+  { id: 'blue',   label: '블루',   from: '#1d4ed8', to: '#3b82f6', accent: '#93c5fd' },
+  { id: 'green',  label: '그린',   from: '#065f46', to: '#10b981', accent: '#6ee7b7' },
+  { id: 'purple', label: '퍼플',   from: '#581c87', to: '#a855f7', accent: '#d8b4fe' },
+  { id: 'orange', label: '오렌지', from: '#92400e', to: '#f97316', accent: '#fed7aa' },
+  { id: 'dark',   label: '다크',   from: '#0f172a', to: '#334155', accent: '#94a3b8' },
+  { id: 'rose',   label: '로즈',   from: '#9f1239', to: '#f43f5e', accent: '#fda4af' },
 ]
 
-function CardPreview({ card, theme }: { card: CardSlide; theme: string }) {
-  const themeObj = COLOR_THEMES.find(t => t.id === theme) ?? COLOR_THEMES[0]
+function CardPreview({ card, theme, photo }: { card: CardSlide; theme: typeof COLOR_THEMES[0]; photo?: string }) {
+  const isFirst = card.order === 1
+  const isLast = card.order >= 6
 
   return (
-    <div className={cn(
-      'aspect-square rounded-xl bg-gradient-to-br flex flex-col items-center justify-center p-4 text-white text-center shadow-md',
-      themeObj.colors[0], themeObj.colors[1]
-    )}>
-      {card.emoji && <span className="text-3xl mb-2">{card.emoji}</span>}
-      <p className="text-xs font-bold opacity-60 mb-1">0{card.order}</p>
-      <h3 className="font-bold text-sm leading-tight">{card.title}</h3>
-      {card.highlight && (
-        <p className="text-xs bg-white/20 rounded-full px-2 py-0.5 mt-2 font-medium">
-          {card.highlight}
-        </p>
+    <div
+      className="relative aspect-square rounded-2xl overflow-hidden shadow-lg flex flex-col"
+      style={{ background: `linear-gradient(135deg, ${theme.from}, ${theme.to})` }}
+    >
+      {/* 배경 사진 (1번 카드에 반투명) */}
+      {photo && isFirst && (
+        <img
+          src={photo}
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover opacity-20"
+        />
       )}
-      <p className="text-xs opacity-80 mt-2 line-clamp-3">{card.body}</p>
+
+      {/* 장식 원 */}
+      <div
+        className="absolute -top-8 -right-8 w-32 h-32 rounded-full opacity-10"
+        style={{ background: theme.accent }}
+      />
+      <div
+        className="absolute -bottom-6 -left-6 w-24 h-24 rounded-full opacity-10"
+        style={{ background: theme.accent }}
+      />
+
+      {/* 카드 번호 뱃지 */}
+      <div className="absolute top-3 left-3">
+        <span
+          className="text-xs font-bold px-2 py-0.5 rounded-full"
+          style={{ background: 'rgba(255,255,255,0.2)', color: 'white' }}
+        >
+          {String(card.order).padStart(2, '0')}
+        </span>
+      </div>
+
+      {/* 컨텐츠 */}
+      <div className="relative flex flex-col items-center justify-center h-full p-5 text-center text-white gap-2">
+        {card.emoji && (
+          <span className="text-3xl drop-shadow">{card.emoji}</span>
+        )}
+
+        <h3 className="font-extrabold text-base leading-tight drop-shadow-sm">
+          {card.title}
+        </h3>
+
+        {card.highlight && (
+          <div
+            className="text-xs font-semibold px-3 py-1 rounded-full"
+            style={{ background: 'rgba(255,255,255,0.25)' }}
+          >
+            {card.highlight}
+          </div>
+        )}
+
+        {card.body && (
+          <p className="text-xs opacity-90 leading-relaxed line-clamp-3 max-w-[90%]">
+            {card.body}
+          </p>
+        )}
+
+        {/* points (카카오 스타일) */}
+        {card.points && card.points.length > 0 && (
+          <ul className="text-xs space-y-0.5 text-left w-full px-2">
+            {card.points.slice(0, 3).map((p, i) => (
+              <li key={i} className="flex items-start gap-1 opacity-90">
+                <span style={{ color: theme.accent }}>✓</span>
+                <span>{p}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {/* 해시태그 */}
+        {isLast && card.hashtags && card.hashtags.length > 0 && (
+          <div className="flex flex-wrap justify-center gap-1 mt-1">
+            {card.hashtags.slice(0, 4).map((tag, i) => (
+              <span key={i} className="text-[10px] opacity-70">
+                {tag.startsWith('#') ? tag : `#${tag}`}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 하단 그라데이션 바 */}
+      <div
+        className="absolute bottom-0 left-0 right-0 h-0.5"
+        style={{ background: theme.accent, opacity: 0.5 }}
+      />
     </div>
   )
 }
 
-export default function CardNewsTab({ projectId, contents }: CardNewsTabProps) {
+export default function CardNewsTab({ projectId, contents, assets }: CardNewsTabProps) {
   const supabase = createClient()
   const [generating, setGenerating] = useState(false)
-  const [cardCount, setCardCount] = useState<6 | 8>(6)
   const [colorTheme, setColorTheme] = useState('blue')
   const [selectedId, setSelectedId] = useState<string | null>(contents[0]?.id ?? null)
 
@@ -63,11 +142,16 @@ export default function CardNewsTab({ projectId, contents }: CardNewsTabProps) {
   const slides: CardSlide[] = rawCards.map((c: any, i: number) => ({
     order: c.order ?? c.card_number ?? (i + 1),
     title: c.title ?? c.headline ?? `카드 ${i + 1}`,
-    body: c.body ?? (Array.isArray(c.points) ? c.points.join(' · ') : ''),
+    body: c.body ?? '',
     highlight: c.subtitle ?? c.price ?? c.highlight,
     emoji: c.emoji,
-    background: c.background,
+    points: Array.isArray(c.points) ? c.points : undefined,
+    hashtags: Array.isArray(c.hashtags) ? c.hashtags : undefined,
+    cta: c.cta,
   }))
+
+  const theme = COLOR_THEMES.find(t => t.id === colorTheme) ?? COLOR_THEMES[0]
+  const coverPhoto = assets.find((a: any) => a.is_cover)?.file_url ?? assets[0]?.file_url
 
   const handleGenerate = async () => {
     setGenerating(true)
@@ -79,7 +163,7 @@ export default function CardNewsTab({ projectId, contents }: CardNewsTabProps) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token ?? ''}`,
         },
-        body: JSON.stringify({ project_id: projectId, card_count: cardCount, color_theme: colorTheme }),
+        body: JSON.stringify({ project_id: projectId }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? '생성 실패')
@@ -100,47 +184,26 @@ export default function CardNewsTab({ projectId, contents }: CardNewsTabProps) {
         <div className="card p-4">
           <h3 className="text-sm font-semibold text-gray-700 mb-3">카드뉴스 설정</h3>
 
-          {/* 카드 수 */}
-          <div className="mb-3">
-            <label className="label text-xs">카드 수</label>
-            <div className="grid grid-cols-2 gap-1.5">
-              {CARD_COUNT_OPTIONS.map(n => (
-                <button
-                  key={n}
-                  onClick={() => setCardCount(n)}
-                  className={cn(
-                    'py-2 text-sm rounded-lg border font-medium transition-colors',
-                    cardCount === n
-                      ? 'bg-brand-600 text-white border-brand-600'
-                      : 'border-gray-200 text-gray-600 hover:border-brand-300'
-                  )}
-                >
-                  {n}장
-                </button>
-              ))}
-            </div>
-          </div>
-
           {/* 색상 테마 */}
           <div className="mb-4">
             <label className="label text-xs">색상 테마</label>
-            <div className="grid grid-cols-2 gap-1.5">
-              {COLOR_THEMES.map(theme => (
+            <div className="grid grid-cols-3 gap-1.5">
+              {COLOR_THEMES.map(t => (
                 <button
-                  key={theme.id}
-                  onClick={() => setColorTheme(theme.id)}
+                  key={t.id}
+                  onClick={() => setColorTheme(t.id)}
                   className={cn(
                     'py-1.5 text-xs rounded-lg border font-medium transition-all',
-                    colorTheme === theme.id
+                    colorTheme === t.id
                       ? 'ring-2 ring-brand-500 border-transparent'
-                      : 'border-gray-200'
+                      : 'border-gray-200 hover:border-gray-300'
                   )}
                 >
-                  <div className={cn(
-                    'w-full h-4 rounded mb-1 bg-gradient-to-r',
-                    theme.colors[0], theme.colors[1]
-                  )} />
-                  {theme.label}
+                  <div
+                    className="w-full h-4 rounded mb-1"
+                    style={{ background: `linear-gradient(to right, ${t.from}, ${t.to})` }}
+                  />
+                  {t.label}
                 </button>
               ))}
             </div>
@@ -161,6 +224,27 @@ export default function CardNewsTab({ projectId, contents }: CardNewsTabProps) {
             )}
           </button>
         </div>
+
+        {/* 매물 사진 현황 */}
+        {assets.length > 0 && (
+          <div className="card p-4">
+            <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+              <ImageIcon size={14} />
+              매물 사진 ({assets.length}장)
+            </h3>
+            <div className="grid grid-cols-3 gap-1">
+              {assets.slice(0, 6).map((a: any, i) => (
+                <img
+                  key={i}
+                  src={a.file_url}
+                  alt=""
+                  className="aspect-square rounded object-cover"
+                />
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-2">1번 카드에 대표 사진이 적용됩니다</p>
+          </div>
+        )}
 
         {/* 버전 목록 */}
         {contents.length > 0 && (
@@ -205,9 +289,14 @@ export default function CardNewsTab({ projectId, contents }: CardNewsTabProps) {
                 PNG 다운로드
               </button>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               {slides.map(card => (
-                <CardPreview key={card.order} card={card} theme={colorTheme} />
+                <CardPreview
+                  key={card.order}
+                  card={card}
+                  theme={theme}
+                  photo={card.order === 1 ? coverPhoto : undefined}
+                />
               ))}
             </div>
           </>
