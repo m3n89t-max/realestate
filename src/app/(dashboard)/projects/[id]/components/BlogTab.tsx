@@ -116,6 +116,7 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
         project_id: projectId,
         type: 'upload_naver_blog',
         status: 'pending',
+        scheduled_at: new Date().toISOString(),
         payload: { content_id: selectedId, project_id: projectId },
       })
       if (error) throw error
