@@ -58,21 +58,35 @@ export default function CardNewsTab({ projectId, contents }: CardNewsTabProps) {
   const [selectedId, setSelectedId] = useState<string | null>(contents[0]?.id ?? null)
 
   const selected = contents.find(c => c.id === selectedId)
-  const slides: CardSlide[] = selected?.content ? JSON.parse(selected.content) : []
+  const rawContent = selected?.content ? JSON.parse(selected.content) : null
+  const rawCards = Array.isArray(rawContent) ? rawContent : (rawContent?.cards ?? [])
+  const slides: CardSlide[] = rawCards.map((c: any, i: number) => ({
+    order: c.order ?? c.card_number ?? (i + 1),
+    title: c.title ?? c.headline ?? `카드 ${i + 1}`,
+    body: c.body ?? (Array.isArray(c.points) ? c.points.join(' · ') : ''),
+    highlight: c.subtitle ?? c.price ?? c.highlight,
+    emoji: c.emoji,
+    background: c.background,
+  }))
 
   const handleGenerate = async () => {
     setGenerating(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const { data, error } = await supabase.functions.invoke('generate-card-news', {
-        body: { project_id: projectId, card_count: cardCount, color_theme: colorTheme },
-        headers: { Authorization: `Bearer ${session?.access_token}` },
+      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/generate-card-news`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token ?? ''}`,
+        },
+        body: JSON.stringify({ project_id: projectId, card_count: cardCount, color_theme: colorTheme }),
       })
-      if (error) throw error
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? '생성 실패')
       toast.success('카드뉴스가 생성되었습니다!')
       window.location.reload()
-    } catch (err) {
-      toast.error('생성에 실패했습니다')
+    } catch (err: any) {
+      toast.error(err.message ?? '생성에 실패했습니다')
       console.error(err)
     } finally {
       setGenerating(false)
