@@ -30,13 +30,24 @@ export default async function DashboardPage() {
     supabase.rpc('get_org_usage', { p_org_id: orgId }).single(),
     supabase.from('tasks').select('status').eq('org_id', orgId)
       .in('status', ['pending', 'running', 'retrying']),
-    supabase.from('agent_connections').select('status').eq('org_id', orgId).limit(1).single(),
+    supabase.from('agent_connections').select('status, last_seen_at').eq('org_id', orgId).limit(1).single(),
   ])
 
   const projects = projectsResult.data ?? []
   const usage = usageResult.data as Record<string, number> | null
   const pendingTasks = (tasksResult.data ?? []).length
-  const agentStatus = agentResult.data?.status ?? 'offline'
+
+  // 에이전트 상태 계산 (2분 초과 시 오프라인)
+  let agentStatus: 'online' | 'offline' | 'busy' = 'offline'
+  if (agentResult.data?.last_seen_at) {
+    const lastSeen = new Date(agentResult.data.last_seen_at).getTime()
+    const now = new Date().getTime()
+    const diffMin = (now - lastSeen) / 1000 / 60
+
+    if (diffMin < 2) {
+      agentStatus = agentResult.data.status as any
+    }
+  }
 
   const org = membership?.organization as { name?: string; plan_type?: string; monthly_project_limit?: number } | null
 
