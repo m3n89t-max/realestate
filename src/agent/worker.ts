@@ -68,8 +68,11 @@ class LocalAgent {
     // 시작
     // ============================================================
     async start() {
-        // 설정 로드 (여기서 처음 getConfig 호출)
         this.config = getConfig();
+        log(`[Config] Supabase URL: ${this.config.supabase_url}`);
+        log(`[Config] Agent Name: ${this.config.agent_name}`);
+        log(`[Config] Agent Key: ${this.config.agent_key ? '설정됨' : '미설정'}`);
+
         this.supabase = createClient(
             this.config.supabase_url,
             this.config.supabase_anon_key,
@@ -77,6 +80,7 @@ class LocalAgent {
                 global: {
                     headers: {
                         'x-agent-key': this.config.agent_key || '',
+                        'X-Agent-Key': this.config.agent_key || '', // 대소문자 문제 방지
                     },
                 },
             }
@@ -262,190 +266,198 @@ class LocalAgent {
     // ============================================================
     // 6. 밀린 작업 처리
     // ============================================================
+    async catchUpPendingTasks() {
         try {
-    if (!this.orgId) {
-        // orgId가 없으면 아직 validateAndRegister가 완료되지 않은 것임
-        return;
-    }
-
-    log(`[Poll] 작업 확인 중... (org_id: ${this.orgId})`);
-
-    let query = this.supabase
-        .from('tasks')
-        .select('*')
-        .in('status', ['pending', 'retrying'])
-        .lte('scheduled_at', new Date().toISOString())
-        .order('scheduled_at', { ascending: true })
-        .limit(5);
-
-    query = query.eq('org_id', this.orgId);
-
-    const { data: tasks, error } = await query;
-
-    if (error) {
-        log(`[Poll] 작업 조회 실패: ${error.message} (Code: ${error.code})`);
-        return;
-    }
-
-    if (tasks && tasks.length > 0) {
-        for (const task of tasks) {
-            if (AGENT_TASK_TYPES.includes(task.type)) {
-                await this.handleNewTask(task);
+            if (!this.orgId) {
+                // orgId가 없으면 아직 validateAndRegister가 완료되지 않은 것임
+                return;
             }
+
+            log(`[Poll] 작업 확인 중... (org_id: ${this.orgId})`);
+
+            let query = this.supabase
+                .from('tasks')
+                .select('*')
+                .in('status', ['pending', 'retrying'])
+                .lte('scheduled_at', new Date().toISOString())
+                .order('scheduled_at', { ascending: true })
+                .limit(5);
+
+            query = query.eq('org_id', this.orgId);
+
+            const { data: tasks, error } = await query;
+
+            if (error) {
+                log(`[Poll] 작업 조회 실패: ${error.message} (Code: ${error.code})`);
+                return;
+            }
+
+            if (tasks && tasks.length > 0) {
+                for (const task of tasks) {
+                    if (AGENT_TASK_TYPES.includes(task.type)) {
+                        await this.handleNewTask(task);
+                    }
+                }
+            }
+        } catch (err: any) {
+            console.error('[Poll] 에러:', err.message);
         }
-    }
-} catch (err: any) {
-    console.error('[Poll] 에러:', err.message);
-}
     }
 
     // ============================================================
     // 7. 새 작업 수신 핸들러
     // ============================================================
     private async handleNewTask(task: any) {
-    // 에이전트 담당 타입인지 확인
-    if (!AGENT_TASK_TYPES.includes(task.type)) return;
-    if (task.status !== 'pending' && task.status !== 'retrying') return;
-    if (this.isProcessing) return; // 현재 작업 중이면 스킵
+        // 에이전트 담당 타입인지 확인
+        if (!AGENT_TASK_TYPES.includes(task.type)) return;
+        if (task.status !== 'pending' && task.status !== 'retrying') return;
+        if (this.isProcessing) return; // 현재 작업 중이면 스킵
 
-    // Optimistic Lock — 다른 에이전트가 먼저 claim 하면 실패
-    const claimed = await this.claimTask(task.id);
-    if (!claimed) {
-        console.log(`[Agent] 작업 ${task.id} claim 실패 (이미 다른 에이전트가 처리 중)`);
-        return;
+        // Optimistic Lock — 다른 에이전트가 먼저 claim 하면 실패
+        const claimed = await this.claimTask(task.id);
+        if (!claimed) {
+            console.log(`[Agent] 작업 ${task.id} claim 실패 (이미 다른 에이전트가 처리 중)`);
+            return;
+        }
+
+        this.isProcessing = true;
+        console.log(`[Agent] 📋 작업 시작: ${task.type} (${task.id})`);
+
+        try {
+            // webhook: task_started 전송
+            if (this.config.agent_key) {
+                await sendTaskStarted(this.config, task.id);
+            }
+
+            // 작업 타입별 실행
+            let result: Record<string, unknown> = {};
+
+            switch (task.type) {
+                case 'building_register':
+                case 'download_building_register':
+                    result = await downloadBuildingRegister(task, this.config);
+                    break;
+
+                case 'download_cadastral_map':
+                    result = await downloadCadastralMap(task, this.config);
+                    break;
+
+                case 'naver_upload':
+                case 'upload_naver_blog':
+                    result = await uploadNaverBlog(task, this.config);
+                    break;
+
+                case 'youtube_upload':
+                case 'upload_youtube':
+                    result = await uploadYoutube(task, this.config);
+                    break;
+
+                case 'instagram_upload':
+                case 'upload_instagram':
+                    result = await uploadInstagram(task, this.config);
+                    break;
+
+                default:
+                    throw new Error(`지원하지 않는 작업 유형: ${task.type}`);
+            }
+
+            // webhook: task_completed 전송
+            if (this.config.agent_key) {
+                await sendTaskCompleted(this.config, task.id, result);
+            } else {
+                // agent_key 없는 개발 모드: 직접 DB 업데이트
+                await this.supabase
+                    .from('tasks')
+                    .update({
+                        status: 'success',
+                        result,
+                        completed_at: new Date().toISOString(),
+                    })
+                    .eq('id', task.id);
+            }
+
+            console.log(`[Agent] ✅ 작업 완료: ${task.type}`);
+
+        } catch (err: any) {
+            console.error(`[Agent] ❌ 작업 실패: ${err.message}`);
+
+            const errorCode = this.classifyError(err);
+
+            if (this.config.agent_key) {
+                await sendTaskFailed(this.config, task.id, errorCode, err.message, true);
+            } else {
+                await this.supabase
+                    .from('tasks')
+                    .update({
+                        status: 'failed',
+                        error_code: errorCode,
+                        error_message: err.message,
+                        completed_at: new Date().toISOString(),
+                    })
+                    .eq('id', task.id);
+            }
+        } finally {
+            this.isProcessing = false;
+        }
     }
-
-    this.isProcessing = true;
-    console.log(`[Agent] 📋 작업 시작: ${task.type} (${task.id})`);
-
-    try {
-        // webhook: task_started 전송
-        if (this.config.agent_key) {
-            await sendTaskStarted(this.config, task.id);
-        }
-
-        // 작업 타입별 실행
-        let result: Record<string, unknown> = {};
-
-        switch (task.type) {
-            case 'building_register':
-            case 'download_building_register':
-                result = await downloadBuildingRegister(task, this.config);
-                break;
-
-            case 'download_cadastral_map':
-                result = await downloadCadastralMap(task, this.config);
-                break;
-
-            case 'naver_upload':
-            case 'upload_naver_blog':
-                result = await uploadNaverBlog(task, this.config);
-                break;
-
-            case 'youtube_upload':
-            case 'upload_youtube':
-                result = await uploadYoutube(task, this.config);
-                break;
-
-            case 'instagram_upload':
-            case 'upload_instagram':
-                result = await uploadInstagram(task, this.config);
-                break;
-
-            default:
-                throw new Error(`지원하지 않는 작업 유형: ${task.type}`);
-        }
-
-        // webhook: task_completed 전송
-        if (this.config.agent_key) {
-            await sendTaskCompleted(this.config, task.id, result);
-        } else {
-            // agent_key 없는 개발 모드: 직접 DB 업데이트
-            await this.supabase
-                .from('tasks')
-                .update({
-                    status: 'success',
-                    result,
-                    completed_at: new Date().toISOString(),
-                })
-                .eq('id', task.id);
-        }
-
-        console.log(`[Agent] ✅ 작업 완료: ${task.type}`);
-
-    } catch (err: any) {
-        console.error(`[Agent] ❌ 작업 실패: ${err.message}`);
-
-        const errorCode = this.classifyError(err);
-
-        if (this.config.agent_key) {
-            await sendTaskFailed(this.config, task.id, errorCode, err.message, true);
-        } else {
-            await this.supabase
-                .from('tasks')
-                .update({
-                    status: 'failed',
-                    error_code: errorCode,
-                    error_message: err.message,
-                    completed_at: new Date().toISOString(),
-                })
-                .eq('id', task.id);
-        }
-    } finally {
-        this.isProcessing = false;
-    }
-}
 
     // ============================================================
     // 8. Optimistic Lock
     // ============================================================
-    private async claimTask(taskId: string): Promise < boolean > {
-    const { data, error } = await this.supabase
-        .from('tasks')
-        .update({
-            status: 'running',
-            agent_id: this.agentConnectionId || undefined,
-            started_at: new Date().toISOString(),
-        })
-        .eq('id', taskId)
-        .in('status', ['pending', 'retrying'])
-        .select();
+    private async claimTask(taskId: string): Promise<boolean> {
+        const { data, error } = await this.supabase
+            .from('tasks')
+            .update({
+                status: 'running',
+                agent_id: this.agentConnectionId || undefined,
+                started_at: new Date().toISOString(),
+            })
+            .eq('id', taskId)
+            .in('status', ['pending', 'retrying'])
+            .select();
 
-    if(error || !data || data.length === 0) {
-    return false;
-}
-return true;
+        if (error || !data || data.length === 0) {
+            return false;
+        }
+        return true;
     }
 
     // ============================================================
     // 9. Retry 스케줄링
     // ============================================================
     private scheduleRetry(task: any) {
-    const scheduledAt = new Date(task.scheduled_at).getTime();
-    const delayMs = Math.max(scheduledAt - Date.now(), 0);
-    console.log(`[Agent] ⏳ 재시도 예약: ${task.type} (${Math.round(delayMs / 1000)}초 후)`);
-    setTimeout(() => this.handleNewTask({ ...task, status: 'retrying' }), delayMs);
-}
+        const scheduledAt = new Date(task.scheduled_at).getTime();
+        const delayMs = Math.max(scheduledAt - Date.now(), 0);
+        console.log(`[Agent] ⏳ 재시도 예약: ${task.type} (${Math.round(delayMs / 1000)}초 후)`);
+        setTimeout(() => this.handleNewTask({ ...task, status: 'retrying' }), delayMs);
+    }
 
     // ============================================================
     // 10. 에러 분류
     // ============================================================
     private classifyError(err: any): string {
-    const msg = (err.message || '').toLowerCase();
-    if (msg.includes('login') || msg.includes('로그인')) return 'LOGIN_FAILED';
-    if (msg.includes('captcha')) return 'CAPTCHA_TIMEOUT';
-    if (msg.includes('not found') || msg.includes('검색 결과 없음')) return 'SEARCH_NOT_FOUND';
-    if (msg.includes('download') || msg.includes('다운로드')) return 'DOWNLOAD_FAILED';
-    if (msg.includes('upload') || msg.includes('업로드')) return 'UPLOAD_FAILED';
-    if (msg.includes('network') || msg.includes('fetch')) return 'NETWORK_ERROR';
-    if (msg.includes('browser') || msg.includes('playwright')) return 'BROWSER_CRASH';
-    if (msg.includes('점검') || msg.includes('maintenance')) return 'SITE_MAINTENANCE';
-    return 'UNKNOWN_ERROR';
-}
+        const msg = (err.message || '').toLowerCase();
+        if (msg.includes('login') || msg.includes('로그인')) return 'LOGIN_FAILED';
+        if (msg.includes('captcha')) return 'CAPTCHA_TIMEOUT';
+        if (msg.includes('not found') || msg.includes('검색 결과 없음')) return 'SEARCH_NOT_FOUND';
+        if (msg.includes('download') || msg.includes('다운로드')) return 'DOWNLOAD_FAILED';
+        if (msg.includes('upload') || msg.includes('업로드')) return 'UPLOAD_FAILED';
+        if (msg.includes('network') || msg.includes('fetch')) return 'NETWORK_ERROR';
+        if (msg.includes('browser') || msg.includes('playwright')) return 'BROWSER_CRASH';
+        if (msg.includes('점검') || msg.includes('maintenance')) return 'SITE_MAINTENANCE';
+        return 'UNKNOWN_ERROR';
+    }
 }
 
 // ============================================================
 // 에이전트 인터페이스 (main.ts에서 제어)
 // ============================================================
 export const agent = new LocalAgent();
+
+// CLI 실행 지원: node worker.ts 로 직접 실행 시 에이전트 시작
+if (require.main === module) {
+    agent.start().catch((err: any) => {
+        console.error('[Agent] 시작 중 치명적 오류:', err);
+    });
+}
 
