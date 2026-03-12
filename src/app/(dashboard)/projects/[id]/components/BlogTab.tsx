@@ -11,6 +11,7 @@ interface BlogTabProps {
   projectId: string
   orgId: string
   contents: GeneratedContent[]
+  assets: any[]
 }
 
 interface SeoCheckItem {
@@ -67,7 +68,7 @@ function SeoScorePanel({ score }: { score: SeoScore }) {
   )
 }
 
-export default function BlogTab({ projectId, orgId, contents }: BlogTabProps) {
+export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabProps) {
   const supabase = createClient()
   const [generating, setGenerating] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -76,6 +77,7 @@ export default function BlogTab({ projectId, orgId, contents }: BlogTabProps) {
   const [editContent, setEditContent] = useState<string>(contents[0]?.content ?? '')
   const [copiedTitle, setCopiedTitle] = useState<string | null>(null)
   const [showAllTitles, setShowAllTitles] = useState(false)
+  const [showPhotoLibrary, setShowPhotoLibrary] = useState(false)
 
   const selected = contents.find(c => c.id === selectedId)
 
@@ -130,6 +132,71 @@ export default function BlogTab({ projectId, orgId, contents }: BlogTabProps) {
     setCopiedTitle(id)
     setTimeout(() => setCopiedTitle(null), 2000)
     toast.success('클립보드에 복사되었습니다')
+  }
+
+  const insertImage = (url: string, alt: string) => {
+    const markdown = `\n![${alt}](${url})\n*▲ ${alt}*`
+    const textarea = document.getElementById('blog-editor') as HTMLTextAreaElement
+    if (!textarea) {
+      setEditContent(prev => prev + markdown)
+      return
+    }
+
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const content = editContent
+    const newContent = content.substring(0, start) + markdown + content.substring(end)
+
+    setEditContent(newContent)
+
+    // 포커스 유지 및 커서 이동
+    setTimeout(() => {
+      textarea.focus()
+      textarea.setSelectionRange(start + markdown.length, start + markdown.length)
+    }, 0)
+
+    toast.success('이미지가 삽입되었습니다')
+  }
+
+  const handleQuickUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploading(true)
+    try {
+      const ext = file.name.split('.').pop()
+      const fileName = `${Math.random().toString(36).substring(2, 10)}_${Date.now()}.${ext}`
+      const filePath = `${orgId}/${projectId}/${fileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('project-assets')
+        .upload(filePath, file)
+
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('project-assets')
+        .getPublicUrl(filePath)
+
+      // DB에도 기록
+      await supabase.from('assets').insert({
+        project_id: projectId,
+        org_id: orgId,
+        type: 'image',
+        file_name: file.name,
+        file_url: publicUrl,
+        file_size: file.size,
+        mime_type: file.type,
+      })
+
+      insertImage(publicUrl, file.name.split('.')[0])
+      toast.success('사진이 업로드되고 삽입되었습니다')
+    } catch (err) {
+      toast.error('업로드 실패')
+      console.error(err)
+    } finally {
+      setUploading(false)
+    }
   }
 
   return (
@@ -248,6 +315,54 @@ export default function BlogTab({ projectId, orgId, contents }: BlogTabProps) {
             </div>
           </div>
         )}
+
+        {/* 사진 라이브러리 */}
+        <div className="card p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-700">매물 사진 라이브러리</h3>
+            <button
+              onClick={() => setShowPhotoLibrary(!showPhotoLibrary)}
+              className="text-xs text-brand-600 hover:underline"
+            >
+              {showPhotoLibrary ? '접기' : '모두 보기'}
+            </button>
+          </div>
+
+          <div className={cn(
+            "grid grid-cols-3 gap-2",
+            !showPhotoLibrary && "max-h-32 overflow-hidden relative"
+          )}>
+            {assets.slice(0, showPhotoLibrary ? undefined : 6).map((asset, i) => (
+              <button
+                key={i}
+                onClick={() => insertImage(asset.file_url, asset.alt_text || asset.category || '매물사진')}
+                className="relative aspect-square rounded-lg overflow-hidden border border-gray-100 hover:border-brand-500 transition-colors group"
+              >
+                <img src={asset.file_url} alt="" className="object-cover w-full h-full" />
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                  <span className="text-[10px] text-white font-medium">삽입</span>
+                </div>
+              </button>
+            ))}
+            {!showPhotoLibrary && assets.length > 6 && (
+              <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white to-transparent pointer-events-none" />
+            )}
+          </div>
+
+          <div className="mt-4">
+            <label className="btn-secondary w-full justify-center text-xs cursor-pointer">
+              <Upload size={12} />
+              새 사진 업로드 & 삽입
+              <input
+                type="file"
+                className="hidden"
+                accept="image/*"
+                onChange={handleQuickUpload}
+                disabled={uploading}
+              />
+            </label>
+          </div>
+        </div>
       </div>
 
       {/* 우측: 편집기 */}
@@ -322,6 +437,7 @@ export default function BlogTab({ projectId, orgId, contents }: BlogTabProps) {
                 </div>
               </div>
               <textarea
+                id="blog-editor"
                 value={editContent}
                 onChange={e => setEditContent(e.target.value)}
                 rows={20}
