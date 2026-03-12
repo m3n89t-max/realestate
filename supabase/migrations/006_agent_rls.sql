@@ -17,6 +17,7 @@ CREATE POLICY "agent_read_tasks" ON tasks
     org_id IN (
       SELECT org_id FROM agent_connections
       WHERE agent_key = current_setting('request.headers', true)::json->>'x-agent-key'
+         OR agent_key = current_setting('request.headers', true)::json->>'X-Agent-Key'
     )
   );
 
@@ -26,6 +27,7 @@ CREATE POLICY "agent_update_tasks" ON tasks
     org_id IN (
       SELECT org_id FROM agent_connections
       WHERE agent_key = current_setting('request.headers', true)::json->>'x-agent-key'
+         OR agent_key = current_setting('request.headers', true)::json->>'X-Agent-Key'
     )
   );
 
@@ -33,12 +35,14 @@ CREATE POLICY "agent_read_own_connection" ON agent_connections
   FOR SELECT
   USING (
     agent_key = current_setting('request.headers', true)::json->>'x-agent-key'
+    OR agent_key = current_setting('request.headers', true)::json->>'X-Agent-Key'
   );
 
 CREATE POLICY "agent_update_own_heartbeat" ON agent_connections
   FOR UPDATE
   USING (
     agent_key = current_setting('request.headers', true)::json->>'x-agent-key'
+    OR agent_key = current_setting('request.headers', true)::json->>'X-Agent-Key'
   );
 
 -- anon 키 + x-agent-key 헤더 조합으로 접근 허용
