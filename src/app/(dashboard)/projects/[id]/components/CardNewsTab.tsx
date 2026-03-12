@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Wand2, Download, Share2, Image as ImageIcon } from 'lucide-react'
+import { Wand2, Download, Share2, Image as ImageIcon, MapPin, TrendingUp, Home, Phone } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { GeneratedContent } from '@/lib/types'
 import toast from 'react-hot-toast'
@@ -19,112 +19,173 @@ interface CardSlide {
   body: string
   highlight?: string
   emoji?: string
-  subtitle?: string
   hashtags?: string[]
   points?: string[]
   cta?: string
 }
 
 const COLOR_THEMES = [
-  { id: 'blue',   label: '블루',   from: '#1d4ed8', to: '#3b82f6', accent: '#93c5fd' },
-  { id: 'green',  label: '그린',   from: '#065f46', to: '#10b981', accent: '#6ee7b7' },
-  { id: 'purple', label: '퍼플',   from: '#581c87', to: '#a855f7', accent: '#d8b4fe' },
-  { id: 'orange', label: '오렌지', from: '#92400e', to: '#f97316', accent: '#fed7aa' },
-  { id: 'dark',   label: '다크',   from: '#0f172a', to: '#334155', accent: '#94a3b8' },
-  { id: 'rose',   label: '로즈',   from: '#9f1239', to: '#f43f5e', accent: '#fda4af' },
+  { id: 'blue',   label: '블루',   accent: '#3b82f6', dark: '#1e3a8a' },
+  { id: 'green',  label: '그린',   accent: '#10b981', dark: '#064e3b' },
+  { id: 'purple', label: '퍼플',   accent: '#a855f7', dark: '#3b0764' },
+  { id: 'orange', label: '오렌지', accent: '#f97316', dark: '#7c2d12' },
+  { id: 'rose',   label: '로즈',   accent: '#f43f5e', dark: '#881337' },
+  { id: 'slate',  label: '슬레이트', accent: '#64748b', dark: '#0f172a' },
 ]
 
-function CardPreview({ card, theme, photo }: { card: CardSlide; theme: typeof COLOR_THEMES[0]; photo?: string }) {
-  const isFirst = card.order === 1
+// 카드 번호에 따라 사진 배분 (카테고리 우선, 없으면 순번)
+function assignPhoto(order: number, assets: any[]): string | undefined {
+  if (!assets.length) return undefined
+  const cover = assets.find(a => a.is_cover) ?? assets[0]
+  const rest = assets.filter(a => !a.is_cover)
+
+  // 카테고리 기반 매핑
+  const find = (cats: string[]) =>
+    assets.find(a => cats.some(c => (a.category ?? '').toLowerCase().includes(c)))
+
+  const exterior = find(['exterior', 'outside', 'front', '외부', '전경', '외관']) ?? cover
+  const interior = find(['interior', 'inside', 'room', 'living', '내부', '거실', '방']) ?? rest[0] ?? cover
+  const kitchen  = find(['kitchen', 'bath', 'toilet', 'facility', '주방', '욕실', '시설']) ?? rest[1] ?? interior
+
+  const pool: Record<number, string | undefined> = {
+    1: cover?.file_url,                      // 표지 — 대표사진
+    2: exterior?.file_url,                   // 입지강점 — 외관/전경
+    3: interior?.file_url,                   // 시설인프라 — 내부
+    4: kitchen?.file_url,                    // 투자포인트 — 다른 실내
+    5: (rest[rest.length - 1] ?? cover)?.file_url, // 실거주 — 마지막 사진
+    6: cover?.file_url,                      // 문의안내 — 대표사진 재사용
+  }
+  return pool[order] ?? assets[(order - 1) % assets.length]?.file_url
+}
+
+// 카드별 오버레이 스타일
+function overlayStyle(order: number): string {
+  switch (order) {
+    case 1: return 'bg-gradient-to-t from-black/80 via-black/30 to-transparent'
+    case 2: return 'bg-gradient-to-br from-black/60 via-black/30 to-transparent'
+    case 3: return 'bg-gradient-to-t from-black/75 via-black/20 to-black/10'
+    case 4: return 'bg-gradient-to-t from-black/85 via-black/40 to-transparent'
+    case 5: return 'bg-gradient-to-t from-black/70 via-black/20 to-transparent'
+    case 6: return 'bg-gradient-to-b from-black/70 via-black/50 to-black/80'
+    default: return 'bg-gradient-to-t from-black/75 via-black/20 to-transparent'
+  }
+}
+
+function CardPreview({
+  card, theme, photo,
+}: {
+  card: CardSlide
+  theme: typeof COLOR_THEMES[0]
+  photo?: string
+}) {
   const isLast = card.order >= 6
+  const overlay = overlayStyle(card.order)
 
   return (
-    <div
-      className="relative aspect-square rounded-2xl overflow-hidden shadow-lg flex flex-col"
-      style={{ background: `linear-gradient(135deg, ${theme.from}, ${theme.to})` }}
-    >
-      {/* 배경 사진 (1번 카드에 반투명) */}
-      {photo && isFirst && (
+    <div className="relative aspect-square rounded-2xl overflow-hidden shadow-xl group cursor-pointer">
+      {/* 배경 */}
+      {photo ? (
         <img
           src={photo}
           alt=""
-          className="absolute inset-0 w-full h-full object-cover opacity-20"
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+      ) : (
+        <div
+          className="absolute inset-0"
+          style={{ background: `linear-gradient(135deg, ${theme.dark}, ${theme.accent})` }}
         />
       )}
 
-      {/* 장식 원 */}
-      <div
-        className="absolute -top-8 -right-8 w-32 h-32 rounded-full opacity-10"
-        style={{ background: theme.accent }}
-      />
-      <div
-        className="absolute -bottom-6 -left-6 w-24 h-24 rounded-full opacity-10"
-        style={{ background: theme.accent }}
-      />
+      {/* 오버레이 */}
+      <div className={cn('absolute inset-0', overlay)} />
 
-      {/* 카드 번호 뱃지 */}
-      <div className="absolute top-3 left-3">
-        <span
-          className="text-xs font-bold px-2 py-0.5 rounded-full"
-          style={{ background: 'rgba(255,255,255,0.2)', color: 'white' }}
+      {/* 카드 번호 + 테마 컬러 뱃지 */}
+      <div className="absolute top-3 left-3 flex items-center gap-1.5">
+        <div
+          className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black text-white shadow"
+          style={{ background: theme.accent }}
         >
-          {String(card.order).padStart(2, '0')}
-        </span>
+          {card.order}
+        </div>
       </div>
 
-      {/* 컨텐츠 */}
-      <div className="relative flex flex-col items-center justify-center h-full p-5 text-center text-white gap-2">
-        {card.emoji && (
-          <span className="text-3xl drop-shadow">{card.emoji}</span>
-        )}
-
-        <h3 className="font-extrabold text-base leading-tight drop-shadow-sm">
-          {card.title}
-        </h3>
-
-        {card.highlight && (
-          <div
-            className="text-xs font-semibold px-3 py-1 rounded-full"
-            style={{ background: 'rgba(255,255,255,0.25)' }}
-          >
-            {card.highlight}
-          </div>
-        )}
-
-        {card.body && (
-          <p className="text-xs opacity-90 leading-relaxed line-clamp-3 max-w-[90%]">
-            {card.body}
-          </p>
-        )}
-
-        {/* points (카카오 스타일) */}
-        {card.points && card.points.length > 0 && (
-          <ul className="text-xs space-y-0.5 text-left w-full px-2">
-            {card.points.slice(0, 3).map((p, i) => (
-              <li key={i} className="flex items-start gap-1 opacity-90">
-                <span style={{ color: theme.accent }}>✓</span>
-                <span>{p}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {/* 해시태그 */}
-        {isLast && card.hashtags && card.hashtags.length > 0 && (
-          <div className="flex flex-wrap justify-center gap-1 mt-1">
-            {card.hashtags.slice(0, 4).map((tag, i) => (
-              <span key={i} className="text-[10px] opacity-70">
-                {tag.startsWith('#') ? tag : `#${tag}`}
-              </span>
-            ))}
-          </div>
-        )}
+      {/* 카드별 아이콘 (우상단) */}
+      <div className="absolute top-3 right-3 opacity-60">
+        {card.order === 2 && <MapPin size={16} className="text-white" />}
+        {card.order === 4 && <TrendingUp size={16} className="text-white" />}
+        {card.order === 5 && <Home size={16} className="text-white" />}
+        {card.order === 6 && <Phone size={16} className="text-white" />}
       </div>
 
-      {/* 하단 그라데이션 바 */}
+      {/* 컨텐츠 — 카드 1: 중앙 정렬, 나머지: 하단 정렬 */}
+      {card.order === 1 ? (
+        <div className="absolute inset-0 flex flex-col items-center justify-center p-5 text-center text-white">
+          <h2 className="font-black text-xl leading-tight drop-shadow-lg mb-2">
+            {card.title}
+          </h2>
+          {card.highlight && (
+            <div
+              className="text-xs font-bold px-3 py-1 rounded-full mb-2 backdrop-blur-sm"
+              style={{ background: `${theme.accent}cc` }}
+            >
+              {card.highlight}
+            </div>
+          )}
+          {card.body && (
+            <p className="text-xs opacity-80 leading-relaxed line-clamp-2">{card.body}</p>
+          )}
+        </div>
+      ) : (
+        <div className="absolute inset-x-0 bottom-0 p-4 text-white">
+          {/* 포인트 리스트 (카드 2,3,4,5) */}
+          {card.points && card.points.length > 0 && (
+            <ul className="mb-2 space-y-0.5">
+              {card.points.slice(0, 3).map((p, i) => (
+                <li key={i} className="flex items-start gap-1 text-[11px] opacity-90">
+                  <span style={{ color: theme.accent }} className="mt-0.5 shrink-0">●</span>
+                  <span>{p}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <h3 className="font-black text-sm leading-tight drop-shadow mb-1">
+            {card.title}
+          </h3>
+
+          {card.body && !isLast && (
+            <p className="text-[11px] opacity-80 leading-snug line-clamp-2">{card.body}</p>
+          )}
+
+          {/* 6번 카드: 문의 정보 */}
+          {isLast && (
+            <div className="mt-1">
+              <p className="text-xs opacity-80">{card.body}</p>
+              {card.hashtags && card.hashtags.length > 0 && (
+                <p className="text-[10px] mt-1 opacity-60">
+                  {card.hashtags.slice(0, 5).map(t => t.startsWith('#') ? t : `#${t}`).join(' ')}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* 하이라이트 뱃지 */}
+          {card.highlight && !isLast && (
+            <div
+              className="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full mt-1"
+              style={{ background: `${theme.accent}99` }}
+            >
+              {card.highlight}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 하단 컬러 라인 */}
       <div
         className="absolute bottom-0 left-0 right-0 h-0.5"
-        style={{ background: theme.accent, opacity: 0.5 }}
+        style={{ background: theme.accent }}
       />
     </div>
   )
@@ -142,7 +203,7 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
   const slides: CardSlide[] = rawCards.map((c: any, i: number) => ({
     order: c.order ?? c.card_number ?? (i + 1),
     title: c.title ?? c.headline ?? `카드 ${i + 1}`,
-    body: c.body ?? '',
+    body: c.body ?? (Array.isArray(c.points) ? '' : ''),
     highlight: c.subtitle ?? c.price ?? c.highlight,
     emoji: c.emoji,
     points: Array.isArray(c.points) ? c.points : undefined,
@@ -151,7 +212,6 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
   }))
 
   const theme = COLOR_THEMES.find(t => t.id === colorTheme) ?? COLOR_THEMES[0]
-  const coverPhoto = assets.find((a: any) => a.is_cover)?.file_url ?? assets[0]?.file_url
 
   const handleGenerate = async () => {
     setGenerating(true)
@@ -184,7 +244,6 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
         <div className="card p-4">
           <h3 className="text-sm font-semibold text-gray-700 mb-3">카드뉴스 설정</h3>
 
-          {/* 색상 테마 */}
           <div className="mb-4">
             <label className="label text-xs">색상 테마</label>
             <div className="grid grid-cols-3 gap-1.5">
@@ -195,13 +254,14 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
                   className={cn(
                     'py-1.5 text-xs rounded-lg border font-medium transition-all',
                     colorTheme === t.id
-                      ? 'ring-2 ring-brand-500 border-transparent'
+                      ? 'ring-2 ring-offset-1 border-transparent'
                       : 'border-gray-200 hover:border-gray-300'
                   )}
+                  style={colorTheme === t.id ? { ringColor: t.accent } : {}}
                 >
                   <div
                     className="w-full h-4 rounded mb-1"
-                    style={{ background: `linear-gradient(to right, ${t.from}, ${t.to})` }}
+                    style={{ background: `linear-gradient(to right, ${t.dark}, ${t.accent})` }}
                   />
                   {t.label}
                 </button>
@@ -225,7 +285,7 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
           </button>
         </div>
 
-        {/* 매물 사진 현황 */}
+        {/* 매물 사진 */}
         {assets.length > 0 && (
           <div className="card p-4">
             <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
@@ -234,24 +294,20 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
             </h3>
             <div className="grid grid-cols-3 gap-1">
               {assets.slice(0, 6).map((a: any, i) => (
-                <img
-                  key={i}
-                  src={a.file_url}
-                  alt=""
-                  className="aspect-square rounded object-cover"
-                />
+                <img key={i} src={a.file_url} alt="" className="aspect-square rounded object-cover" />
               ))}
             </div>
-            <p className="text-xs text-gray-400 mt-2">1번 카드에 대표 사진이 적용됩니다</p>
+            <p className="text-[11px] text-gray-400 mt-2 leading-snug">
+              카드별로 사진이 자동 배치됩니다<br />
+              (표지→전경→내부→시설→실거주→문의)
+            </p>
           </div>
         )}
 
         {/* 버전 목록 */}
         {contents.length > 0 && (
           <div className="card p-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">
-              생성 기록 ({contents.length})
-            </h3>
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">생성 기록 ({contents.length})</h3>
             <div className="space-y-1.5">
               {contents.map(c => (
                 <button
@@ -278,7 +334,7 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
           <div className="card p-12 text-center">
             <Share2 size={40} className="mx-auto text-gray-200 mb-3" />
             <p className="text-gray-500 font-medium">카드뉴스를 생성해보세요</p>
-            <p className="text-sm text-gray-400 mt-1">SNS/카카오톡 공유용 이미지 세트가 자동 생성됩니다</p>
+            <p className="text-sm text-gray-400 mt-1">매물 사진이 카드별로 자동 배치됩니다</p>
           </div>
         ) : (
           <>
@@ -295,7 +351,7 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
                   key={card.order}
                   card={card}
                   theme={theme}
-                  photo={card.order === 1 ? coverPhoto : undefined}
+                  photo={assignPhoto(card.order, assets)}
                 />
               ))}
             </div>
