@@ -78,6 +78,7 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
   const [copiedTitle, setCopiedTitle] = useState<string | null>(null)
   const [showAllTitles, setShowAllTitles] = useState(false)
   const [showPhotoLibrary, setShowPhotoLibrary] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
 
   const selected = contents.find(c => c.id === selectedId)
 
@@ -418,6 +419,15 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-sm font-semibold text-gray-700">본문 편집</h4>
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowPreview(!showPreview)}
+                    className={cn(
+                      "text-xs px-2 py-1 rounded border transition-colors",
+                      showPreview ? "bg-brand-50 border-brand-200 text-brand-700" : "bg-white border-gray-200 text-gray-600"
+                    )}
+                  >
+                    {showPreview ? '편집 모드' : '미리보기'}
+                  </button>
                   <span className="text-xs text-gray-400">
                     {editContent.length.toLocaleString()}자
                     {editContent.length < 1500 && (
@@ -436,13 +446,44 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
                   </button>
                 </div>
               </div>
-              <textarea
-                id="blog-editor"
-                value={editContent}
-                onChange={e => setEditContent(e.target.value)}
-                rows={20}
-                className="w-full text-sm text-gray-700 border border-gray-200 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono"
-              />
+
+              {showPreview ? (
+                <div className="w-full min-h-[400px] max-h-[600px] overflow-y-auto text-sm text-gray-700 border border-gray-200 rounded-lg p-4 bg-gray-50 prose prose-sm max-w-none">
+                  {editContent.split('\n').map((line, i) => {
+                    // 간단한 마크다운 파싱 (이미지, 헤딩, 굵게)
+                    const imgMatch = line.match(/!\[(.*?)\]\((.*?)\)/)
+                    if (imgMatch) {
+                      return (
+                        <div key={i} className="my-4">
+                          <img src={imgMatch[2]} alt={imgMatch[1]} className="rounded-lg border border-gray-200 max-w-full" />
+                          <p className="text-center text-xs text-gray-400 mt-1">{imgMatch[1]}</p>
+                        </div>
+                      )
+                    }
+                    if (line.startsWith('### ')) return <h3 key={i} className="text-lg font-bold mt-4 mb-2">{line.replace('### ', '')}</h3>
+                    if (line.startsWith('## ')) return <h2 key={i} className="text-xl font-bold mt-6 mb-3 border-b pb-1">{line.replace('## ', '')}</h2>
+                    if (line.startsWith('# ')) return <h1 key={i} className="text-2xl font-bold mt-8 mb-4">{line.replace('# ', '')}</h1>
+
+                    // 굵게 처리
+                    const boldedLine = line.split(/(\*\*.*?\*\*)/).map((part, j) => {
+                      if (part.startsWith('**') && part.endsWith('**')) {
+                        return <strong key={j}>{part.slice(2, -2)}</strong>
+                      }
+                      return part
+                    })
+
+                    return <p key={i} className="min-h-[1.5em] mb-2">{boldedLine}</p>
+                  })}
+                </div>
+              ) : (
+                <textarea
+                  id="blog-editor"
+                  value={editContent}
+                  onChange={e => setEditContent(e.target.value)}
+                  rows={20}
+                  className="w-full text-sm text-gray-700 border border-gray-200 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono"
+                />
+              )}
             </div>
 
             {/* FAQ */}

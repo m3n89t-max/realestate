@@ -103,7 +103,7 @@ export async function uploadNaverBlog(
             const hasCaptcha = await page.locator('#captcha, .captcha_wrap').count() > 0;
             if (hasCaptcha) {
                 await progress(config, task.id, '⚠️ CAPTCHA 감지 — 수동 입력 대기 (120초)...', 15);
-                await page.waitForURL('**/naver.com/**', { timeout: 120_000 }).catch(() => {});
+                await page.waitForURL('**/naver.com/**', { timeout: 120_000 }).catch(() => { });
             }
 
             // 세션 저장
@@ -127,8 +127,9 @@ export async function uploadNaverBlog(
 
         // 6. 제목 입력
         await progress(config, task.id, '제목 입력 중...', 40);
-        await mainFrame.waitForSelector('.se-title-text, [placeholder*="제목"]', { timeout: 15_000 });
-        const titleEl = mainFrame.locator('.se-title-text, [placeholder*="제목"]').first();
+        const titleSelector = '.se-title-text, .se-placeholder, [placeholder*="제목"]';
+        await mainFrame.waitForSelector(titleSelector, { timeout: 15_000 });
+        const titleEl = mainFrame.locator(titleSelector).first();
         await titleEl.click();
         await page.keyboard.press('Control+a');
         await page.keyboard.type(content.title || '매물 소개', { delay: 20 });
@@ -136,12 +137,13 @@ export async function uploadNaverBlog(
 
         // 7. 본문 클립보드 붙여넣기
         await progress(config, task.id, '본문 입력 중...', 55);
-        const plainBody = content.content || '';
+
+        // 마크다운 이미지 태그 제거 (텍스트만 업로드하고 이미지는 나중에 별도로 올림)
+        const plainBody = (content.content || '').replace(/!\[.*?\]\((.*?)\)/g, '').replace(/\*▲.*?\*/g, '');
 
         // 클립보드에 텍스트 복사
         await page.evaluate((text) => {
             return navigator.clipboard.writeText(text).catch(() => {
-                // fallback: execCommand
                 const ta = document.createElement('textarea');
                 ta.value = text;
                 document.body.appendChild(ta);
@@ -152,19 +154,31 @@ export async function uploadNaverBlog(
         }, plainBody);
 
         // 본문 영역 클릭 후 붙여넣기
-        const bodyEl = mainFrame.locator('.se-section .se-component-content, .se-main-section .ProseMirror').first();
+        const bodySelector = '.se-content, .se-main-container, .se-section .se-component-content, .se-main-section .ProseMirror';
+        const bodyEl = mainFrame.locator(bodySelector).first();
         if (await bodyEl.count() > 0) {
             await bodyEl.click();
+            await page.waitForTimeout(800);
+            await bodyEl.click({ position: { x: 50, y: 50 } });
             await page.waitForTimeout(500);
             await page.keyboard.press('Control+a');
             await page.keyboard.press('Delete');
             await page.keyboard.press('Control+v');
             await page.waitForTimeout(2000);
+        } else {
+            console.error('[NaverUpload] 본문 영역을 찾을 수 없습니다.');
+            await page.keyboard.press('Tab');
+            await page.waitForTimeout(500);
+            await page.keyboard.press('Control+v');
         }
 
-        // 8. 이미지 업로드
+        // 8. 이미지 업로드 처리 (본문 하단에 일괄 삽입)
         if (assets && assets.length > 0) {
-            await progress(config, task.id, `이미지 ${assets.length}장 다운로드 중...`, 65);
+            await progress(config, task.id, `이미지 ${assets.length}장 처리 중...`, 65);
+
+            // 본문 맨 아래로 이동
+            await page.keyboard.press('Control+End');
+            await page.keyboard.press('Enter');
 
             // 이미지를 임시 파일로 다운로드
             const tempPaths: string[] = [];
