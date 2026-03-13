@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
       .select()
       .single()
 
-    if (saveError) throw saveError
+    if (saveError) throw new Error(saveError.message)
 
     // 사용량 기록
     const adminClient = createClient(
