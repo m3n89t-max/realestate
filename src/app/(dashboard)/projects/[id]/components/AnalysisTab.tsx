@@ -435,8 +435,12 @@ function CommercialSection({ commercial_data, projectId }: {
   const fetchData = async () => {
     setLoading(true)
     try {
+      const { data: { session } } = await supabase.auth.getSession()
       const { error } = await supabase.functions.invoke('analyze-commercial', {
         body: { project_id: projectId },
+        headers: session?.access_token
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : undefined,
       })
       if (error) throw error
       toast.success('상권 데이터 수집이 완료되었습니다')
