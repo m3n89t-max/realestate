@@ -32,28 +32,81 @@ function buildApiUrl(operation: string, serviceKey: string, params: Record<strin
   return `${BASE_URL}/${operation}?serviceKey=${serviceKey}&${qs}`
 }
 
+// 공공데이터포털 API 응답에서 items 배열 추출
+// 가능한 구조: body.items.item[], body.items[], body.item[], 또는 직접 배열
+function extractItems(data: any): any[] {
+  if (!data) return []
+
+  // 에러 응답 체크
+  const resultCode = data?.header?.resultCode ?? data?.response?.header?.resultCode
+  if (resultCode && resultCode !== '00' && resultCode !== '0000') {
+    const msg = data?.header?.resultMsg ?? data?.response?.header?.resultMsg ?? 'API 오류'
+    console.error('[analyze-commercial] API error:', resultCode, msg)
+    return []
+  }
+
+  const body = data?.body ?? data?.response?.body ?? data
+  if (!body) return []
+
+  // Format 1: body.items.item (배열 또는 단일 객체)
+  if (body?.items?.item !== undefined) {
+    const item = body.items.item
+    return Array.isArray(item) ? item : [item]
+  }
+
+  // Format 2: body.items (직접 배열)
+  if (Array.isArray(body?.items)) {
+    return body.items
+  }
+
+  // Format 3: body.item (직접)
+  if (body?.item !== undefined) {
+    const item = body.item
+    return Array.isArray(item) ? item : [item]
+  }
+
+  // Format 4: 최상위 배열
+  if (Array.isArray(data)) {
+    return data
+  }
+
+  return []
+}
+
 async function fetchCommercialZones(serviceKey: string, lat: number, lng: number): Promise<ZoneItem[]> {
   const url = buildApiUrl('storeZoneInRadius', serviceKey, {
-    pageNo: '1', numOfRows: '20', radius: '500',
+    pageNo: '1', numOfRows: '20', radius: '1000',
     cx: String(lng), cy: String(lat), type: 'json',
   })
+  console.log('[analyze-commercial] zones URL:', url.replace(serviceKey, serviceKey.slice(0, 8) + '...'))
   const res = await fetch(url)
-  const data = await res.json()
-  const items = data?.body?.items?.item
-  if (!items) return []
-  return Array.isArray(items) ? items : [items]
+  const text = await res.text()
+  console.log('[analyze-commercial] zones raw response (first 500):', text.slice(0, 500))
+  try {
+    const data = JSON.parse(text)
+    return extractItems(data)
+  } catch {
+    console.error('[analyze-commercial] zones JSON parse error, raw:', text.slice(0, 200))
+    return []
+  }
 }
 
 async function fetchNearbyStores(serviceKey: string, lat: number, lng: number): Promise<StoreItem[]> {
   const url = buildApiUrl('storeListInRadius', serviceKey, {
-    pageNo: '1', numOfRows: '100', radius: '500',
+    pageNo: '1', numOfRows: '100', radius: '1000',
     cx: String(lng), cy: String(lat), type: 'json',
   })
+  console.log('[analyze-commercial] stores URL:', url.replace(serviceKey, serviceKey.slice(0, 8) + '...'))
   const res = await fetch(url)
-  const data = await res.json()
-  const items = data?.body?.items?.item
-  if (!items) return []
-  return Array.isArray(items) ? items : [items]
+  const text = await res.text()
+  console.log('[analyze-commercial] stores raw response (first 500):', text.slice(0, 500))
+  try {
+    const data = JSON.parse(text)
+    return extractItems(data)
+  } catch {
+    console.error('[analyze-commercial] stores JSON parse error, raw:', text.slice(0, 200))
+    return []
+  }
 }
 
 Deno.serve(async (req) => {
@@ -135,7 +188,7 @@ Deno.serve(async (req) => {
       zones,
       stores,
       store_count_by_category: storeCounts,
-      radius_m: 500,
+      radius_m: 1000,
       collected_at: new Date().toISOString(),
     }
 
