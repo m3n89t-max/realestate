@@ -367,10 +367,39 @@ function MapSection({
 }
 
 // ── 실거래가 섹션 ─────────────────────────────────────────────
-function RealPriceSection({ real_price_data }: { real_price_data: RealPriceItem[] }) {
+function RealPriceSection({ real_price_data, projectId }: { real_price_data: RealPriceItem[], projectId: string }) {
   const [showAll, setShowAll] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const supabase = createClient()
+
+  const collect = async () => {
+    setLoading(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const { error } = await supabase.functions.invoke('collect-real-price', {
+        body: { project_id: projectId },
+        headers: session?.access_token
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : undefined,
+      })
+      if (error) throw error
+      toast.success('실거래가 수집이 완료되었습니다')
+      window.location.reload()
+    } catch {
+      toast.error('실거래가 수집에 실패했습니다')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   if (!real_price_data.length) return (
-    <div className="text-center py-6 text-gray-400 text-sm">실거래가 데이터 없음</div>
+    <div className="text-center py-6 space-y-3">
+      <TrendingUp size={32} className="mx-auto text-gray-200" />
+      <p className="text-sm text-gray-400">실거래가 데이터 없음</p>
+      <button onClick={collect} disabled={loading} className="btn-primary text-xs py-1.5">
+        {loading ? <><Loader2 size={12} className="animate-spin" /> 수집 중...</> : <><RefreshCw size={12} /> 실거래가 수집</>}
+      </button>
+    </div>
   )
   const amounts = real_price_data.map(t => t.amount).filter((a): a is number => a !== null && a > 0)
   const avg = amounts.length ? Math.round(amounts.reduce((s, a) => s + a, 0) / amounts.length) : null
@@ -419,7 +448,15 @@ function RealPriceSection({ real_price_data }: { real_price_data: RealPriceItem[
           {showAll ? <><ChevronUp size={12} /> 접기</> : <><ChevronDown size={12} /> 전체 {real_price_data.length}건 보기</>}
         </button>
       )}
-      <p className="text-xs text-gray-400 mt-2">출처: 국토교통부 실거래가 공개시스템</p>
+      <button
+        onClick={collect}
+        disabled={loading}
+        className="w-full mt-3 text-xs text-gray-400 hover:text-gray-600 flex items-center justify-center gap-1"
+      >
+        {loading ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+        데이터 갱신
+      </button>
+      <p className="text-xs text-gray-400 mt-1">출처: 국토교통부 실거래가 공개시스템</p>
     </div>
   )
 }
@@ -632,9 +669,7 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
           </h3>
           {isCommercial
             ? <CommercialSection commercial_data={project.commercial_data} projectId={projectId} />
-            : hasRealPrice
-              ? <RealPriceSection real_price_data={project.real_price_data} />
-              : <div className="text-center py-6 text-gray-400 text-sm">데이터 없음</div>
+            : <RealPriceSection real_price_data={project.real_price_data ?? []} projectId={projectId} />
           }
         </div>
       </div>
