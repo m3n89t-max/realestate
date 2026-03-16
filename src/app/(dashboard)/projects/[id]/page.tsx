@@ -16,6 +16,7 @@ import ShortsTab from './components/ShortsTab'
 import TasksTab from './components/TasksTab'
 import ProjectActions from './components/ProjectActions'
 import PhotoGallery from './components/PhotoGallery'
+import AnalysisTab from './components/AnalysisTab'
 
 interface Params {
   id: string
@@ -23,6 +24,7 @@ interface Params {
 
 const TABS = [
   { id: 'overview', label: '개요' },
+  { id: 'analysis', label: '입지분석' },
   { id: 'blog', label: '블로그 글' },
   { id: 'card_news', label: '카드뉴스' },
   { id: 'shorts', label: '쇼츠' },
@@ -237,6 +239,10 @@ export default async function ProjectDetailPage({
           {/* 하단: 업로드된 사진 전체 갤러리 */}
           <PhotoGallery assets={assets || []} />
         </div>
+      )}
+
+      {tab === 'analysis' && (
+        <AnalysisTab projectId={id} project={project} locationAnalysis={locationAnalysis} />
       )}
 
       {tab === 'blog' && (
