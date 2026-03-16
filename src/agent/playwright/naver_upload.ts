@@ -135,7 +135,7 @@ export async function uploadNaverBlog(
         await mainFrame.locator('.se-section-documentTitle').first().click();
         await page.waitForTimeout(500);
         await mainFrame.locator('.se-section-documentTitle').first().pressSequentially(
-            content.title || '매물 소개', { delay: 30 }
+            task.payload?.content_title || content.title || '매물 소개', { delay: 30 }
         );
         await page.waitForTimeout(800);
 
@@ -191,36 +191,35 @@ export async function uploadNaverBlog(
 
         if (photoPosition === 'inline') {
             // ── 인라인 모드: 텍스트 중간에 이미지 삽입 ─────────────────────────────
-            // asset URL → 로컬 임시 파일 맵 (미리 다운로드)
-            const assetPathMap = new Map<string, string>();
-            if (assets && assets.length > 0) {
-                for (let i = 0; i < assets.length; i++) {
-                    try {
-                        const res = await fetch(assets[i].file_url);
-                        const buf = await res.arrayBuffer();
-                        const ext = (assets[i].file_url.split('.').pop() ?? 'jpg').split('?')[0];
-                        const tmpPath = join(tmpdir(), `naver_inline_${Date.now()}_${i}.${ext}`);
-                        writeFileSync(tmpPath, Buffer.from(buf));
-                        assetPathMap.set(assets[i].file_url, tmpPath);
-                    } catch (e) {
-                        console.warn(`[NaverUpload] 이미지 다운로드 실패: ${assets[i].file_url}`, e);
-                    }
+            // 마크다운 이미지 URL에서 직접 다운로드 (URL 매칭 불필요)
+            const downloadImage = async (imgUrl: string, idx: number): Promise<string | null> => {
+                try {
+                    const res = await fetch(imgUrl);
+                    if (!res.ok) return null;
+                    const buf = await res.arrayBuffer();
+                    const ext = (imgUrl.split('.').pop() ?? 'jpg').split('?')[0].substring(0, 4);
+                    const tmpPath = join(tmpdir(), `naver_inline_${Date.now()}_${idx}.${ext}`);
+                    writeFileSync(tmpPath, Buffer.from(buf));
+                    return tmpPath;
+                } catch (e) {
+                    console.warn(`[NaverUpload] 이미지 다운로드 실패: ${imgUrl}`, e);
+                    return null;
                 }
-            }
+            };
 
             const rawLines = (content.content || '').split('\n');
+            let imgIdx = 0;
             for (const line of rawLines) {
                 const imgMatch = line.match(/!\[([^\]]*)\]\(([^)]+)\)/);
                 if (imgMatch) {
-                    // 이미지 라인 → 현재 위치에 삽입
-                    const imgUrl = imgMatch[2];
-                    const tmpPath = assetPathMap.get(imgUrl);
+                    // 이미지 라인 → URL에서 직접 다운로드 후 삽입
+                    const tmpPath = await downloadImage(imgMatch[2], imgIdx++);
                     if (tmpPath) {
                         await insertImageAtCursor(tmpPath);
                         await page.keyboard.press('Enter');
                     }
                 } else if (line.match(/^\*▲/)) {
-                    // 캡션 라인 — 건너뜀 (이미지 ALT로 대체)
+                    // 캡션 라인 — 건너뜀
                 } else {
                     const stripped = stripLine(line);
                     if (stripped.trim()) {

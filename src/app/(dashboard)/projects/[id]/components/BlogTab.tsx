@@ -606,6 +606,22 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
                     if (line.startsWith('## ')) return <h2 key={i} className="text-lg font-bold mt-6 mb-2 border-b border-gray-200 pb-1 text-gray-900">{parseBold(line.replace(/^## /, ''))}</h2>
                     if (line.startsWith('# ')) return <h1 key={i} className="text-xl font-bold mt-8 mb-3 text-gray-900">{parseBold(line.replace(/^# /, ''))}</h1>
 
+                    // FAQ Q: / A: 라인 — 번호 목록보다 먼저 처리
+                    const qMatch = line.match(/^(?:\d+\.\s*)?Q[：:]\s*(.+)/)
+                    if (qMatch) return (
+                      <div key={i} className="mt-3 mb-0.5 flex gap-1.5">
+                        <span className="text-brand-600 font-bold text-xs mt-0.5 flex-shrink-0">Q.</span>
+                        <span className="font-semibold text-gray-800">{parseBold(qMatch[1])}</span>
+                      </div>
+                    )
+                    const aMatch = line.match(/^(?:\s*\d+\.\s*)?A[：:]\s*(.+)/)
+                    if (aMatch) return (
+                      <div key={i} className="mb-2 flex gap-1.5 pl-4">
+                        <span className="text-green-600 font-bold text-xs mt-0.5 flex-shrink-0">A.</span>
+                        <span className="text-gray-600">{parseBold(aMatch[1])}</span>
+                      </div>
+                    )
+
                     // 리스트 항목 (선행 공백 허용)
                     if (line.match(/^\s*[-*]\s/)) return (
                       <div key={i} className="flex gap-2 mb-1 pl-4">
@@ -616,12 +632,11 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
                     // 번호 리스트 — 중복 숫자 제거 ("2. 2. 텍스트" → "2. 텍스트")
                     const numMatch = line.match(/^(\d+)\.\s+(.*)/)
                     if (numMatch) {
-                      // content에서 앞에 중복된 숫자 패턴 제거
-                      const content = numMatch[2].replace(/^\d+\.\s+/, '')
+                      const innerContent = numMatch[2].replace(/^\d+\.\s+/, '')
                       return (
                         <div key={i} className="flex gap-2 mb-1.5 pl-2">
                           <span className="text-brand-500 font-semibold min-w-[1.5rem] flex-shrink-0">{numMatch[1]}.</span>
-                          <span className="flex-1">{parseBold(content)}</span>
+                          <span className="flex-1">{parseBold(innerContent)}</span>
                         </div>
                       )
                     }
