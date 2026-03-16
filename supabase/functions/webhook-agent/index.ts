@@ -201,6 +201,40 @@ Deno.serve(async (req) => {
         break
       }
 
+      case 'get_pending_tasks': {
+        // 에이전트가 폴링으로 대기 작업 조회 (서비스 롤로 RLS 우회)
+        const { data: tasks } = await adminClient
+          .from('tasks')
+          .select('*')
+          .in('status', ['pending', 'retrying'])
+          .lte('scheduled_at', new Date().toISOString())
+          .eq('org_id', agent.org_id)
+          .order('scheduled_at', { ascending: true })
+          .limit(5)
+        return new Response(JSON.stringify({ success: true, tasks: tasks ?? [] }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      case 'claim_task': {
+        // 작업 claim (Optimistic Lock — 서비스 롤로 RLS 우회)
+        const { task_id } = data
+        if (!task_id) throw new Error('task_id가 필요합니다')
+        const { data: claimed } = await adminClient
+          .from('tasks')
+          .update({
+            status: 'running',
+            agent_id: agent.id,
+            started_at: new Date().toISOString(),
+          })
+          .eq('id', task_id)
+          .in('status', ['pending', 'retrying'])
+          .select()
+        return new Response(JSON.stringify({ success: true, claimed: (claimed?.length ?? 0) > 0 }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
       default:
         throw new Error(`알 수 없는 이벤트: ${event}`)
     }

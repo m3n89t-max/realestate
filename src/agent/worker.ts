@@ -6,6 +6,8 @@ import {
     sendTaskProgress,
     sendTaskCompleted,
     sendTaskFailed,
+    getPendingTasks,
+    claimTaskViaWebhook,
 } from './webhook-client';
 import { downloadBuildingRegister } from './playwright/building_register';
 import { downloadCadastralMap } from './playwright/cadastral_map';
@@ -274,31 +276,16 @@ class LocalAgent {
     // ============================================================
     async catchUpPendingTasks() {
         try {
-            if (!this.orgId) {
-                // orgId가 없으면 아직 validateAndRegister가 완료되지 않은 것임
+            if (!this.orgId || !this.config.agent_key) {
                 return;
             }
 
-            log(`[Poll] 작업 확인 중... (org_id: ${this.orgId})`);
+            log(`[Poll] 작업 확인 중... (webhook 경유)`);
 
-            let query = this.supabase
-                .from('tasks')
-                .select('*')
-                .in('status', ['pending', 'retrying'])
-                .lte('scheduled_at', new Date().toISOString())
-                .order('scheduled_at', { ascending: true })
-                .limit(5);
+            const tasks = await getPendingTasks(this.config);
 
-            query = query.eq('org_id', this.orgId);
-
-            const { data: tasks, error } = await query;
-
-            if (error) {
-                log(`[Poll] 작업 조회 실패: ${error.message} (Code: ${error.code})`);
-                return;
-            }
-
-            if (tasks && tasks.length > 0) {
+            if (tasks.length > 0) {
+                log(`[Poll] 대기 작업 ${tasks.length}건 발견`);
                 for (const task of tasks) {
                     if (AGENT_TASK_TYPES.includes(task.type)) {
                         await this.handleNewTask(task);
@@ -437,6 +424,10 @@ class LocalAgent {
     // 8. Optimistic Lock
     // ============================================================
     private async claimTask(taskId: string): Promise<boolean> {
+        if (this.config.agent_key) {
+            return claimTaskViaWebhook(this.config, taskId);
+        }
+        // agent_key 없는 개발 모드: 직접 DB 업데이트
         const { data, error } = await this.supabase
             .from('tasks')
             .update({
@@ -447,10 +438,7 @@ class LocalAgent {
             .eq('id', taskId)
             .in('status', ['pending', 'retrying'])
             .select();
-
-        if (error || !data || data.length === 0) {
-            return false;
-        }
+        if (error || !data || data.length === 0) return false;
         return true;
     }
 

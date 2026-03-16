@@ -100,6 +100,16 @@ export async function sendTaskFailed(
     });
 }
 
+export async function getPendingTasks(config: AgentConfig): Promise<any[]> {
+    const res = await sendWebhook(config, { event: 'get_pending_tasks' });
+    return res?.tasks ?? [];
+}
+
+export async function claimTaskViaWebhook(config: AgentConfig, taskId: string): Promise<boolean> {
+    const res = await sendWebhook(config, { event: 'claim_task', task_id: taskId });
+    return res?.claimed === true;
+}
+
 export async function sendDocumentUploaded(
     config: AgentConfig,
     projectId: string,
