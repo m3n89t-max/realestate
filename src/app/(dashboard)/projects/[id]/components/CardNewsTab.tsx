@@ -257,7 +257,7 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
                       ? 'ring-2 ring-offset-1 border-transparent'
                       : 'border-gray-200 hover:border-gray-300'
                   )}
-                  style={colorTheme === t.id ? { ringColor: t.accent } : {}}
+                  style={colorTheme === t.id ? { '--tw-ring-color': t.accent } as React.CSSProperties : {}}
                 >
                   <div
                     className="w-full h-4 rounded mb-1"

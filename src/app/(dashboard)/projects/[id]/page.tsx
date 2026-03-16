@@ -246,11 +246,11 @@ export default async function ProjectDetailPage({
       )}
 
       {tab === 'blog' && (
-        <BlogTab projectId={id} contents={blogContents} />
+        <BlogTab projectId={id} orgId={project.org_id} contents={blogContents} assets={assets ?? []} />
       )}
 
       {tab === 'card_news' && (
-        <CardNewsTab projectId={id} contents={cardNewsContents} />
+        <CardNewsTab projectId={id} contents={cardNewsContents} assets={assets ?? []} />
       )}
 
       {tab === 'docs' && (
