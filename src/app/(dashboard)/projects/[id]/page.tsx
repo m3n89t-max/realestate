@@ -15,7 +15,7 @@ import DocsTab from './components/DocsTab'
 import ShortsTab from './components/ShortsTab'
 import TasksTab from './components/TasksTab'
 import ProjectActions from './components/ProjectActions'
-import AnalysisTab from './components/AnalysisTab'
+import PhotoGallery from './components/PhotoGallery'
 
 interface Params {
   id: string
@@ -23,7 +23,6 @@ interface Params {
 
 const TABS = [
   { id: 'overview', label: '개요' },
-  { id: 'analysis', label: '입지분석' },
   { id: 'blog', label: '블로그 글' },
   { id: 'card_news', label: '카드뉴스' },
   { id: 'shorts', label: '쇼츠' },
@@ -185,28 +184,25 @@ export default async function ProjectDetailPage({
                 )}
               </div>
 
-              {/* 입지분석 바로가기 */}
-              <div className="card p-4 border border-brand-100 bg-brand-50/40">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-                      <MapPin size={15} className="text-brand-500" />
-                      입지 분석
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {locationAnalysis
-                        ? `AI 분석 완료 · 장점 ${locationAnalysis.advantages?.length ?? 0}개`
-                        : 'POI · 토지이용규제 · 실거래가 · AI 분석'}
-                    </p>
-                  </div>
-                  <Link
-                    href={`/projects/${id}?tab=analysis`}
-                    className="btn-primary text-xs py-1.5"
-                  >
-                    상세 보기
-                  </Link>
+              {/* 입지 분석 */}
+              {locationAnalysis?.advantages && (
+                <div className="card p-5">
+                  <h3 className="section-title mb-4 flex items-center gap-2">
+                    <MapPin size={16} className="text-brand-500" />
+                    입지 분석
+                  </h3>
+                  <ul className="space-y-2">
+                    {locationAnalysis.advantages.map((adv: string, i: number) => (
+                      <li key={i} className="flex items-start gap-2 text-sm">
+                        <span className="w-5 h-5 bg-green-100 text-green-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
+                          {i + 1}
+                        </span>
+                        <span className="text-gray-700">{adv}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* 우측: 생성 현황 */}
@@ -239,57 +235,16 @@ export default async function ProjectDetailPage({
           </div>
 
           {/* 하단: 업로드된 사진 전체 갤러리 */}
-          <div className="card p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="section-title">업로드된 사진</h3>
-              <span className="text-sm font-medium text-brand-600 bg-brand-50 px-2 py-1 rounded-md">{(assets ?? []).length}장</span>
-            </div>
-
-            {/* 이미지 갤러리 */}
-            {assets && assets.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {assets.map((asset: any, idx: number) => (
-                  <div key={asset.id ?? idx} className="relative aspect-[4/3] rounded-lg overflow-hidden border border-gray-100 group">
-                    <Image
-                      src={asset.file_url}
-                      alt={`매물 사진 ${idx + 1}`}
-                      fill
-                      className="object-cover group-hover:scale-105 transition-transform duration-300"
-                      sizes="(max-width: 768px) 100vw, 300px"
-                    />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="bg-gray-50 rounded-lg p-8 text-center border-2 border-dashed border-gray-200">
-                <Upload size={32} className="mx-auto text-gray-300 mb-3" />
-                <p className="text-sm font-medium text-gray-500">등록된 사진이 없습니다</p>
-                <p className="text-xs text-gray-400 mt-1">새 매물 등록 화면에서 사진을 업로드할 수 있습니다.</p>
-              </div>
-            )}
-          </div>
+          <PhotoGallery assets={assets || []} />
         </div>
       )}
 
-      {tab === 'analysis' && (
-        <AnalysisTab
-          projectId={id}
-          project={project}
-          locationAnalysis={locationAnalysis}
-        />
-      )}
-
       {tab === 'blog' && (
-        <BlogTab
-          projectId={id}
-          orgId={project.org_id}
-          contents={blogContents}
-          assets={assets ?? []}
-        />
+        <BlogTab projectId={id} contents={blogContents} />
       )}
 
       {tab === 'card_news' && (
-        <CardNewsTab projectId={id} contents={cardNewsContents} assets={assets ?? []} />
+        <CardNewsTab projectId={id} contents={cardNewsContents} />
       )}
 
       {tab === 'docs' && (
