@@ -92,8 +92,31 @@ async function collectRealPrice(
     )
   )
 
-  allItems.sort((a, b) => (b.amount ?? 0) - (a.amount ?? 0))
-  return allItems.slice(0, 60)
+  // 최신순 정렬
+  allItems.sort((a, b) => (b.deal_ym ?? '').localeCompare(a.deal_ym ?? ''))
+  return allItems
+}
+
+// 같은 동(洞) 우선 필터링
+function filterByDong(items: any[], legal_dong: string | null): any[] {
+  if (!legal_dong || items.length === 0) return items.slice(0, 60)
+
+  // 법정동 이름 정규화 (예: "역삼1동" → "역삼동" 포함 여부 체크)
+  const normDong = legal_dong.replace(/[0-9]/g, '').replace('동', '')
+
+  const sameDong = items.filter(it => {
+    if (!it.dong) return false
+    return it.dong.includes(normDong) || it.dong.includes(legal_dong)
+  })
+
+  // 같은 동 거래가 3건 이상이면 동 필터 적용, 아니면 전체 시군구 데이터
+  if (sameDong.length >= 3) {
+    console.log(`[collect-real-price] 동 필터 적용: ${legal_dong} → ${sameDong.length}건 / 전체 ${items.length}건`)
+    return sameDong.slice(0, 60)
+  }
+
+  console.log(`[collect-real-price] 동 필터 결과 부족(${sameDong.length}건), 전체 시군구 사용`)
+  return items.slice(0, 60)
 }
 
 Deno.serve(async (req) => {
@@ -148,9 +171,10 @@ Deno.serve(async (req) => {
     const apiKey = Deno.env.get('PUBLIC_DATA_API_KEY') ?? Deno.env.get('BUILDING_API_KEY') ?? ''
     if (!apiKey) throw new Error('PUBLIC_DATA_API_KEY가 설정되지 않았습니다')
 
-    console.log('[collect-real-price] sigungu_code:', sigungu_code, 'type:', project.property_type)
+    console.log('[collect-real-price] sigungu_code:', sigungu_code, 'legal_dong:', project.legal_dong, 'type:', project.property_type)
 
-    const real_price_data = await collectRealPrice(sigungu_code, project.property_type, apiKey)
+    const allItems = await collectRealPrice(sigungu_code, project.property_type, apiKey)
+    const real_price_data = filterByDong(allItems, project.legal_dong ?? null)
 
     console.log('[collect-real-price] total items:', real_price_data.length)
 

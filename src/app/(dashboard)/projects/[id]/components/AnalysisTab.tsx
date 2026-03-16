@@ -367,7 +367,7 @@ function MapSection({
 }
 
 // ── 실거래가 섹션 ─────────────────────────────────────────────
-function RealPriceSection({ real_price_data, projectId }: { real_price_data: RealPriceItem[], projectId: string }) {
+function RealPriceSection({ real_price_data, projectId, legalDong }: { real_price_data: RealPriceItem[], projectId: string, legalDong?: string | null }) {
   const [showAll, setShowAll] = useState(false)
   const [loading, setLoading] = useState(false)
   const supabase = createClient()
@@ -407,8 +407,24 @@ function RealPriceSection({ real_price_data, projectId }: { real_price_data: Rea
   const min = amounts.length ? Math.min(...amounts) : null
   const list = showAll ? real_price_data.slice(0, 50) : real_price_data.slice(0, 10)
 
+  // 현재 데이터의 동 분포 파악
+  const dongs = [...new Set(real_price_data.map(t => t.dong).filter(Boolean))]
+  const singleDong = dongs.length === 1 ? dongs[0] : null
+
   return (
     <div>
+      {/* 동 필터 안내 */}
+      {legalDong && (
+        <div className="flex items-center gap-1.5 mb-3 text-xs">
+          <MapPin size={11} className="text-brand-500 flex-shrink-0" />
+          <span className="text-gray-500">
+            {singleDong
+              ? <><span className="font-medium text-brand-700">{singleDong}</span> 인근 거래 {real_price_data.length}건</>
+              : <><span className="font-medium text-gray-700">{legalDong}</span> 주변 거래 {real_price_data.length}건</>
+            }
+          </span>
+        </div>
+      )}
       {avg && (
         <div className="grid grid-cols-3 gap-3 mb-4 p-3 bg-gray-50 rounded-lg">
           <div className="text-center">
@@ -669,7 +685,7 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
           </h3>
           {isCommercial
             ? <CommercialSection commercial_data={project.commercial_data} projectId={projectId} />
-            : <RealPriceSection real_price_data={project.real_price_data ?? []} projectId={projectId} />
+            : <RealPriceSection real_price_data={project.real_price_data ?? []} projectId={projectId} legalDong={project.legal_dong} />
           }
         </div>
       </div>
