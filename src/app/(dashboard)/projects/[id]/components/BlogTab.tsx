@@ -91,6 +91,7 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
   const [showPhotoLibrary, setShowPhotoLibrary] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [photoLayout, setPhotoLayout] = useState<'individual' | 'collage' | 'slideshow'>('individual')
+  const [photoPosition, setPhotoPosition] = useState<'inline' | 'bulk'>('inline')
 
   const selected = contents.find(c => c.id === selectedId)
 
@@ -136,6 +137,7 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
           content_body: editContent || selected.content,
           content_tags: selected.tags ?? [],
           photo_layout: photoLayout,
+          photo_position: photoPosition,
         },
       })
       if (error) throw error
@@ -283,23 +285,53 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
               로컬 에이전트가 실행 중이어야 합니다
             </p>
 
-            {/* 사진 첨부 방식 선택 */}
+            {/* 사진 배치 위치 */}
+            <div className="mb-2">
+              <label className="text-xs text-gray-500 mb-1.5 block">사진 배치</label>
+              <div className="grid grid-cols-2 gap-1.5">
+                {([
+                  ['inline', '글 중간 (인라인)', '각 섹션 내 삽입'],
+                  ['bulk', '글 마지막 (일괄)', '본문 뒤 한번에'],
+                ] as const).map(([val, label, desc]) => (
+                  <button
+                    key={val}
+                    onClick={() => setPhotoPosition(val)}
+                    className={cn(
+                      'py-2 px-2 text-left rounded-lg border transition-colors',
+                      photoPosition === val
+                        ? 'bg-green-50 border-green-500 text-green-700'
+                        : 'border-gray-200 text-gray-600 hover:border-green-300'
+                    )}
+                  >
+                    <div className="text-xs font-medium">{label}</div>
+                    <div className="text-[10px] text-gray-400 mt-0.5">{desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 사진 형식 (일괄 모드에서만 의미 있음) */}
             <div className="mb-3">
-              <label className="text-xs text-gray-500 mb-1.5 block">사진 첨부 방식</label>
+              <label className="text-xs text-gray-500 mb-1.5 block">
+                사진 형식
+                {photoPosition === 'inline' && <span className="text-gray-300 ml-1">(인라인 시 개별 적용)</span>}
+              </label>
               <div className="grid grid-cols-3 gap-1.5">
                 {([
-                  ['individual', '개별사진'],
+                  ['individual', '개별'],
                   ['collage', '콜라주'],
                   ['slideshow', '슬라이드'],
                 ] as const).map(([val, label]) => (
                   <button
                     key={val}
                     onClick={() => setPhotoLayout(val)}
+                    disabled={photoPosition === 'inline' && val !== 'individual'}
                     className={cn(
                       'py-1.5 text-xs rounded-lg border font-medium transition-colors',
                       photoLayout === val
                         ? 'bg-green-600 text-white border-green-600'
-                        : 'border-gray-200 text-gray-600 hover:border-green-300'
+                        : 'border-gray-200 text-gray-600 hover:border-green-300',
+                      photoPosition === 'inline' && val !== 'individual' && 'opacity-30 cursor-not-allowed'
                     )}
                   >
                     {label}

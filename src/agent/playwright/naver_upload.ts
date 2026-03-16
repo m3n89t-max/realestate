@@ -26,6 +26,7 @@ export async function uploadNaverBlog(
     const projectId = task.payload?.project_id || task.project_id;
     const contentId = task.payload?.content_id;
     const photoLayout: 'individual' | 'collage' | 'slideshow' = task.payload?.photo_layout ?? 'individual';
+    const photoPosition: 'inline' | 'bulk' = task.payload?.photo_position ?? 'bulk';
 
     // 사진 첨부 방식 → 다이얼로그 텍스트 매핑
     const layoutLabelMap = { individual: '개별사진', collage: '콜라주', slideshow: '슬라이드' };
@@ -138,119 +139,172 @@ export async function uploadNaverBlog(
         );
         await page.waitForTimeout(800);
 
-        // 7. 본문 입력 — .se-section-text 클릭 후 한 글자씩 타이핑
-        await progress(config, task.id, '본문 입력 중...', 55);
+        // 마크다운 줄 → 네이버용 텍스트로 변환 (이미지 제외)
+        const stripLine = (line: string) => line
+            .replace(/^#{1,6}\s+/, '')
+            .replace(/\*\*([^*]+)\*\*/g, '$1')
+            .replace(/\*([^*]+)\*/g, '$1')
+            .replace(/^[-*]\s/, '• ');
 
-        // 마크다운 → 네이버 업로드용 텍스트 변환
-        const plainBody = (content.content || '')
-            .replace(/!\[.*?\]\(.*?\)/g, '')   // 이미지 제거 (별도 업로드)
-            .replace(/\*▲.*?\*/g, '')           // 이미지 캡션 제거
-            .replace(/^#{1,6}\s+/gm, '')        // 헤딩 기호 제거
-            .replace(/\*\*([^*]+)\*\*/g, '$1')  // **bold** → bold (마크다운 기호 제거)
-            .replace(/\*([^*]+)\*/g, '$1')       // *italic* → italic
-            .replace(/^[-*]\s/gm, '• ')          // 리스트 항목 → 불릿 기호
-            .replace(/\n{3,}/g, '\n\n')          // 3줄 이상 빈줄 → 2줄로
-            .trim();
+        // 이미지 1장을 현재 커서 위치에 삽입하는 헬퍼
+        const insertImageAtCursor = async (tmpPath: string) => {
+            const imgBtn = mainFrame.locator('button[data-name="image"], button[aria-label*="이미지 첨부"]').first();
+            if (await imgBtn.count() === 0) return;
+            const [fileChooser] = await Promise.all([
+                page.waitForEvent('filechooser', { timeout: 10_000 }).catch(() => null),
+                imgBtn.click(),
+            ]);
+            if (!fileChooser) return;
+            await fileChooser.setFiles([tmpPath]);
+            await page.waitForTimeout(2000);
 
+            // 사진 첨부 방식 다이얼로그 처리
+            const dialogVisible = await page.locator('text=사진 첨부 방식').count() > 0
+                || await mainFrame.locator('text=사진 첨부 방식').count() > 0;
+            if (dialogVisible) {
+                for (const sel of [`text=${layoutLabel}`, `[data-type="${photoLayout}"]`, '.se-popup-photo-layout-item:first-child']) {
+                    for (const ctx of [page, mainFrame]) {
+                        if (await ctx.locator(sel).count() > 0) {
+                            await ctx.locator(sel).first().click();
+                            break;
+                        }
+                    }
+                }
+                await page.waitForTimeout(400);
+                for (const sel of ['button:has-text("확인")', 'button:has-text("적용")', '.se-popup-button-primary']) {
+                    for (const ctx of [page, mainFrame]) {
+                        if (await ctx.locator(sel).count() > 0) {
+                            await ctx.locator(sel).first().click();
+                            break;
+                        }
+                    }
+                }
+            }
+            await page.waitForTimeout(2000);
+        };
+
+        // 7. 본문 입력
+        await progress(config, task.id, `본문 입력 중... (사진 ${photoPosition === 'inline' ? '인라인' : '일괄'} 모드)`, 55);
         await mainFrame.waitForSelector('.se-section-text', { timeout: 10_000 });
         await mainFrame.locator('.se-section-text').first().click();
         await page.waitForTimeout(500);
 
-        // 긴 본문은 줄 단위로 입력 (속도 최적화)
-        const lines = plainBody.split('\n');
-        for (let i = 0; i < lines.length; i++) {
-            if (lines[i].trim()) {
-                await mainFrame.locator('.se-section-text').first().pressSequentially(lines[i], { delay: 30 });
-            }
-            if (i < lines.length - 1) {
-                await page.keyboard.press('Enter');
-            }
-            await page.waitForTimeout(100);
-        }
-        await page.waitForTimeout(1000);
-
-        // 8. 이미지 업로드 처리 (본문 하단에 일괄 삽입)
-        if (assets && assets.length > 0) {
-            await progress(config, task.id, `이미지 ${assets.length}장 처리 중...`, 65);
-            await page.keyboard.press('Control+End');
-            await page.keyboard.press('Enter');
-
-            const tempPaths: string[] = [];
-            for (let i = 0; i < assets.length; i++) {
-                try {
-                    const res = await fetch(assets[i].file_url);
-                    const buf = await res.arrayBuffer();
-                    const ext = (assets[i].file_url.split('.').pop() ?? 'jpg').split('?')[0];
-                    const tmpPath = join(tmpdir(), `naver_img_${Date.now()}_${i}.${ext}`);
-                    writeFileSync(tmpPath, Buffer.from(buf));
-                    tempPaths.push(tmpPath);
-                } catch (e) {
-                    console.warn(`[NaverUpload] 이미지 다운로드 실패: ${assets[i].file_url}`, e);
+        if (photoPosition === 'inline') {
+            // ── 인라인 모드: 텍스트 중간에 이미지 삽입 ─────────────────────────────
+            // asset URL → 로컬 임시 파일 맵 (미리 다운로드)
+            const assetPathMap = new Map<string, string>();
+            if (assets && assets.length > 0) {
+                for (let i = 0; i < assets.length; i++) {
+                    try {
+                        const res = await fetch(assets[i].file_url);
+                        const buf = await res.arrayBuffer();
+                        const ext = (assets[i].file_url.split('.').pop() ?? 'jpg').split('?')[0];
+                        const tmpPath = join(tmpdir(), `naver_inline_${Date.now()}_${i}.${ext}`);
+                        writeFileSync(tmpPath, Buffer.from(buf));
+                        assetPathMap.set(assets[i].file_url, tmpPath);
+                    } catch (e) {
+                        console.warn(`[NaverUpload] 이미지 다운로드 실패: ${assets[i].file_url}`, e);
+                    }
                 }
             }
 
-            if (tempPaths.length > 0) {
-                await progress(config, task.id, `이미지 ${tempPaths.length}장 업로드 중...`, 70);
-                const imgBtn = mainFrame.locator('button[data-name="image"], button[aria-label*="이미지 첨부"]').first();
-                if (await imgBtn.count() > 0) {
-                    const [fileChooser] = await Promise.all([
-                        page.waitForEvent('filechooser', { timeout: 10_000 }).catch(() => null),
-                        imgBtn.click(),
-                    ]);
-                    if (fileChooser) {
-                        await fileChooser.setFiles(tempPaths);
-                        await page.waitForTimeout(2000);
+            const rawLines = (content.content || '').split('\n');
+            for (const line of rawLines) {
+                const imgMatch = line.match(/!\[([^\]]*)\]\(([^)]+)\)/);
+                if (imgMatch) {
+                    // 이미지 라인 → 현재 위치에 삽입
+                    const imgUrl = imgMatch[2];
+                    const tmpPath = assetPathMap.get(imgUrl);
+                    if (tmpPath) {
+                        await insertImageAtCursor(tmpPath);
+                        await page.keyboard.press('Enter');
+                    }
+                } else if (line.match(/^\*▲/)) {
+                    // 캡션 라인 — 건너뜀 (이미지 ALT로 대체)
+                } else {
+                    const stripped = stripLine(line);
+                    if (stripped.trim()) {
+                        await mainFrame.locator('.se-section-text').first().pressSequentially(stripped, { delay: 20 });
+                    }
+                    await page.keyboard.press('Enter');
+                }
+                await page.waitForTimeout(80);
+            }
+        } else {
+            // ── 일괄 모드: 텍스트 전체 입력 후 이미지 마지막에 삽입 ─────────────────
+            const plainBody = (content.content || '')
+                .replace(/!\[.*?\]\(.*?\)/g, '')
+                .replace(/\*▲.*?\*/g, '')
+                .replace(/^#{1,6}\s+/gm, '')
+                .replace(/\*\*([^*]+)\*\*/g, '$1')
+                .replace(/\*([^*]+)\*/g, '$1')
+                .replace(/^[-*]\s/gm, '• ')
+                .replace(/\n{3,}/g, '\n\n')
+                .trim();
 
-                        // "사진 첨부 방식" 다이얼로그 자동 처리
-                        // 다이얼로그는 page 또는 mainFrame 레이어에서 뜸
-                        const dialogVisible = await page.locator('text=사진 첨부 방식').count() > 0
-                            || await mainFrame.locator('text=사진 첨부 방식').count() > 0;
+            const lines = plainBody.split('\n');
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].trim()) {
+                    await mainFrame.locator('.se-section-text').first().pressSequentially(lines[i], { delay: 20 });
+                }
+                if (i < lines.length - 1) await page.keyboard.press('Enter');
+                await page.waitForTimeout(80);
+            }
 
-                        if (dialogVisible) {
-                            // 선택된 레이아웃 옵션 클릭 (텍스트 기반)
-                            const individualSelectors = [
-                                `text=${layoutLabel}`,
-                                `[data-type="${photoLayout}"]`,
-                                `.se-popup-photo-layout-item:first-child`,
-                                `li:has-text("${layoutLabel}")`,
-                            ];
-                            let clicked = false;
-                            for (const sel of individualSelectors) {
-                                for (const ctx of [page, mainFrame]) {
-                                    const el = ctx.locator(sel).first();
-                                    if (await el.count() > 0) {
-                                        await el.click();
-                                        clicked = true;
-                                        break;
+            // 이미지 일괄 업로드 (본문 마지막)
+            if (assets && assets.length > 0) {
+                await progress(config, task.id, `이미지 ${assets.length}장 일괄 업로드 중...`, 68);
+                await page.keyboard.press('Control+End');
+                await page.keyboard.press('Enter');
+
+                const tempPaths: string[] = [];
+                for (let i = 0; i < assets.length; i++) {
+                    try {
+                        const res = await fetch(assets[i].file_url);
+                        const buf = await res.arrayBuffer();
+                        const ext = (assets[i].file_url.split('.').pop() ?? 'jpg').split('?')[0];
+                        const tmpPath = join(tmpdir(), `naver_bulk_${Date.now()}_${i}.${ext}`);
+                        writeFileSync(tmpPath, Buffer.from(buf));
+                        tempPaths.push(tmpPath);
+                    } catch (e) {
+                        console.warn(`[NaverUpload] 이미지 다운로드 실패: ${assets[i].file_url}`, e);
+                    }
+                }
+
+                if (tempPaths.length > 0) {
+                    const imgBtn = mainFrame.locator('button[data-name="image"], button[aria-label*="이미지 첨부"]').first();
+                    if (await imgBtn.count() > 0) {
+                        const [fileChooser] = await Promise.all([
+                            page.waitForEvent('filechooser', { timeout: 10_000 }).catch(() => null),
+                            imgBtn.click(),
+                        ]);
+                        if (fileChooser) {
+                            await fileChooser.setFiles(tempPaths);
+                            await page.waitForTimeout(2000);
+
+                            // 사진 첨부 방식 다이얼로그 처리
+                            const dialogVisible = await page.locator('text=사진 첨부 방식').count() > 0
+                                || await mainFrame.locator('text=사진 첨부 방식').count() > 0;
+                            if (dialogVisible) {
+                                for (const sel of [`text=${layoutLabel}`, `[data-type="${photoLayout}"]`, '.se-popup-photo-layout-item:first-child']) {
+                                    for (const ctx of [page, mainFrame]) {
+                                        if (await ctx.locator(sel).count() > 0) { await ctx.locator(sel).first().click(); break; }
                                     }
                                 }
-                                if (clicked) break;
-                            }
-                            // 첫 번째 옵션(개별사진)이 기본 선택인 경우 바로 확인 버튼 클릭
-                            await page.waitForTimeout(500);
-                            const confirmSelectors = [
-                                'button:has-text("확인")',
-                                'button:has-text("적용")',
-                                '.se-popup-button-primary',
-                                '.btn_confirm',
-                                '.confirm_btn',
-                            ];
-                            for (const sel of confirmSelectors) {
-                                for (const ctx of [page, mainFrame]) {
-                                    const el = ctx.locator(sel).first();
-                                    if (await el.count() > 0) {
-                                        await el.click();
-                                        break;
+                                await page.waitForTimeout(400);
+                                for (const sel of ['button:has-text("확인")', '.se-popup-button-primary']) {
+                                    for (const ctx of [page, mainFrame]) {
+                                        if (await ctx.locator(sel).count() > 0) { await ctx.locator(sel).first().click(); break; }
                                     }
                                 }
                             }
+                            await page.waitForTimeout(3000);
                         }
-
-                        await page.waitForTimeout(3000);
                     }
                 }
             }
         }
+        await page.waitForTimeout(1000);
 
         // 9. 태그 입력 (mainFrame 안 또는 페이지 레벨에서 시도)
         if (content.tags && content.tags.length > 0) {
