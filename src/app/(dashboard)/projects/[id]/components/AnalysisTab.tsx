@@ -497,6 +497,9 @@ function CommercialSection({ commercial_data, projectId }: {
   projectId: string
 }) {
   const [loading, setLoading] = useState(false)
+  const [expandedCat, setExpandedCat] = useState<string | null>(null)
+  const [expandedMid, setExpandedMid] = useState<string | null>(null)
+  const [showAllCats, setShowAllCats] = useState(false)
   const supabase = createClient()
 
   const fetchData = async () => {
@@ -542,6 +545,27 @@ function CommercialSection({ commercial_data, projectId }: {
   const categories = Object.entries(store_count_by_category as Record<string, number>)
     .sort((a, b) => b[1] - a[1])
 
+  // 대분류 → 중분류 → 소분류 드릴다운 데이터 구성
+  function getMidBreakdown(lcls: string): { name: string; count: number; scls: { name: string; count: number }[] }[] {
+    const midMap: Record<string, Record<string, number>> = {}
+    for (const s of stores as any[]) {
+      if ((s.indsLclsNm ?? '기타') !== lcls) continue
+      const mid = s.indsMclsNm ?? '기타'
+      const scl = s.indsSclsNm ?? '기타'
+      if (!midMap[mid]) midMap[mid] = {}
+      midMap[mid][scl] = (midMap[mid][scl] ?? 0) + 1
+    }
+    return Object.entries(midMap)
+      .map(([name, sclsMap]) => ({
+        name,
+        count: Object.values(sclsMap).reduce((a, b) => a + b, 0),
+        scls: Object.entries(sclsMap)
+          .map(([n, c]) => ({ name: n, count: c }))
+          .sort((a, b) => b.count - a.count),
+      }))
+      .sort((a, b) => b.count - a.count)
+  }
+
   return (
     <div className="space-y-4">
       {/* 요약 수치 */}
@@ -556,27 +580,87 @@ function CommercialSection({ commercial_data, projectId }: {
         </div>
       </div>
 
-      {/* 업종별 분포 */}
+      {/* 업종별 분포 (클릭 시 중분류/소분류 드릴다운) */}
       {categories.length > 0 && (
         <div>
-          <p className="text-xs font-semibold text-gray-500 mb-2">업종별 분포</p>
-          <div className="space-y-1.5">
-            {categories.slice(0, 8).map(([cat, count]) => {
+          <p className="text-xs font-semibold text-gray-500 mb-2">업종별 분포 <span className="font-normal text-gray-400">(클릭 시 세분화)</span></p>
+          <div className="space-y-1">
+            {(showAllCats ? categories : categories.slice(0, 8)).map(([cat, count]) => {
               const pct = totalStores > 0 ? Math.round((count / totalStores) * 100) : 0
+              const isOpen = expandedCat === cat
+              const midBreakdown = isOpen ? getMidBreakdown(cat) : []
+
               return (
-                <div key={cat} className="flex items-center gap-2 text-xs">
-                  <span className="w-20 text-gray-600 truncate flex-shrink-0">{cat}</span>
-                  <div className="flex-1 bg-gray-100 rounded-full h-2">
-                    <div
-                      className="bg-brand-500 h-2 rounded-full"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                  <span className="text-gray-500 w-10 text-right flex-shrink-0">{count}개</span>
+                <div key={cat} className="rounded-lg overflow-hidden border border-transparent hover:border-gray-100">
+                  {/* 대분류 행 */}
+                  <button
+                    onClick={() => {
+                      setExpandedCat(isOpen ? null : cat)
+                      setExpandedMid(null)
+                    }}
+                    className="w-full flex items-center gap-2 text-xs px-2 py-1.5 hover:bg-gray-50 transition-colors"
+                  >
+                    <span className="w-20 text-gray-600 truncate flex-shrink-0 text-left">{cat}</span>
+                    <div className="flex-1 bg-gray-100 rounded-full h-2">
+                      <div className="bg-brand-500 h-2 rounded-full" style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="text-gray-500 w-10 text-right flex-shrink-0">{count}개</span>
+                    <span className="text-gray-300 flex-shrink-0">
+                      {isOpen ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                    </span>
+                  </button>
+
+                  {/* 중분류 드릴다운 */}
+                  {isOpen && (
+                    <div className="ml-3 mb-1 border-l-2 border-brand-100 pl-2 space-y-0.5">
+                      {midBreakdown.map((mid) => {
+                        const midOpen = expandedMid === `${cat}::${mid.name}`
+                        return (
+                          <div key={mid.name}>
+                            <button
+                              onClick={() => setExpandedMid(midOpen ? null : `${cat}::${mid.name}`)}
+                              className="w-full flex items-center gap-2 text-xs px-1.5 py-1 hover:bg-brand-50 rounded transition-colors"
+                            >
+                              <span className="flex-1 text-gray-600 text-left truncate">{mid.name}</span>
+                              <span className="text-brand-600 font-medium flex-shrink-0">{mid.count}개</span>
+                              {mid.scls.length > 1 && (
+                                <span className="text-gray-300 flex-shrink-0">
+                                  {midOpen ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+                                </span>
+                              )}
+                            </button>
+
+                            {/* 소분류 드릴다운 */}
+                            {midOpen && mid.scls.length > 1 && (
+                              <div className="ml-2 border-l border-gray-100 pl-2 mb-1 space-y-0.5">
+                                {mid.scls.map((scl) => (
+                                  <div key={scl.name} className="flex items-center gap-2 text-xs px-1.5 py-0.5">
+                                    <span className="flex-1 text-gray-500 truncate">{scl.name}</span>
+                                    <span className="text-gray-400 flex-shrink-0">{scl.count}개</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               )
             })}
           </div>
+          {categories.length > 8 && (
+            <button
+              onClick={() => setShowAllCats(!showAllCats)}
+              className="w-full mt-1.5 text-xs text-gray-400 hover:text-gray-600 flex items-center justify-center gap-1"
+            >
+              {showAllCats
+                ? <><ChevronUp size={11} /> 접기</>
+                : <><ChevronDown size={11} /> 전체 {categories.length}개 업종 보기</>
+              }
+            </button>
+          )}
         </div>
       )}
 
