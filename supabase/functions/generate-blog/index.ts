@@ -14,12 +14,74 @@ Deno.serve(async (req) => {
     const { user, supabaseClient } = await getAuthenticatedUser(req)
     const orgId = await getOrgId(supabaseClient, user.id)
 
+    // 요청 파싱
+    const body = await req.json()
+    const { project_id, style = 'informative', titles_only = false, content_id } = body
+
+    // ── titles_only 모드: 기존 콘텐츠에 제목 5개만 재생성 ──────────────────
+    if (titles_only && content_id) {
+      // 기존 콘텐츠에서 project_id 파악
+      const { data: existing, error: cErr } = await supabaseClient
+        .from('generated_contents')
+        .select('id, project_id, title')
+        .eq('id', content_id)
+        .single()
+      if (cErr || !existing) throw new Error('콘텐츠를 찾을 수 없습니다')
+
+      const pid = existing.project_id
+
+      const { data: project, error: pError } = await supabaseClient
+        .from('projects')
+        .select('address, property_type, price, area, direction, features')
+        .eq('id', pid)
+        .single()
+      if (pError || !project) throw new Error('프로젝트를 찾을 수 없습니다')
+
+      const { data: location } = await supabaseClient
+        .from('location_analyses')
+        .select('advantages')
+        .eq('project_id', pid)
+        .single()
+
+      const titlesPrompt = `다음 부동산 매물에 대해 SEO 최적화된 블로그 제목 5개를 JSON으로 반환하세요.
+각 제목은 반드시 아래 5가지 스타일로 1개씩 작성하세요:
+1. [정보형] 지역명+매물유형+핵심강점 나열
+2. [후킹형] 강한 임팩트·긴박감 ("안 보면 후회", "지금 아니면 늦어요" 등)
+3. [질문형] 독자 궁금증 자극 ("왜?", "어떻게?" 등)
+4. [감성형] 라이프스타일·스토리텔링
+5. [숫자형] 구체적 수치·거리·시간 강조
+
+매물: ${maskPersonalInfo(project.address)} / ${project.property_type ?? '아파트'} / ${project.area ? project.area + '㎡' : ''} / ${project.direction ?? ''}
+특징: ${project.features?.join(', ') ?? ''}
+입지: ${location?.advantages?.slice(0, 3).join(', ') ?? ''}
+
+출력 형식 (JSON만):
+{"titles": ["제목1", "제목2", "제목3", "제목4", "제목5"]}`
+
+      const responseText = await callOpenAI(
+        [{ role: 'user', content: titlesPrompt }],
+        { responseFormat: 'json', maxTokens: 800, temperature: 0.9 }
+      )
+      const result = JSON.parse(responseText)
+      const newTitles: string[] = result.titles ?? []
+
+      // DB 업데이트
+      const { error: updateErr } = await supabaseClient
+        .from('generated_contents')
+        .update({ titles: newTitles, title: newTitles[0] ?? existing.title })
+        .eq('id', content_id)
+      if (updateErr) throw new Error(updateErr.message)
+
+      return new Response(JSON.stringify({ success: true, titles: newTitles }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // ── 전체 블로그 생성 모드 ────────────────────────────────────────────────
+    if (!project_id) throw new Error('project_id가 필요합니다')
+
     // 사용량 한도 확인
     await checkQuota(supabaseClient, orgId, 'generation')
-
-    // 요청 파싱
-    const { project_id, style = 'informative' } = await req.json()
-    if (!project_id) throw new Error('project_id가 필요합니다')
 
     // 프로젝트 데이터 조회
     const { data: project, error: pError } = await supabaseClient

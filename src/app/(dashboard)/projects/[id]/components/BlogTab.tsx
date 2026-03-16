@@ -93,8 +93,36 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
   const [photoLayout, setPhotoLayout] = useState<'individual' | 'collage' | 'slideshow'>('individual')
   const [photoPosition, setPhotoPosition] = useState<'inline' | 'bulk'>('inline')
   const [selectedTitle, setSelectedTitle] = useState<string | null>(null)
+  const [regeneratingTitles, setRegeneratingTitles] = useState(false)
+  const [localTitles, setLocalTitles] = useState<Record<string, string[]>>({})
 
   const selected = contents.find(c => c.id === selectedId)
+
+  const handleRegenerateTitles = async () => {
+    if (!selectedId) return
+    setRegeneratingTitles(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/generate-blog`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token ?? ''}`,
+        },
+        body: JSON.stringify({ titles_only: true, content_id: selectedId }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? '제목 재생성 실패')
+      setLocalTitles(prev => ({ ...prev, [selectedId]: json.titles }))
+      setSelectedTitle(null)
+      setShowAllTitles(true)
+      toast.success('제목 5개가 재생성되었습니다!')
+    } catch (err: any) {
+      toast.error(err.message || '재생성에 실패했습니다.')
+    } finally {
+      setRegeneratingTitles(false)
+    }
+  }
 
   const handleGenerate = async () => {
     setGenerating(true)
@@ -454,10 +482,8 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
             {selected.title && (
               <div className="card p-4">
                 {(() => {
-                  // titles 배열 우선, 없으면 title 단일값 fallback
-                  const allTitles = (selected.titles && selected.titles.length > 0)
-                    ? selected.titles
-                    : [selected.title].filter(Boolean) as string[]
+                  // localTitles(재생성) > DB titles > title 단일값 순 우선
+                  const allTitles = (localTitles[selectedId!] ?? (selected.titles && selected.titles.length > 0 ? selected.titles : null) ?? [selected.title].filter(Boolean)) as string[]
                   const displayed = showAllTitles ? allTitles : allTitles.slice(0, 1)
                   return (
                     <>
@@ -465,15 +491,27 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
                         <h4 className="text-sm font-semibold text-gray-700">
                           추천 제목 ({allTitles.length}개)
                         </h4>
-                        {allTitles.length > 1 && (
+                        <div className="flex items-center gap-2">
                           <button
-                            onClick={() => setShowAllTitles(!showAllTitles)}
-                            className="text-xs text-gray-400 flex items-center gap-1"
+                            onClick={handleRegenerateTitles}
+                            disabled={regeneratingTitles}
+                            className="text-xs text-brand-600 hover:underline flex items-center gap-1"
                           >
-                            {showAllTitles ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                            {showAllTitles ? '접기' : `+${allTitles.length - 1}개 더 보기`}
+                            {regeneratingTitles
+                              ? <><Loader2 size={11} className="animate-spin" />재생성 중...</>
+                              : <><Wand2 size={11} />제목 5개 재생성</>
+                            }
                           </button>
-                        )}
+                          {allTitles.length > 1 && (
+                            <button
+                              onClick={() => setShowAllTitles(!showAllTitles)}
+                              className="text-xs text-gray-400 flex items-center gap-1"
+                            >
+                              {showAllTitles ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                              {showAllTitles ? '접기' : `+${allTitles.length - 1}개 더 보기`}
+                            </button>
+                          )}
+                        </div>
                       </div>
                       {selectedTitle && (
                         <div className="mb-2 px-2 py-1.5 bg-brand-50 border border-brand-200 rounded-lg flex items-center gap-2">
