@@ -26,10 +26,12 @@ const POI_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: 
 }
 const SHOW_POI = ['subway', 'mart', 'hospital', 'school', 'convenience', 'pharmacy', 'culture']
 
-function distanceLabel(m: number) {
+function distanceLabel(m: number | null | undefined) {
+  if (!m) return '거리 미상'
   return m < 1000 ? `${m}m` : `${(m / 1000).toFixed(1)}km`
 }
-function walkMin(m: number) {
+function walkMin(m: number | null | undefined) {
+  if (!m) return '?'
   return Math.round(m / 67)
 }
 function formatAmount(amount: number | null): string {
@@ -253,13 +255,13 @@ function POISection({ poi_data }: { poi_data: Record<string, POIItem[]> }) {
             </div>
             <p className="text-sm font-medium text-gray-800 truncate">{nearest.name}</p>
             <p className="text-xs text-gray-400 mt-0.5">
-              {distanceLabel(nearest.distance_m)} · 도보 {walkMin(nearest.distance_m)}분
+              {nearest.distance_m ? `${distanceLabel(nearest.distance_m)} · 도보 ${walkMin(nearest.distance_m)}분` : '위치 정보 없음'}
             </p>
             {items.length > 1 && (
               <div className="mt-1.5 space-y-0.5">
                 {items.slice(1, 3).map((it, i) => (
                   <p key={i} className="text-xs text-gray-400 truncate">
-                    {it.name} · {distanceLabel(it.distance_m)}
+                    {it.name}{it.distance_m ? ` · ${distanceLabel(it.distance_m)}` : ''}
                   </p>
                 ))}
               </div>
@@ -273,15 +275,41 @@ function POISection({ poi_data }: { poi_data: Record<string, POIItem[]> }) {
 
 // ── 지도 섹션 ─────────────────────────────────────────────────
 function MapSection({
-  lat, lng, poi_data, real_price_data,
+  lat, lng, poi_data, real_price_data, projectId,
 }: {
   lat: number | null
   lng: number | null
   poi_data: Record<string, POIItem[]> | null
   real_price_data: RealPriceItem[] | null
+  projectId: string
 }) {
+  const [loading, setLoading] = useState(false)
+  const supabase = createClient()
+
+  const geocode = async () => {
+    setLoading(true)
+    try {
+      const { error } = await supabase.functions.invoke('analyze-location', {
+        body: { project_id: projectId },
+      })
+      if (error) throw error
+      toast.success('좌표 수집 완료')
+      window.location.reload()
+    } catch {
+      toast.error('좌표 수집 실패')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   if (!lat || !lng) return (
-    <div className="text-center py-6 text-gray-400 text-sm">좌표 없음</div>
+    <div className="text-center py-8 space-y-3">
+      <MapPin size={32} className="mx-auto text-gray-200" />
+      <p className="text-sm text-gray-400">좌표 없음</p>
+      <button onClick={geocode} disabled={loading} className="btn-secondary text-xs py-1.5">
+        {loading ? <><Loader2 size={12} className="animate-spin" /> 수집 중...</> : <><RefreshCw size={12} /> 좌표 재수집</>}
+      </button>
+    </div>
   )
 
   const poiSummary = SHOW_POI.slice(0, 6).map(key => {
@@ -586,6 +614,7 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
             lng={project.lng}
             poi_data={project.poi_data}
             real_price_data={isCommercial ? null : project.real_price_data}
+            projectId={projectId}
           />
         </div>
 
