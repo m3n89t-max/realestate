@@ -92,6 +92,7 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
   const [showPreview, setShowPreview] = useState(false)
   const [photoLayout, setPhotoLayout] = useState<'individual' | 'collage' | 'slideshow'>('individual')
   const [photoPosition, setPhotoPosition] = useState<'inline' | 'bulk'>('inline')
+  const [selectedTitle, setSelectedTitle] = useState<string | null>(null)
 
   const selected = contents.find(c => c.id === selectedId)
 
@@ -133,7 +134,7 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
         payload: {
           content_id: selectedId,
           project_id: projectId,
-          content_title: selected.title,
+          content_title: selectedTitle ?? selected.title,
           content_body: editContent || selected.content,
           content_tags: selected.tags ?? [],
           photo_layout: photoLayout,
@@ -310,12 +311,9 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
               </div>
             </div>
 
-            {/* 사진 형식 (일괄 모드에서만 의미 있음) */}
+            {/* 사진 형식 */}
             <div className="mb-3">
-              <label className="text-xs text-gray-500 mb-1.5 block">
-                사진 형식
-                {photoPosition === 'inline' && <span className="text-gray-300 ml-1">(인라인 시 개별 적용)</span>}
-              </label>
+              <label className="text-xs text-gray-500 mb-1.5 block">사진 형식</label>
               <div className="grid grid-cols-3 gap-1.5">
                 {([
                   ['individual', '개별'],
@@ -325,13 +323,11 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
                   <button
                     key={val}
                     onClick={() => setPhotoLayout(val)}
-                    disabled={photoPosition === 'inline' && val !== 'individual'}
                     className={cn(
                       'py-1.5 text-xs rounded-lg border font-medium transition-colors',
                       photoLayout === val
                         ? 'bg-green-600 text-white border-green-600'
-                        : 'border-gray-200 text-gray-600 hover:border-green-300',
-                      photoPosition === 'inline' && val !== 'individual' && 'opacity-30 cursor-not-allowed'
+                        : 'border-gray-200 text-gray-600 hover:border-green-300'
                     )}
                   >
                     {label}
@@ -479,13 +475,24 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
                           </button>
                         )}
                       </div>
+                      {selectedTitle && (
+                        <div className="mb-2 px-2 py-1.5 bg-brand-50 border border-brand-200 rounded-lg flex items-center gap-2">
+                          <span className="text-[10px] text-brand-600 font-semibold flex-shrink-0">선택됨</span>
+                          <p className="text-xs text-brand-800 flex-1 truncate">{selectedTitle}</p>
+                          <button onClick={() => setSelectedTitle(null)} className="text-[10px] text-gray-400 hover:text-gray-600 flex-shrink-0">✕</button>
+                        </div>
+                      )}
                       <div className="space-y-1.5">
-                        {displayed.map((title, i) => (
-                          <div key={i} className="flex items-center gap-2 group">
+                        {displayed.map((title, i) => {
+                          const isSelected = selectedTitle === title
+                          return (
+                          <div key={i} className={cn("flex items-center gap-2 group rounded-lg px-1.5 py-1 transition-colors cursor-pointer",
+                            isSelected ? "bg-brand-50" : "hover:bg-gray-50"
+                          )} onClick={() => setSelectedTitle(isSelected ? null : title)}>
                             <span className="text-xs text-gray-400 w-4 flex-shrink-0">{i + 1}.</span>
-                            <p className="text-sm text-gray-700 flex-1">{title}</p>
+                            <p className={cn("text-sm flex-1", isSelected ? "text-brand-700 font-medium" : "text-gray-700")}>{title}</p>
                             <button
-                              onClick={() => copyToClipboard(title, `title-${i}`)}
+                              onClick={e => { e.stopPropagation(); copyToClipboard(title, `title-${i}`) }}
                               className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-gray-100 flex-shrink-0"
                             >
                               {copiedTitle === `title-${i}`
@@ -494,7 +501,8 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
                               }
                             </button>
                           </div>
-                        ))}
+                        )})}
+
                       </div>
                     </>
                   )
