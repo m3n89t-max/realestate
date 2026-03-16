@@ -175,6 +175,7 @@ export interface GeneratedContent {
   org_id: string
   type: ContentType
   title?: string
+  titles?: string[]
   content: string
   meta_description?: string
   tags?: string[]

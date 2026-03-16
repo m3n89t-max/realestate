@@ -3,7 +3,6 @@ import { getConfig, AgentConfig } from './config';
 import {
     sendHeartbeat,
     sendTaskStarted,
-    sendTaskProgress,
     sendTaskCompleted,
     sendTaskFailed,
     getPendingTasks,
@@ -45,6 +44,7 @@ const AGENT_TASK_TYPES = [
     'upload_instagram',
     'poi_analysis',
     'location_analysis',
+    'location_analyze',
     'commercial_analysis',
     'blog_generation',
     'cardnews_generation',
@@ -286,9 +286,12 @@ class LocalAgent {
 
             if (tasks.length > 0) {
                 log(`[Poll] 대기 작업 ${tasks.length}건 발견`);
+                log(`[Poll] 타입 목록: ${tasks.map((t: any) => t.type).join(', ')}`);
                 for (const task of tasks) {
                     if (AGENT_TASK_TYPES.includes(task.type)) {
                         await this.handleNewTask(task);
+                    } else {
+                        log(`[Poll] 스킵 (미지원 타입): ${task.type}`);
                     }
                 }
             }
@@ -403,7 +406,8 @@ class LocalAgent {
             const errorCode = this.classifyError(err);
 
             if (this.config.agent_key) {
-                await sendTaskFailed(this.config, task.id, errorCode, err.message, true);
+                const shouldRetry = errorCode !== 'CONFIG_MISSING' && errorCode !== 'LOGIN_FAILED' && errorCode !== 'SEARCH_NOT_FOUND';
+                await sendTaskFailed(this.config, task.id, errorCode, err.message, shouldRetry);
             } else {
                 await this.supabase
                     .from('tasks')
@@ -457,9 +461,10 @@ class LocalAgent {
     // ============================================================
     private classifyError(err: any): string {
         const msg = (err.message || '').toLowerCase();
+        if (msg.includes('config_missing') || msg.includes('설정되지 않았습니다') || msg.includes('api_key')) return 'CONFIG_MISSING';
         if (msg.includes('login') || msg.includes('로그인')) return 'LOGIN_FAILED';
         if (msg.includes('captcha')) return 'CAPTCHA_TIMEOUT';
-        if (msg.includes('not found') || msg.includes('검색 결과 없음')) return 'SEARCH_NOT_FOUND';
+        if (msg.includes('search_not_found') || msg.includes('not found') || msg.includes('없음') || msg.includes('검색 결과 없음')) return 'SEARCH_NOT_FOUND';
         if (msg.includes('download') || msg.includes('다운로드')) return 'DOWNLOAD_FAILED';
         if (msg.includes('upload') || msg.includes('업로드')) return 'UPLOAD_FAILED';
         if (msg.includes('network') || msg.includes('fetch')) return 'NETWORK_ERROR';

@@ -102,6 +102,7 @@ Deno.serve(async (req) => {
         org_id: orgId,
         type: 'blog',
         title: result.titles?.[0] ?? '',
+        titles: result.titles ?? [],
         content: result.content,
         meta_description: result.meta_description,
         tags: result.tags,

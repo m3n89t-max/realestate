@@ -68,6 +68,17 @@ function SeoScorePanel({ score }: { score: SeoScore }) {
   )
 }
 
+function parseBold(text: string): React.ReactNode[] {
+  // **bold** 및 중첩 패턴 처리 — 줄 전체가 **...** 인 경우도 포함
+  const parts = text.split(/(\*\*[\s\S]+?\*\*)/)
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+      return <strong key={i} className="font-bold text-gray-900">{part.slice(2, -2)}</strong>
+    }
+    return part || null
+  }).filter(Boolean) as React.ReactNode[]
+}
+
 export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabProps) {
   const supabase = createClient()
   const [generating, setGenerating] = useState(false)
@@ -79,6 +90,7 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
   const [showAllTitles, setShowAllTitles] = useState(false)
   const [showPhotoLibrary, setShowPhotoLibrary] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
+  const [photoLayout, setPhotoLayout] = useState<'individual' | 'collage' | 'slideshow'>('individual')
 
   const selected = contents.find(c => c.id === selectedId)
 
@@ -108,7 +120,7 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
   }
 
   const handleNaverUpload = async () => {
-    if (!selectedId) return
+    if (!selectedId || !selected) return
     setUploading(true)
     try {
       const { error } = await supabase.from('tasks').insert({
@@ -117,7 +129,14 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
         type: 'upload_naver_blog',
         status: 'pending',
         scheduled_at: new Date().toISOString(),
-        payload: { content_id: selectedId, project_id: projectId },
+        payload: {
+          content_id: selectedId,
+          project_id: projectId,
+          content_title: selected.title,
+          content_body: editContent || selected.content,
+          content_tags: selected.tags ?? [],
+          photo_layout: photoLayout,
+        },
       })
       if (error) throw error
       toast.success('네이버 블로그 업로드 작업이 등록되었습니다. 에이전트가 실행하면 자동 업로드됩니다.')
@@ -260,9 +279,35 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
         {selectedId && (
           <div className="card p-4">
             <h3 className="text-sm font-semibold text-gray-700 mb-2">자동 업로드</h3>
-            <p className="text-xs text-gray-400 mb-3">
+            <p className="text-xs text-gray-400 mb-2">
               로컬 에이전트가 실행 중이어야 합니다
             </p>
+
+            {/* 사진 첨부 방식 선택 */}
+            <div className="mb-3">
+              <label className="text-xs text-gray-500 mb-1.5 block">사진 첨부 방식</label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {([
+                  ['individual', '개별사진'],
+                  ['collage', '콜라주'],
+                  ['slideshow', '슬라이드'],
+                ] as const).map(([val, label]) => (
+                  <button
+                    key={val}
+                    onClick={() => setPhotoLayout(val)}
+                    className={cn(
+                      'py-1.5 text-xs rounded-lg border font-medium transition-colors',
+                      photoLayout === val
+                        ? 'bg-green-600 text-white border-green-600'
+                        : 'border-gray-200 text-gray-600 hover:border-green-300'
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <button
               onClick={handleNaverUpload}
               disabled={uploading}
@@ -380,33 +425,48 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
             {/* 제목 목록 */}
             {selected.title && (
               <div className="card p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-semibold text-gray-700">추천 제목 (5개)</h4>
-                  <button
-                    onClick={() => setShowAllTitles(!showAllTitles)}
-                    className="text-xs text-gray-400 flex items-center gap-1"
-                  >
-                    {showAllTitles ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                    {showAllTitles ? '접기' : '펼치기'}
-                  </button>
-                </div>
-                <div className="space-y-1.5">
-                  {(showAllTitles ? [selected.title] : [selected.title]).map((title, i) => (
-                    <div key={i} className="flex items-center gap-2 group">
-                      <span className="text-xs text-gray-400 w-4 flex-shrink-0">{i + 1}.</span>
-                      <p className="text-sm text-gray-700 flex-1 truncate">{title}</p>
-                      <button
-                        onClick={() => copyToClipboard(title, `title-${i}`)}
-                        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-gray-100"
-                      >
-                        {copiedTitle === `title-${i}`
-                          ? <Check size={12} className="text-green-500" />
-                          : <Copy size={12} className="text-gray-400" />
-                        }
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                {(() => {
+                  // titles 배열 우선, 없으면 title 단일값 fallback
+                  const allTitles = (selected.titles && selected.titles.length > 0)
+                    ? selected.titles
+                    : [selected.title].filter(Boolean) as string[]
+                  const displayed = showAllTitles ? allTitles : allTitles.slice(0, 1)
+                  return (
+                    <>
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-sm font-semibold text-gray-700">
+                          추천 제목 ({allTitles.length}개)
+                        </h4>
+                        {allTitles.length > 1 && (
+                          <button
+                            onClick={() => setShowAllTitles(!showAllTitles)}
+                            className="text-xs text-gray-400 flex items-center gap-1"
+                          >
+                            {showAllTitles ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                            {showAllTitles ? '접기' : `+${allTitles.length - 1}개 더 보기`}
+                          </button>
+                        )}
+                      </div>
+                      <div className="space-y-1.5">
+                        {displayed.map((title, i) => (
+                          <div key={i} className="flex items-center gap-2 group">
+                            <span className="text-xs text-gray-400 w-4 flex-shrink-0">{i + 1}.</span>
+                            <p className="text-sm text-gray-700 flex-1">{title}</p>
+                            <button
+                              onClick={() => copyToClipboard(title, `title-${i}`)}
+                              className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-gray-100 flex-shrink-0"
+                            >
+                              {copiedTitle === `title-${i}`
+                                ? <Check size={12} className="text-green-500" />
+                                : <Copy size={12} className="text-gray-400" />
+                              }
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )
+                })()}
               </div>
             )}
 
@@ -449,9 +509,8 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
               </div>
 
               {showPreview ? (
-                <div className="w-full min-h-[400px] max-h-[600px] overflow-y-auto text-sm text-gray-700 border border-gray-200 rounded-lg p-4 bg-gray-50 prose prose-sm max-w-none">
+                <div className="w-full min-h-[400px] max-h-[600px] overflow-y-auto text-sm text-gray-700 border border-gray-200 rounded-lg p-4 bg-white prose prose-sm max-w-none">
                   {editContent.split('\n').map((line, i) => {
-                    // 간단한 마크다운 파싱 (이미지, 헤딩, 굵게)
                     const imgMatch = line.match(/!\[(.*?)\]\((.*?)\)/)
                     if (imgMatch) {
                       return (
@@ -461,19 +520,36 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
                         </div>
                       )
                     }
-                    if (line.startsWith('### ')) return <h3 key={i} className="text-lg font-bold mt-4 mb-2">{line.replace('### ', '')}</h3>
-                    if (line.startsWith('## ')) return <h2 key={i} className="text-xl font-bold mt-6 mb-3 border-b pb-1">{line.replace('## ', '')}</h2>
-                    if (line.startsWith('# ')) return <h1 key={i} className="text-2xl font-bold mt-8 mb-4">{line.replace('# ', '')}</h1>
+                    // 이미지 캡션
+                    const captionMatch = line.match(/^\*▲\s*(.*?)\*$/)
+                    if (captionMatch) return <p key={i} className="text-center text-xs text-gray-400 -mt-2 mb-3">▲ {captionMatch[1]}</p>
 
-                    // 굵게 처리
-                    const boldedLine = line.split(/(\*\*.*?\*\*)/).map((part, j) => {
-                      if (part.startsWith('**') && part.endsWith('**')) {
-                        return <strong key={j}>{part.slice(2, -2)}</strong>
-                      }
-                      return part
-                    })
+                    if (line.startsWith('### ')) return <h3 key={i} className="text-base font-bold mt-4 mb-1 text-gray-800">{parseBold(line.replace(/^### /, ''))}</h3>
+                    if (line.startsWith('## ')) return <h2 key={i} className="text-lg font-bold mt-6 mb-2 border-b border-gray-200 pb-1 text-gray-900">{parseBold(line.replace(/^## /, ''))}</h2>
+                    if (line.startsWith('# ')) return <h1 key={i} className="text-xl font-bold mt-8 mb-3 text-gray-900">{parseBold(line.replace(/^# /, ''))}</h1>
 
-                    return <p key={i} className="min-h-[1.5em] mb-2">{boldedLine}</p>
+                    // 리스트 항목 (선행 공백 허용)
+                    if (line.match(/^\s*[-*]\s/)) return (
+                      <div key={i} className="flex gap-2 mb-1 pl-4">
+                        <span className="text-brand-500 mt-0.5 flex-shrink-0">•</span>
+                        <span>{parseBold(line.replace(/^\s*[-*]\s/, ''))}</span>
+                      </div>
+                    )
+                    // 번호 리스트 — 중복 숫자 제거 ("2. 2. 텍스트" → "2. 텍스트")
+                    const numMatch = line.match(/^(\d+)\.\s+(.*)/)
+                    if (numMatch) {
+                      // content에서 앞에 중복된 숫자 패턴 제거
+                      const content = numMatch[2].replace(/^\d+\.\s+/, '')
+                      return (
+                        <div key={i} className="flex gap-2 mb-1.5 pl-2">
+                          <span className="text-brand-500 font-semibold min-w-[1.5rem] flex-shrink-0">{numMatch[1]}.</span>
+                          <span className="flex-1">{parseBold(content)}</span>
+                        </div>
+                      )
+                    }
+
+                    if (!line.trim()) return <div key={i} className="h-3" />
+                    return <p key={i} className="mb-2 leading-relaxed">{parseBold(line)}</p>
                   })}
                 </div>
               ) : (

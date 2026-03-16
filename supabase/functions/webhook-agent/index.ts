@@ -201,6 +201,45 @@ Deno.serve(async (req) => {
         break
       }
 
+      case 'update_content': {
+        // 에이전트가 콘텐츠 상태 업데이트 (발행 완료 등)
+        const { content_id: ucId, updates } = data
+        if (!ucId) throw new Error('content_id가 필요합니다')
+        await adminClient.from('generated_contents').update(updates).eq('id', ucId)
+        break
+      }
+
+      case 'get_content': {
+        // 에이전트가 콘텐츠 조회 (서비스 롤로 RLS 우회)
+        const { content_id } = data
+        if (!content_id) throw new Error('content_id가 필요합니다')
+        const { data: content, error } = await adminClient
+          .from('generated_contents')
+          .select('id, title, content, tags')
+          .eq('id', content_id)
+          .single()
+        if (error || !content) throw new Error(`콘텐츠를 찾을 수 없습니다: ${content_id}`)
+        return new Response(JSON.stringify({ success: true, content }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      case 'get_assets': {
+        // 에이전트가 에셋 조회 (서비스 롤로 RLS 우회)
+        const { project_id: assetProjectId } = data
+        if (!assetProjectId) throw new Error('project_id가 필요합니다')
+        const { data: assets } = await adminClient
+          .from('assets')
+          .select('file_url, type, is_cover, sort_order')
+          .eq('project_id', assetProjectId)
+          .eq('type', 'image')
+          .order('sort_order', { ascending: true })
+          .limit(5)
+        return new Response(JSON.stringify({ success: true, assets: assets ?? [] }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
       case 'get_pending_tasks': {
         // 에이전트가 폴링으로 대기 작업 조회 (서비스 롤로 RLS 우회)
         const { data: tasks } = await adminClient
@@ -210,7 +249,7 @@ Deno.serve(async (req) => {
           .lte('scheduled_at', new Date().toISOString())
           .eq('org_id', agent.org_id)
           .order('scheduled_at', { ascending: true })
-          .limit(5)
+          .limit(10)
         return new Response(JSON.stringify({ success: true, tasks: tasks ?? [] }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })

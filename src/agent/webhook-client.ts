@@ -100,6 +100,21 @@ export async function sendTaskFailed(
     });
 }
 
+export async function updateContent(config: AgentConfig, contentId: string, updates: Record<string, unknown>): Promise<void> {
+    await sendWebhook(config, { event: 'update_content', content_id: contentId, updates });
+}
+
+export async function getContent(config: AgentConfig, contentId: string): Promise<any> {
+    const res = await sendWebhook(config, { event: 'get_content', content_id: contentId });
+    if (!res?.content) throw new Error(`[SEARCH_NOT_FOUND] 콘텐츠 없음: ${contentId}`);
+    return res.content;
+}
+
+export async function getAssets(config: AgentConfig, projectId: string): Promise<any[]> {
+    const res = await sendWebhook(config, { event: 'get_assets', project_id: projectId });
+    return res?.assets ?? [];
+}
+
 export async function getPendingTasks(config: AgentConfig): Promise<any[]> {
     const res = await sendWebhook(config, { event: 'get_pending_tasks' });
     return res?.tasks ?? [];
