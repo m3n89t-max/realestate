@@ -41,6 +41,24 @@ function formatRealPrice(real_price_data: any[] | null): string {
   ).join('\n')
 }
 
+function formatCommercial(commercial_data: any): string {
+  if (!commercial_data) return '(상권 데이터 없음)'
+  const { zones = [], store_count_by_category = {}, stores = [], radius_m = 500 } = commercial_data
+  const lines: string[] = [
+    `반경 ${radius_m}m 내 상가업소: ${stores.length}개`,
+  ]
+  if (zones.length > 0) {
+    lines.push(`주변 상권: ${zones.slice(0, 3).map((z: any) => z.mainTrarNm).join(', ')}`)
+  }
+  const categories = Object.entries(store_count_by_category as Record<string, number>)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+  if (categories.length > 0) {
+    lines.push(`업종별 현황: ${categories.map(([k, v]) => `${k}(${v}개)`).join(', ')}`)
+  }
+  return lines.join('\n')
+}
+
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
   if (corsResponse) return corsResponse
@@ -111,8 +129,11 @@ Deno.serve(async (req) => {
     }
 
     // ── 실제 수집 데이터 포맷팅 ──────────────────────────────
+    const isCommercial  = project.property_type === 'commercial'
     const poiText       = formatPOI(project.poi_data)
-    const realPriceText = formatRealPrice(project.real_price_data)
+    const realPriceText = isCommercial
+      ? formatCommercial(project.commercial_data)
+      : formatRealPrice(project.real_price_data)
 
     const systemPrompt = `당신은 대한민국 부동산 입지 분석 전문가입니다.
 실제 수집된 데이터를 기반으로 입지 분석을 수행하세요. 수집된 데이터가 있으면 반드시 활용하고, 없는 항목은 주소와 지역 특성으로 추론하세요.
@@ -159,7 +180,7 @@ ${project.note || '(없음)'}
 [실제 수집된 POI 데이터]
 ${poiText}
 
-[최근 실거래가]
+[${isCommercial ? '상권 분석 데이터' : '최근 실거래가'}]
 ${realPriceText}
 
 위 실제 데이터를 적극 활용하여 분석하세요. 장점은 "도보/차량 N분" 등 구체적 수치 표현을 사용하세요.

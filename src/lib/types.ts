@@ -75,6 +75,35 @@ export interface RealPriceItem {
   type:     string
 }
 
+export interface CommercialZone {
+  trarNo: string
+  mainTrarNm: string
+  ctprvnNm?: string
+  signguNm?: string
+  trarArea?: number
+  lon?: number
+  lat?: number
+}
+
+export interface CommercialStore {
+  bizesId: string
+  bizesNm: string
+  indsLclsNm?: string
+  indsMclsNm?: string
+  indsSclsNm?: string
+  lon?: number
+  lat?: number
+  lnoAdr?: string
+}
+
+export interface CommercialData {
+  zones: CommercialZone[]
+  stores: CommercialStore[]
+  store_count_by_category: Record<string, number>
+  radius_m: number
+  collected_at: string
+}
+
 export interface Project {
   id: string
   org_id: string
@@ -102,6 +131,7 @@ export interface Project {
   poi_data?: Record<string, POIItem[]> | null
   land_use_data?: LandUseItem[] | null
   real_price_data?: RealPriceItem[] | null
+  commercial_data?: CommercialData | null
   created_at: string
   updated_at: string
 }

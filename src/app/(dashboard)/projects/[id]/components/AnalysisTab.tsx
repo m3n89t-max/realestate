@@ -5,7 +5,7 @@ import {
   MapPin, TrendingUp, Building2, Target, FileText,
   Loader2, CheckCircle2, AlertCircle, RefreshCw, ChevronDown, ChevronUp,
   Train, ShoppingCart, Hospital, GraduationCap, Coffee, Pill, Landmark,
-  ExternalLink
+  ExternalLink, Store
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
@@ -71,21 +71,21 @@ function WorkflowStatus({ steps }: { steps: WorkflowStep[] }) {
 }
 
 // ── AI 분석 보고서 섹션 ───────────────────────────────────────
-function AIAnalysisReport({ analysis, projectId, hasCoords, hasPOI, hasRealPrice }: {
+function AIAnalysisReport({ analysis, projectId, hasCoords, hasPOI, hasData, isCommercial }: {
   analysis: any
   projectId: string
   hasCoords: boolean
   hasPOI: boolean
-  hasRealPrice: boolean
+  hasData: boolean
+  isCommercial: boolean
 }) {
   const [loading, setLoading] = useState(false)
   const supabase = createClient()
 
-  // 선행 조건 체크
   const prereqs = [
     { label: '좌표 변환', done: hasCoords },
     { label: 'POI 수집',  done: hasPOI },
-    { label: '부동산 데이터', done: hasRealPrice },
+    { label: isCommercial ? '상권 데이터' : '부동산 데이터', done: hasData },
   ]
   const canAnalyze = prereqs.every(p => p.done)
 
@@ -111,9 +111,8 @@ function AIAnalysisReport({ analysis, projectId, hasCoords, hasPOI, hasRealPrice
       <div className="card p-8 text-center border-2 border-dashed border-gray-200">
         <MapPin size={36} className="mx-auto text-gray-300 mb-3" />
         <p className="font-medium text-gray-600 mb-1">AI 입지 분석 미실행</p>
-        <p className="text-sm text-gray-400 mb-3">좌표 변환 → POI 수집 → 부동산 데이터 수집 완료 후 실행 가능합니다</p>
+        <p className="text-sm text-gray-400 mb-3">좌표 변환 → POI 수집 → {isCommercial ? '상권' : '부동산'} 데이터 수집 완료 후 실행 가능합니다</p>
 
-        {/* 선행 조건 체크리스트 */}
         <div className="flex items-center justify-center gap-3 mb-5">
           {prereqs.map((p, i) => (
             <div key={i} className="flex items-center gap-1.5">
@@ -146,7 +145,6 @@ function AIAnalysisReport({ analysis, projectId, hasCoords, hasPOI, hasRealPrice
 
   return (
     <div className="space-y-4">
-      {/* 종합 분석 */}
       {analysis.analysis_text && (
         <div className="card p-5">
           <div className="flex items-center justify-between mb-3">
@@ -165,7 +163,6 @@ function AIAnalysisReport({ analysis, projectId, hasCoords, hasPOI, hasRealPrice
         </div>
       )}
 
-      {/* 입지 장점 */}
       {analysis.advantages?.length > 0 && (
         <div className="card p-5">
           <h3 className="section-title mb-4 flex items-center gap-2">
@@ -185,7 +182,6 @@ function AIAnalysisReport({ analysis, projectId, hasCoords, hasPOI, hasRealPrice
         </div>
       )}
 
-      {/* 추천 타겟 + 토지이용/실거래가 요약 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {analysis.recommended_targets?.length > 0 && (
           <div className="card p-5">
@@ -221,7 +217,7 @@ function AIAnalysisReport({ analysis, projectId, hasCoords, hasPOI, hasRealPrice
           {analysis.price_trend && (
             <div className="card p-4">
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                <TrendingUp size={12} /> 실거래가 동향
+                <TrendingUp size={12} /> {isCommercial ? '상권 현황' : '실거래가 동향'}
               </h3>
               <p className="text-sm text-gray-700 leading-relaxed">{analysis.price_trend}</p>
             </div>
@@ -275,7 +271,7 @@ function POISection({ poi_data }: { poi_data: Record<string, POIItem[]> }) {
   )
 }
 
-// ── 지도 + 주변시설/시세 섹션 ────────────────────────────────
+// ── 지도 섹션 ─────────────────────────────────────────────────
 function MapSection({
   lat, lng, poi_data, real_price_data,
 }: {
@@ -288,21 +284,18 @@ function MapSection({
     <div className="text-center py-6 text-gray-400 text-sm">좌표 없음</div>
   )
 
-  // POI 요약: 6개 카테고리 중 가장 가까운 것
   const poiSummary = SHOW_POI.slice(0, 6).map(key => {
     const items = poi_data?.[key] ?? []
     const nearest = items[0]
     return nearest ? { key, cfg: POI_CONFIG[key], nearest } : null
   }).filter(Boolean) as { key: string; cfg: typeof POI_CONFIG[string]; nearest: POIItem }[]
 
-  // 실거래가 요약
   const amounts = (real_price_data ?? []).map(t => t.amount).filter((a): a is number => a !== null && a > 0)
   const avgPrice = amounts.length ? Math.round(amounts.reduce((s, a) => s + a, 0) / amounts.length) : null
   const maxPrice = amounts.length ? Math.max(...amounts) : null
 
   return (
     <div className="space-y-3">
-      {/* 카카오 지도 (JS SDK, 핀 표시) */}
       <div className="rounded-xl overflow-hidden border border-gray-100 relative">
         <KakaoMap lat={lat} lng={lng} level={4} style={{ width: '100%', height: 260 }} />
         <a
@@ -316,7 +309,6 @@ function MapSection({
         </a>
       </div>
 
-      {/* POI 요약 */}
       {poiSummary.length > 0 && (
         <div className="grid grid-cols-2 gap-1.5">
           {poiSummary.map(({ key, cfg, nearest }) => (
@@ -333,7 +325,6 @@ function MapSection({
         </div>
       )}
 
-      {/* 주변 시세 */}
       {avgPrice && (
         <div className="flex items-center gap-2 p-2.5 bg-brand-50 rounded-lg border border-brand-100">
           <TrendingUp size={12} className="text-brand-500 flex-shrink-0" />
@@ -405,6 +396,122 @@ function RealPriceSection({ real_price_data }: { real_price_data: RealPriceItem[
   )
 }
 
+// ── 상권 분석 섹션 (상가/사무실용) ────────────────────────────
+function CommercialSection({ commercial_data, projectId }: {
+  commercial_data: any
+  projectId: string
+}) {
+  const [loading, setLoading] = useState(false)
+  const supabase = createClient()
+
+  const fetchData = async () => {
+    setLoading(true)
+    try {
+      const { error } = await supabase.functions.invoke('analyze-commercial', {
+        body: { project_id: projectId },
+      })
+      if (error) throw error
+      toast.success('상권 데이터 수집이 완료되었습니다')
+      window.location.reload()
+    } catch {
+      toast.error('상권 데이터 수집에 실패했습니다')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (!commercial_data) {
+    return (
+      <div className="text-center py-6 space-y-3">
+        <Store size={32} className="mx-auto text-gray-200" />
+        <p className="text-sm text-gray-400">상권 데이터 없음</p>
+        <button onClick={fetchData} disabled={loading} className="btn-primary text-xs py-1.5">
+          {loading ? <><Loader2 size={12} className="animate-spin" /> 수집 중...</> : <><RefreshCw size={12} /> 상권 데이터 수집</>}
+        </button>
+      </div>
+    )
+  }
+
+  const {
+    zones = [],
+    store_count_by_category = {},
+    stores = [],
+    radius_m = 500,
+  } = commercial_data
+
+  const totalStores: number = stores.length
+  const categories = Object.entries(store_count_by_category as Record<string, number>)
+    .sort((a, b) => b[1] - a[1])
+
+  return (
+    <div className="space-y-4">
+      {/* 요약 수치 */}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="p-3 bg-brand-50 rounded-lg text-center">
+          <p className="text-xs text-gray-500 mb-0.5">반경 {radius_m}m 상가</p>
+          <p className="text-xl font-bold text-brand-700">{totalStores}개</p>
+        </div>
+        <div className="p-3 bg-orange-50 rounded-lg text-center">
+          <p className="text-xs text-gray-500 mb-0.5">인근 상권</p>
+          <p className="text-xl font-bold text-orange-600">{zones.length}개</p>
+        </div>
+      </div>
+
+      {/* 업종별 분포 */}
+      {categories.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-gray-500 mb-2">업종별 분포</p>
+          <div className="space-y-1.5">
+            {categories.slice(0, 8).map(([cat, count]) => {
+              const pct = totalStores > 0 ? Math.round((count / totalStores) * 100) : 0
+              return (
+                <div key={cat} className="flex items-center gap-2 text-xs">
+                  <span className="w-20 text-gray-600 truncate flex-shrink-0">{cat}</span>
+                  <div className="flex-1 bg-gray-100 rounded-full h-2">
+                    <div
+                      className="bg-brand-500 h-2 rounded-full"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <span className="text-gray-500 w-10 text-right flex-shrink-0">{count}개</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 인근 상권 목록 */}
+      {zones.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-gray-500 mb-2">인근 상권</p>
+          <div className="space-y-1.5">
+            {zones.slice(0, 5).map((zone: any, i: number) => (
+              <div key={i} className="flex items-center justify-between text-xs p-2 bg-gray-50 rounded-lg">
+                <span className="font-medium text-gray-700 truncate">{zone.mainTrarNm}</span>
+                <span className="text-gray-400 flex-shrink-0 ml-2">
+                  {zone.signguNm ?? ''}
+                  {zone.trarArea ? ` · ${Math.round(zone.trarArea / 10000)}만㎡` : ''}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <button
+        onClick={fetchData}
+        disabled={loading}
+        className="w-full mt-1 text-xs text-gray-400 hover:text-gray-600 flex items-center justify-center gap-1"
+      >
+        {loading ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+        데이터 갱신
+      </button>
+      <p className="text-xs text-gray-400">출처: 소상공인시장진흥공단</p>
+    </div>
+  )
+}
+
 // ── 메인 ─────────────────────────────────────────────────────
 interface AnalysisTabProps {
   projectId: string
@@ -413,16 +520,19 @@ interface AnalysisTabProps {
 }
 
 export default function AnalysisTab({ projectId, project, locationAnalysis }: AnalysisTabProps) {
-  const hasPOI       = project.poi_data != null && Object.keys(project.poi_data).length > 0
-  // 빈 배열이어도 수집 시도된 것으로 간주 (해당 지역 데이터 없음)
-const hasRealPrice = project.real_price_data != null
-  const hasAnalysis  = !!locationAnalysis
+  const isCommercial = project.property_type === 'commercial'
+
+  const hasPOI        = project.poi_data != null && Object.keys(project.poi_data).length > 0
+  const hasRealPrice  = project.real_price_data != null
+  const hasCommercial = project.commercial_data != null
+  const hasData       = isCommercial ? hasCommercial : hasRealPrice
+  const hasAnalysis   = !!locationAnalysis
 
   const workflowSteps = [
-    { label: '좌표 변환',   done: !!(project.lat && project.lng) },
-    { label: 'POI 수집',    done: hasPOI },
-    { label: '부동산 데이터', done: hasRealPrice },
-    { label: '입지 분석',   done: hasAnalysis },
+    { label: '좌표 변환', done: !!(project.lat && project.lng) },
+    { label: 'POI 수집',  done: hasPOI },
+    { label: isCommercial ? '상권 데이터' : '부동산 데이터', done: hasData },
+    { label: '입지 분석', done: hasAnalysis },
   ]
 
   return (
@@ -431,11 +541,11 @@ const hasRealPrice = project.real_price_data != null
       <div className="card p-4">
         <p className="text-xs text-gray-400 mb-3 font-medium uppercase tracking-wide">데이터 수집 현황</p>
         <WorkflowStatus steps={workflowSteps} />
-        {(!hasPOI || !hasRealPrice) && (
+        {(!hasPOI || !hasData) && (
           <div className="flex items-center gap-2 mt-3 p-2.5 bg-amber-50 rounded-lg">
             <AlertCircle size={13} className="text-amber-500 flex-shrink-0" />
             <p className="text-xs text-amber-700">
-              일부 데이터가 수집되지 않았습니다. 새 매물 등록 시 주소를 다시 입력하면 재수집됩니다.
+              일부 데이터가 수집되지 않았습니다. {isCommercial ? '상권 데이터 수집 버튼을 눌러 수집하세요.' : '새 매물 등록 시 주소를 다시 입력하면 재수집됩니다.'}
             </p>
           </div>
         )}
@@ -447,7 +557,8 @@ const hasRealPrice = project.real_price_data != null
         projectId={projectId}
         hasCoords={!!(project.lat && project.lng)}
         hasPOI={hasPOI}
-        hasRealPrice={hasRealPrice}
+        hasData={hasData}
+        isCommercial={isCommercial}
       />
 
       {/* 수집 데이터 3단 */}
@@ -474,19 +585,23 @@ const hasRealPrice = project.real_price_data != null
             lat={project.lat}
             lng={project.lng}
             poi_data={project.poi_data}
-            real_price_data={project.real_price_data}
+            real_price_data={isCommercial ? null : project.real_price_data}
           />
         </div>
 
-        {/* 실거래가 */}
+        {/* 실거래가 또는 상권 분석 */}
         <div className="card p-5">
           <h3 className="section-title mb-4 flex items-center gap-2">
-            <TrendingUp size={15} className="text-brand-500" />
-            부동산 데이터 (실거래가)
+            {isCommercial
+              ? <><Store size={15} className="text-orange-500" /> 상권 분석</>
+              : <><TrendingUp size={15} className="text-brand-500" /> 부동산 데이터 (실거래가)</>
+            }
           </h3>
-          {hasRealPrice
-            ? <RealPriceSection real_price_data={project.real_price_data} />
-            : <div className="text-center py-6 text-gray-400 text-sm">데이터 없음</div>
+          {isCommercial
+            ? <CommercialSection commercial_data={project.commercial_data} projectId={projectId} />
+            : hasRealPrice
+              ? <RealPriceSection real_price_data={project.real_price_data} />
+              : <div className="text-center py-6 text-gray-400 text-sm">데이터 없음</div>
           }
         </div>
       </div>
