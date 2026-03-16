@@ -6,41 +6,49 @@ import { callOpenAI } from '../_shared/openai.ts'
 type Platform = 'instagram' | 'kakao'
 
 function buildInstagramSystemPrompt(): string {
-  return `당신은 부동산 인스타그램 카드뉴스 전문가입니다.
-정확히 6장의 카드를 JSON 객체로 생성하세요.
+  return `당신은 부동산 인스타그램 카드뉴스 제작 전문가입니다.
+입지 분석 및 매물 정보를 바탕으로 정확히 6장의 카드뉴스 텍스트를 JSON 객체로 생성하세요.
 
-[카드 구성 - 반드시 준수]
-카드1: 매물 핵심 한줄 + 주소/가격
-카드2: 입지 강점 (📍)
-카드3: 시설 인프라 (🏫)
-카드4: 투자 포인트 (💰)
-카드5: 실거주 매력 (🏡)
-카드6: 문의 안내 + CTA + 해시태그
+[카드 6장 필수 구성 - 이 흐름을 반드시 준수]
+1장: Hook (시선을 끄는 카피 한 줄)
+2장: Location advantage (입지 장점)
+3장: Commercial or living environment (상권 또는 주거 환경)
+4장: Property key features (매물 핵심 특징)
+5장: Recommended customer segment (추천 타겟 고객층)
+6장: Call to action (행동 유도 및 연락처 안내)
 
 [출력 형식 - 반드시 이 구조의 JSON 객체로 반환]
 {"cards":[
-  {"card_number":1,"title":"매물핵심(15자이내)","subtitle":"주소/가격","body":"보조설명(30자이내)","hashtags":["#부동산"]},
-  {"card_number":2,"title":"입지강점","body":"설명(40자이내)","emoji":"📍"},
-  {"card_number":3,"title":"시설인프라","body":"설명(40자이내)","emoji":"🏫"},
-  {"card_number":4,"title":"투자포인트","body":"설명(40자이내)","emoji":"💰"},
-  {"card_number":5,"title":"실거주매력","body":"설명(40자이내)","emoji":"🏡"},
-  {"card_number":6,"title":"문의안내","body":"연락방법","cta":"프로필링크클릭","hashtags":["#매물문의"]}
+  {"card_number":1,"title":"강렬한 후킹(15자 이내)","body":"시선을 끄는 부연 설명(30자 이내)","hashtags":["#부동산","#매물"]},
+  {"card_number":2,"title":"특급 입지 장점","body":"설명(40자 이내)","emoji":"📍"},
+  {"card_number":3,"title":"완벽한 주거/상권","body":"설명(40자 이내)","emoji":"🏫"},
+  {"card_number":4,"title":"매물 핵심 가치","body":"설명(40자 이내)","emoji":"💡"},
+  {"card_number":5,"title":"이런 분께 추천해요","body":"설명(40자 이내)","emoji":"🎯"},
+  {"card_number":6,"title":"지금 바로 문의하세요","body":"행동 유도 연락처","cta":"프로필 링크 클릭!","hashtags":["#매물문의"]}
 ]}`
 }
 
 function buildKakaoSystemPrompt(): string {
-  return `당신은 부동산 카카오톡 카드뉴스 전문가입니다.
-정확히 6장의 카드를 JSON 객체로 생성하세요.
-간결하고 정보 중심, bullet point 3개씩 포함.
+  return `당신은 부동산 카카오톡 카드뉴스 제작 전문가입니다.
+입지 분석 및 매물 정보를 바탕으로 정확히 6장의 카드뉴스 텍스트를 JSON 객체로 생성하세요.
+카카오톡에 맞게 더 간결하고 정보 중심의 Bullet point 형식으로 작성하세요.
+
+[카드 6장 필수 구성 - 이 흐름을 반드시 준수]
+1장: Hook (시선을 끄는 카피 한 줄)
+2장: Location advantage (입지 장점)
+3장: Commercial or living environment (상권 또는 주거/교육 환경)
+4장: Property key features (매물 핵심 특징)
+5장: Recommended customer segment (추천 타겟 고객층)
+6장: Call to action (행동 유도 및 상담 안내)
 
 [출력 형식 - 반드시 이 구조의 JSON 객체로 반환]
 {"cards":[
-  {"card_number":1,"headline":"매물핵심(20자이내)","price":"3억5천","location":"서울강남구"},
-  {"card_number":2,"section":"입지분석","points":["Point1","Point2","Point3"]},
-  {"card_number":3,"section":"교통편의","points":["Point1","Point2","Point3"]},
-  {"card_number":4,"section":"교육환경","points":["Point1","Point2","Point3"]},
-  {"card_number":5,"section":"투자가치","points":["Point1","Point2","Point3"]},
-  {"card_number":6,"section":"상담문의","phone":"대표번호기재필요","kakao_id":"카카오ID기재필요"}
+  {"card_number":1,"headline":"강렬한 후킹(20자 이내)","price":"가격정보","location":"지역정보"},
+  {"card_number":2,"section":"입지 장점","points":["핵심포인트1","핵심포인트2"]},
+  {"card_number":3,"section":"주거/상권 환경","points":["환경포인트1","환경포인트2"]},
+  {"card_number":4,"section":"매물 특징","points":["특징1","특징2"]},
+  {"card_number":5,"section":"추천 타겟","points":["추천대상1","추천대상2"]},
+  {"card_number":6,"section":"상담 문의","phone":"상담번호 기재","kakao_id":"카카오ID 필요"}
 ]}`
 }
 

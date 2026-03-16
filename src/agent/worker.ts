@@ -41,6 +41,12 @@ const AGENT_TASK_TYPES = [
     'upload_youtube',
     'instagram_upload',
     'upload_instagram',
+    'poi_analysis',
+    'location_analysis',
+    'commercial_analysis',
+    'blog_generation',
+    'cardnews_generation',
+    'shorts_generation'
 ];
 
 const HEARTBEAT_INTERVAL = 30_000; // 30초
@@ -355,6 +361,32 @@ class LocalAgent {
                 case 'instagram_upload':
                 case 'upload_instagram':
                     result = await uploadInstagram(task, this.config);
+                    break;
+
+                // TEAM 4: Content Engine & Automation Skeleton
+                case 'poi_analysis':
+                    console.log(`[Agent] POI 분석 실행 (ID: ${task.id})`);
+                    result = { message: 'POI analysis completed (stub)' };
+                    break;
+                case 'location_analysis':
+                    console.log(`[Agent] 입지 분석 실행 (ID: ${task.id})`);
+                    result = { message: 'Location analysis completed (stub)' };
+                    break;
+                case 'commercial_analysis':
+                    console.log(`[Agent] 상권 분석 실행 (ID: ${task.id})`);
+                    result = { message: 'Commercial analysis completed (stub)' };
+                    break;
+                case 'blog_generation':
+                    console.log(`[Agent] 블로그 생성 실행 (ID: ${task.id})`);
+                    result = { message: 'Blog generation completed (stub)' };
+                    break;
+                case 'cardnews_generation':
+                    console.log(`[Agent] 카드뉴스 생성 실행 (ID: ${task.id})`);
+                    result = { message: 'Cardnews generation completed (stub)' };
+                    break;
+                case 'shorts_generation':
+                    console.log(`[Agent] 쇼츠 스크립트 생성 실행 (ID: ${task.id})`);
+                    result = { message: 'Shorts generation completed (stub)' };
                     break;
 
                 default:
