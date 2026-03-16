@@ -95,8 +95,16 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
   const [selectedTitle, setSelectedTitle] = useState<string | null>(null)
   const [regeneratingTitles, setRegeneratingTitles] = useState(false)
   const [localTitles, setLocalTitles] = useState<Record<string, string[]>>({})
+  const [realtorName, setRealtorName] = useState('')
+  const [realtorAddress, setRealtorAddress] = useState('')
+  const [realtorPhone, setRealtorPhone] = useState('')
 
   const selected = contents.find(c => c.id === selectedId)
+
+  const buildContactFooter = () => {
+    if (!realtorName && !realtorAddress && !realtorPhone) return ''
+    return `\n\n---\n\n## 📞 문의 안내\n\n이 매물에 관심이 있으신 분들은 언제든지 연락 주세요.\n\n${realtorName ? `- **공인중개사:** ${realtorName}\n` : ''}${realtorAddress ? `- **사무소 주소:** ${realtorAddress}\n` : ''}${realtorPhone ? `- **연락처:** ${realtorPhone}\n` : ''}\n신뢰할 수 있는 부동산 전문가와 함께 최선의 매물을 찾아드립니다. 언제든지 편하게 문의해 주세요! 😊`
+  }
 
   const handleRegenerateTitles = async () => {
     if (!selectedId) return
@@ -163,7 +171,7 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
           content_id: selectedId,
           project_id: projectId,
           content_title: selectedTitle ?? selected.title,
-          content_body: editContent || selected.content,
+          content_body: (editContent || selected.content) + buildContactFooter(),
           content_tags: selected.tags ?? [],
           photo_layout: photoLayout,
           photo_position: photoPosition,
@@ -361,6 +369,34 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
                     {label}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            {/* 공인중개사 연락처 */}
+            <div className="mb-3 border-t border-gray-100 pt-3">
+              <label className="text-xs text-gray-500 mb-1.5 block font-medium">공인중개사 정보 (하단 자동 삽입)</label>
+              <div className="space-y-1.5">
+                <input
+                  type="text"
+                  placeholder="이름 (예: 홍길동 공인중개사)"
+                  value={realtorName}
+                  onChange={e => setRealtorName(e.target.value)}
+                  className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400"
+                />
+                <input
+                  type="text"
+                  placeholder="사무소 주소"
+                  value={realtorAddress}
+                  onChange={e => setRealtorAddress(e.target.value)}
+                  className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400"
+                />
+                <input
+                  type="text"
+                  placeholder="연락처 (예: 010-1234-5678)"
+                  value={realtorPhone}
+                  onChange={e => setRealtorPhone(e.target.value)}
+                  className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400"
+                />
               </div>
             </div>
 
@@ -629,10 +665,14 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
                         <span>{parseBold(line.replace(/^\s*[-*]\s/, ''))}</span>
                       </div>
                     )
-                    // 번호 리스트 — 중복 숫자 제거 ("2. 2. 텍스트" → "2. 텍스트")
+                    // 번호 리스트 — 중복 숫자 완전 제거 (다단계: "3. 3. 3. 텍스트" → "3. 텍스트")
                     const numMatch = line.match(/^(\d+)\.\s+(.*)/)
                     if (numMatch) {
-                      const innerContent = numMatch[2].replace(/^\d+\.\s+/, '')
+                      let innerContent = numMatch[2]
+                      // 앞에 붙은 "N. " 패턴을 모두 제거
+                      while (/^\d+[.)]\s+/.test(innerContent)) {
+                        innerContent = innerContent.replace(/^\d+[.)]\s+/, '')
+                      }
                       return (
                         <div key={i} className="flex gap-2 mb-1.5 pl-2">
                           <span className="text-brand-500 font-semibold min-w-[1.5rem] flex-shrink-0">{numMatch[1]}.</span>
