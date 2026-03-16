@@ -86,23 +86,31 @@ function AIAnalysisReport({ analysis, projectId, hasCoords, hasPOI, hasData, isC
 
   const prereqs = [
     { label: '좌표 변환', done: hasCoords },
-    { label: 'POI 수집',  done: hasPOI },
+    { label: 'POI 수집',  done: hasPOI, auto: true },
     { label: isCommercial ? '상권 데이터' : '부동산 데이터', done: hasData },
   ]
-  const canAnalyze = prereqs.every(p => p.done)
+  // 좌표만 있으면 분석 가능 (POI는 analyze-location 내부에서 자동 수집)
+  const canAnalyze = hasCoords
 
   const runAnalysis = async () => {
     if (!canAnalyze) return
     setLoading(true)
     try {
-      const { error } = await supabase.functions.invoke('analyze-location', {
-        body: { project_id: projectId },
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/analyze-location`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token ?? ''}`,
+        },
+        body: JSON.stringify({ project_id: projectId }),
       })
-      if (error) throw error
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? '분석 실패')
       toast.success('AI 입지 분석이 완료되었습니다')
       window.location.reload()
-    } catch {
-      toast.error('분석에 실패했습니다')
+    } catch (err: any) {
+      toast.error(err.message ?? '분석에 실패했습니다')
     } finally {
       setLoading(false)
     }
@@ -113,7 +121,7 @@ function AIAnalysisReport({ analysis, projectId, hasCoords, hasPOI, hasData, isC
       <div className="card p-8 text-center border-2 border-dashed border-gray-200">
         <MapPin size={36} className="mx-auto text-gray-300 mb-3" />
         <p className="font-medium text-gray-600 mb-1">AI 입지 분석 미실행</p>
-        <p className="text-sm text-gray-400 mb-3">좌표 변환 → POI 수집 → {isCommercial ? '상권' : '부동산'} 데이터 수집 완료 후 실행 가능합니다</p>
+        <p className="text-sm text-gray-400 mb-3">주소 좌표 확인 후 실행하세요. POI는 자동 수집되며 {isCommercial ? '상권' : '실거래가'} 데이터가 있으면 함께 분석합니다</p>
 
         <div className="flex items-center justify-center gap-3 mb-5">
           {prereqs.map((p, i) => (
@@ -138,7 +146,7 @@ function AIAnalysisReport({ analysis, projectId, hasCoords, hasPOI, hasData, isC
         </button>
         {!canAnalyze && (
           <p className="text-xs text-amber-600 mt-2">
-            미완료 항목: {prereqs.filter(p => !p.done).map(p => p.label).join(', ')}
+            주소 좌표가 없습니다. 매물 주소를 확인하세요.
           </p>
         )}
       </div>
@@ -289,14 +297,20 @@ function MapSection({
   const geocode = async () => {
     setLoading(true)
     try {
-      const { error } = await supabase.functions.invoke('analyze-location', {
-        body: { project_id: projectId },
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/analyze-location`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token ?? ''}`,
+        },
+        body: JSON.stringify({ project_id: projectId }),
       })
-      if (error) throw error
-      toast.success('좌표 수집 완료')
+      if (!res.ok) throw new Error('실패')
+      toast.success('분석 완료')
       window.location.reload()
     } catch {
-      toast.error('좌표 수집 실패')
+      toast.error('분석 실패')
     } finally {
       setLoading(false)
     }

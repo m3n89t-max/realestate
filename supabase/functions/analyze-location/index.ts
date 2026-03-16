@@ -128,9 +128,51 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ── POI 자동 수집 (없으면 Kakao Local API로 수집) ──────────
+    let poi_data = project.poi_data
+    if ((!poi_data || Object.keys(poi_data).length === 0) && lat && lng) {
+      const kakaoKey = Deno.env.get('KAKAO_REST_API_KEY')
+      if (kakaoKey) {
+        const POI_CATEGORIES: Record<string, string> = {
+          subway:      'SW8',
+          mart:        'MT1',
+          hospital:    'HP8',
+          school:      'SC4',
+          convenience: 'CS2',
+          pharmacy:    'PM9',
+          bank:        'BK9',
+          culture:     'CT1',
+          cafe:        'CE7',
+          restaurant:  'FD6',
+        }
+        const collected: Record<string, any[]> = {}
+        await Promise.allSettled(
+          Object.entries(POI_CATEGORIES).map(async ([key, code]) => {
+            try {
+              const url = `https://dapi.kakao.com/v2/local/search/category.json?category_group_code=${code}&radius=1000&x=${lng}&y=${lat}&size=5`
+              const res = await fetch(url, { headers: { Authorization: `KakaoAK ${kakaoKey}` } })
+              const data = await res.json()
+              if (data.documents?.length > 0) {
+                collected[key] = data.documents.map((d: any) => ({
+                  name:       d.place_name,
+                  distance_m: parseInt(d.distance) || null,
+                  address:    d.road_address_name || d.address_name,
+                }))
+              }
+            } catch { /* 개별 실패 무시 */ }
+          })
+        )
+        if (Object.keys(collected).length > 0) {
+          poi_data = collected
+          await supabaseClient.from('projects').update({ poi_data }).eq('id', project_id)
+          console.log('[analyze-location] POI 수집 완료:', Object.keys(collected).length, '카테고리')
+        }
+      }
+    }
+
     // ── 실제 수집 데이터 포맷팅 ──────────────────────────────
     const isCommercial  = project.property_type === 'commercial'
-    const poiText       = formatPOI(project.poi_data)
+    const poiText       = formatPOI(poi_data)
     const realPriceText = isCommercial
       ? formatCommercial(project.commercial_data)
       : formatRealPrice(project.real_price_data)
