@@ -24,17 +24,20 @@ interface StoreItem {
   lnoAdr?: string
 }
 
-async function fetchCommercialZones(serviceKey: string, lat: number, lng: number): Promise<ZoneItem[]> {
-  const url = new URL(`${BASE_URL}/storeZoneInRadius`)
-  url.searchParams.set('serviceKey', serviceKey)
-  url.searchParams.set('pageNo', '1')
-  url.searchParams.set('numOfRows', '20')
-  url.searchParams.set('radius', '500')
-  url.searchParams.set('cx', String(lng))
-  url.searchParams.set('cy', String(lat))
-  url.searchParams.set('type', 'json')
+// serviceKey는 공공데이터포털 인코딩키를 그대로 URL에 삽입 (이중 인코딩 방지)
+function buildApiUrl(operation: string, serviceKey: string, params: Record<string, string>): string {
+  const qs = Object.entries(params)
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+    .join('&')
+  return `${BASE_URL}/${operation}?serviceKey=${serviceKey}&${qs}`
+}
 
-  const res = await fetch(url.toString())
+async function fetchCommercialZones(serviceKey: string, lat: number, lng: number): Promise<ZoneItem[]> {
+  const url = buildApiUrl('storeZoneInRadius', serviceKey, {
+    pageNo: '1', numOfRows: '20', radius: '500',
+    cx: String(lng), cy: String(lat), type: 'json',
+  })
+  const res = await fetch(url)
   const data = await res.json()
   const items = data?.body?.items?.item
   if (!items) return []
@@ -42,16 +45,11 @@ async function fetchCommercialZones(serviceKey: string, lat: number, lng: number
 }
 
 async function fetchNearbyStores(serviceKey: string, lat: number, lng: number): Promise<StoreItem[]> {
-  const url = new URL(`${BASE_URL}/storeListInRadius`)
-  url.searchParams.set('serviceKey', serviceKey)
-  url.searchParams.set('pageNo', '1')
-  url.searchParams.set('numOfRows', '100')
-  url.searchParams.set('radius', '500')
-  url.searchParams.set('cx', String(lng))
-  url.searchParams.set('cy', String(lat))
-  url.searchParams.set('type', 'json')
-
-  const res = await fetch(url.toString())
+  const url = buildApiUrl('storeListInRadius', serviceKey, {
+    pageNo: '1', numOfRows: '100', radius: '500',
+    cx: String(lng), cy: String(lat), type: 'json',
+  })
+  const res = await fetch(url)
   const data = await res.json()
   const items = data?.body?.items?.item
   if (!items) return []
@@ -117,10 +115,14 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get('COMMERCIAL_API_KEY') ?? ''
     if (!serviceKey) throw new Error('COMMERCIAL_API_KEY가 설정되지 않았습니다')
 
+    console.log('[analyze-commercial] lat:', lat, 'lng:', lng, 'key prefix:', serviceKey.slice(0, 8))
+
     const [zones, stores] = await Promise.all([
       fetchCommercialZones(serviceKey, lat, lng),
       fetchNearbyStores(serviceKey, lat, lng),
     ])
+
+    console.log('[analyze-commercial] zones:', zones.length, 'stores:', stores.length)
 
     // 카테고리(대분류)별 상가 수 집계
     const storeCounts: Record<string, number> = {}
