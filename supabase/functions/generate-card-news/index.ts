@@ -7,24 +7,65 @@ type Platform = 'instagram' | 'kakao'
 
 function buildInstagramSystemPrompt(): string {
   return `당신은 부동산 인스타그램 카드뉴스 제작 전문가입니다.
-입지 분석 및 매물 정보를 바탕으로 정확히 6장의 카드뉴스 텍스트를 JSON 객체로 생성하세요.
+입지 분석 및 매물 정보를 바탕으로 정확히 6장의 카드뉴스를 JSON으로 생성하세요.
 
-[카드 6장 필수 구성 - 이 흐름을 반드시 준수]
-1장: Hook (시선을 끄는 카피 한 줄)
-2장: Location advantage (입지 장점)
-3장: Commercial or living environment (상권 또는 주거 환경)
-4장: Property key features (매물 핵심 특징)
-5장: Recommended customer segment (추천 타겟 고객층)
-6장: Call to action (행동 유도 및 연락처 안내)
+[카드 6장 구성]
+1장(cover): 강렬한 후킹 제목 + 가격뱃지 + 체크포인트 3개
+2장(location): 위치 강점 + 주소 + 체크포인트 3개
+3장(composition): 건물구성 또는 상권환경 스펙 그리드
+4장(investment): 임대현황 또는 투자포인트
+5장(interior): 내부 특징 체크포인트 3~4개
+6장(cta): 행동유도 + 가격 + 해시태그 5개
 
-[출력 형식 - 반드시 이 구조의 JSON 객체로 반환]
+[출력 JSON - 반드시 이 구조]
 {"cards":[
-  {"card_number":1,"title":"강렬한 후킹(15자 이내)","body":"시선을 끄는 부연 설명(30자 이내)","hashtags":["#부동산","#매물"]},
-  {"card_number":2,"title":"특급 입지 장점","body":"설명(40자 이내)","emoji":"📍"},
-  {"card_number":3,"title":"완벽한 주거/상권","body":"설명(40자 이내)","emoji":"🏫"},
-  {"card_number":4,"title":"매물 핵심 가치","body":"설명(40자 이내)","emoji":"💡"},
-  {"card_number":5,"title":"이런 분께 추천해요","body":"설명(40자 이내)","emoji":"🎯"},
-  {"card_number":6,"title":"지금 바로 문의하세요","body":"행동 유도 연락처","cta":"프로필 링크 클릭!","hashtags":["#매물문의"]}
+  {
+    "card_number":1,"layout":"cover",
+    "title":"강렬한 2줄 제목(\\n으로 줄바꿈, 줄당 10자 이내)",
+    "subtitle":"특장점 나열 (20자 이내)",
+    "price_badge":"희망 매매가: OO억",
+    "checkpoints":["특징1","특징2","특징3"],
+    "image_prompt":"Professional real estate exterior photo, [specific style], bright lighting, no text overlays"
+  },
+  {
+    "card_number":2,"layout":"location",
+    "title":"위치","address":"전체 주소",
+    "checkpoints":["위치강점1","위치강점2","위치강점3"],
+    "body":"한줄 부가 설명(20자 이내)",
+    "image_prompt":"Aerial or street view of [region] neighborhood, sunny, no text"
+  },
+  {
+    "card_number":3,"layout":"composition",
+    "title":"건물 구성 또는 상권 환경",
+    "spec_grid":[
+      {"label":"1층","value":"업종 및 특징 (줄바꿈 가능)"},
+      {"label":"2층 이상","value":"세부 구성 (줄바꿈 가능)"}
+    ],
+    "points":["추가포인트1","추가포인트2"],
+    "image_prompt":"Clean building interior or commercial street, modern, bright, no text"
+  },
+  {
+    "card_number":4,"layout":"investment",
+    "title":"임대 현황 또는 투자 포인트",
+    "highlight":"핵심 한 줄 (예: 현재 4실 임대중)",
+    "body":"부가 설명(30자 이내)",
+    "points":["포인트1","포인트2"],
+    "image_prompt":"Commercial building exterior, professional photography, no text"
+  },
+  {
+    "card_number":5,"layout":"interior",
+    "title":"내부 사진 또는 실거주 매력",
+    "checkpoints":["내부특징1","내부특징2","내부특징3","추가특징(선택)"],
+    "image_prompt":"Bright clean interior room, natural light, modern, no text"
+  },
+  {
+    "card_number":6,"layout":"cta",
+    "title":"마지막 임팩트 제목(\\n으로 줄바꿈)",
+    "price_badge":"희망 매매가: OO억",
+    "cta":"지금 바로 문의하세요",
+    "hashtags":["#태그1","#태그2","#태그3","#태그4","#태그5"],
+    "image_prompt":"Beautiful property exterior, golden hour lighting, no text"
+  }
 ]}`
 }
 
