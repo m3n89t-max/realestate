@@ -419,10 +419,22 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
   const handleGenerate = async () => {
     setGenerating(true)
     try {
-      const { data, error } = await supabase.functions.invoke('generate-card-news', {
-        body: { project_id: projectId },
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        toast.error('로그인이 필요합니다. 페이지를 새로고침해주세요.')
+        return
+      }
+      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/generate-card-news`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        },
+        body: JSON.stringify({ project_id: projectId }),
       })
-      if (error) throw new Error(error.message ?? '생성 실패')
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? `생성 실패 (${res.status})`)
       toast.success('카드뉴스가 생성되었습니다!')
       window.location.reload()
     } catch (err: any) {

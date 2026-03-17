@@ -1,0 +1,2 @@
+[functions.generate-card-news]
+verify_jwt = false
