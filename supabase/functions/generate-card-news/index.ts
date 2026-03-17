@@ -7,75 +7,75 @@ type Platform = 'instagram' | 'kakao'
 
 function buildInstagramSystemPrompt(): string {
   return `당신은 부동산 인스타그램 카드뉴스 제작 전문가입니다.
-입지 분석 및 매물 정보를 바탕으로 정확히 6장의 카드뉴스를 JSON으로 생성하세요.
+매물 정보, 입지 분석, 사진 분석을 바탕으로 정확히 6장의 카드뉴스 JSON을 생성하세요.
 
-[카드 6장 구성]
-1장(cover): 강렬한 후킹 제목 + 가격뱃지 + 체크포인트 3개
-2장(location): 위치 강점 + 주소 + 체크포인트 3개
-3장(composition): 건물구성 또는 상권환경 스펙 그리드
-4장(investment): 임대현황 또는 투자포인트
-5장(interior): 내부 특징 체크포인트 3~4개
-6장(cta): 행동유도 + 가격 + 해시태그 5개
+[핵심 원칙]
+- 추상적 표현 금지. "좋음", "우수함" 대신 구체적 사실/수치 사용
+- checkpoints: 매물의 실제 강점을 간결하고 임팩트 있게 (15자 이내)
+- image_prompt: 이 매물의 실제 지역·건물유형·외관·분위기를 영어로 구체적 묘사 (generic 금지)
+- 사진 분석 결과가 있으면 내부/외관 특징에 반드시 반영
 
 [image_prompt 작성 규칙 - 매우 중요]
-- 각 카드의 image_prompt는 반드시 실제 매물 정보(유형, 지역, 특징)를 구체적으로 반영해야 함
-- 플레이스홀더([지역명], [유형] 등) 절대 사용 금지 — 실제 값으로 채울 것
-- 매물 유형별 가이드:
-  * 상가/상업시설: "Korean commercial building exterior, street-level shops, urban neighborhood"
-  * 아파트: "Modern Korean apartment complex exterior, residential high-rise"
-  * 단독주택/빌라: "Korean residential house exterior, neighborhood street view"
-  * 토지: "Open land plot, Korean countryside or urban area"
-- 지역명을 영문으로 포함 (예: Jeju Aewol, Gangnam Seoul, Busan Haeundae)
-- 항상 마지막에 추가: "professional real estate photography, no text, no watermarks, high quality"
+❌ 나쁜 예: "Professional real estate exterior photo, bright lighting"
+✅ 좋은 예: "Small 2-story brick commercial building in Jeju Island Korea, ground floor storefront with large windows, residential neighborhood alley, warm afternoon light, Korean traditional neighborhood feel, photorealistic"
+→ 반드시: 지역명(영어) + 건물유형 + 층수/외관 + 주변환경 + 조명/분위기
 
-[출력 JSON - 반드시 이 구조]
+[카드 6장 구성]
+1장(cover): 후킹 제목(2줄, 줄당 8자 이내) + 가격뱃지 + 핵심강점 체크포인트 3개
+2장(location): 위치 + 주소 + 교통·생활 인프라 체크포인트 3개(구체적 거리/시간 포함)
+3장(composition): 층별 구성 스펙그리드 2칸 (실제 업종/용도 명시) + 추가포인트 2개
+4장(investment): 임대현황 하이라이트 + 투자수익 관련 포인트 2개
+5장(interior): 사진 분석 기반 내부 특징 4개 (가장 눈에 띄는 것부터)
+6장(cta): 임팩트 제목(2줄) + 가격뱃지 + CTA문구 + 해시태그 8개
+
+[출력 JSON - 반드시 이 구조만]
 {"cards":[
   {
     "card_number":1,"layout":"cover",
-    "title":"강렬한 2줄 제목(\\n으로 줄바꿈, 줄당 10자 이내)",
-    "subtitle":"특장점 나열 (20자 이내)",
-    "price_badge":"희망 매매가: OO억",
-    "checkpoints":["특징1","특징2","특징3"],
-    "image_prompt":"[매물유형에 맞는 외관 사진 프롬프트, 지역명 포함, professional real estate photography, no text, no watermarks]"
+    "title":"후킹 2줄 제목\\n(줄당 8자 이내)",
+    "subtitle":"핵심 특장점 요약 (20자 이내)",
+    "price_badge":"매매가 OO억 OO만원",
+    "checkpoints":["구체적 강점1","구체적 강점2","구체적 강점3"],
+    "image_prompt":"[지역영문] [건물유형], [외관특징], [층수], [주변환경], warm light, photorealistic, no text"
   },
   {
     "card_number":2,"layout":"location",
-    "title":"위치","address":"전체 주소",
-    "checkpoints":["위치강점1","위치강점2","위치강점3"],
-    "body":"한줄 부가 설명(20자 이내)",
-    "image_prompt":"[지역명] neighborhood street view, Korean urban or rural scenery, daytime, sunny, no text, no watermarks, high quality"
+    "title":"입지 분석","address":"전체 주소",
+    "checkpoints":["교통: 구체적 내용","생활: 구체적 내용","환경: 구체적 내용"],
+    "body":"한줄 입지 요약 (20자 이내)",
+    "image_prompt":"[지역영문] street view, [건물주변환경], sunny day, Korean neighborhood, photorealistic, no text"
   },
   {
     "card_number":3,"layout":"composition",
-    "title":"건물 구성 또는 상권 환경",
+    "title":"건물 구성",
     "spec_grid":[
-      {"label":"1층","value":"업종 및 특징 (줄바꿈 가능)"},
-      {"label":"2층 이상","value":"세부 구성 (줄바꿈 가능)"}
+      {"label":"1층","value":"실제 업종 또는 용도\\n면적/특징 추가"},
+      {"label":"2층 이상","value":"실제 구성\\n현황 추가"}
     ],
-    "points":["추가포인트1","추가포인트2"],
-    "image_prompt":"[매물유형] interior or commercial environment, clean modern space, bright lighting, no text, no watermarks, high quality"
+    "points":["추가 구성 포인트1","추가 구성 포인트2"],
+    "image_prompt":"[건물유형] interior or facade in [지역영문], clean and bright, commercial space, photorealistic, no text"
   },
   {
     "card_number":4,"layout":"investment",
-    "title":"임대 현황 또는 투자 포인트",
-    "highlight":"핵심 한 줄 (예: 현재 4실 임대중)",
-    "body":"부가 설명(30자 이내)",
-    "points":["포인트1","포인트2"],
-    "image_prompt":"[매물유형] building exterior showing investment potential, [지역명] area, professional photography, no text, no watermarks"
+    "title":"임대 현황 · 투자 포인트",
+    "highlight":"핵심 임대현황 한 줄",
+    "body":"수익/투자 관련 부가 설명 (30자 이내)",
+    "points":["투자포인트1 (수치 포함)","투자포인트2 (수치 포함)"],
+    "image_prompt":"[건물유형] exterior in [지역영문], afternoon lighting, investment property vibe, photorealistic, no text"
   },
   {
     "card_number":5,"layout":"interior",
-    "title":"내부 사진 또는 실거주 매력",
-    "checkpoints":["내부특징1","내부특징2","내부특징3","추가특징(선택)"],
-    "image_prompt":"[매물유형] interior room, natural light, clean and modern condition, no text, no watermarks, high quality photography"
+    "title":"내부 상태 · 실거주 매력",
+    "checkpoints":["내부특징1 (사진분석 반영)","내부특징2","내부특징3","보너스특징"],
+    "image_prompt":"[건물유형] interior room in Korea, natural light, clean, photorealistic, no text"
   },
   {
     "card_number":6,"layout":"cta",
-    "title":"마지막 임팩트 제목(\\n으로 줄바꿈)",
-    "price_badge":"희망 매매가: OO억",
-    "cta":"지금 바로 문의하세요",
-    "hashtags":["#태그1","#태그2","#태그3","#태그4","#태그5"],
-    "image_prompt":"[매물유형] exterior, [지역명], golden hour warm lighting, inviting atmosphere, no text, no watermarks, high quality"
+    "title":"지금이 기회\\n놓치지 마세요",
+    "price_badge":"매매가 OO억 OO만원",
+    "cta":"지금 바로 문의하세요 →",
+    "hashtags":["#지역태그","#매물유형태그","#투자태그","#부동산태그","#지역특성태그","#추가태그1","#추가태그2","#추가태그3"],
+    "image_prompt":"[건물유형] exterior in [지역영문], golden hour, warm glow, photorealistic, no text"
   }
 ]}`
 }
@@ -145,8 +145,10 @@ Deno.serve(async (req) => {
 
     const nextVersion = (existing?.version ?? 0) + 1
 
+    const billions = project.price ? Math.floor(project.price / 100000000) : 0
+    const tenThousands = project.price ? Math.floor((project.price % 100000000) / 10000) : 0
     const priceText = project.price
-      ? `${Math.floor(project.price / 100000000)}억${Math.floor((project.price % 100000000) / 10000) > 0 ? ` ${Math.floor((project.price % 100000000) / 10000)}만원` : '원'}`
+      ? [billions > 0 ? `${billions}억` : '', tenThousands > 0 ? `${tenThousands}만원` : ''].filter(Boolean).join(' ') || `${project.price.toLocaleString()}원`
       : '가격 협의'
 
     const advantages = (location?.advantages ?? []).slice(0, 5)

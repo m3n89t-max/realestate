@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     const openaiKey = process.env.OPENAI_API_KEY
     if (!openaiKey) return NextResponse.json({ error: 'OPENAI_API_KEY가 설정되지 않았습니다' }, { status: 500 })
 
-    const safePrompt = `${image_prompt}. Professional real estate photography style. Square composition. No text, no watermarks, no logos. High quality.`
+    const safePrompt = `${image_prompt}. Photorealistic, professional real estate photography, square 1:1 composition, high resolution, cinematic lighting. Absolutely NO text, NO watermarks, NO logos, NO signs with readable text.`
 
     const res = await fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',
