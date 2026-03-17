@@ -182,14 +182,23 @@ function CompositionCard({ card, theme, photo }: { card: CardSlide; theme: Theme
               </div>
             ))}
           </div>
-        ) : (
-          <div className="mt-2 space-y-1.5">
-            {card.points?.map((pt, i) => (
-              <div key={i} className="flex items-start gap-1.5 text-xs" style={{ color: theme.dark }}>
-                <span style={{ color: theme.accent }} className="flex-shrink-0">●</span>
-                <span>{pt}</span>
+        ) : card.points && card.points.length > 0 ? (
+          <div className="mt-2 space-y-2">
+            {card.points.map((pt, i) => (
+              <div key={i} className="flex items-start gap-2 p-2.5 rounded-lg" style={{ background: `${theme.accent}18` }}>
+                <span style={{ color: theme.accent }} className="flex-shrink-0 font-bold">●</span>
+                <span className="text-xs" style={{ color: theme.dark }}>{pt}</span>
               </div>
             ))}
+          </div>
+        ) : card.body ? (
+          /* 구 형식 fallback — body 텍스트를 카드처럼 표시 */
+          <div className="mt-2 p-3 rounded-xl h-[calc(100%-8px)]" style={{ background: `${theme.accent}18` }}>
+            <p className="text-xs leading-relaxed" style={{ color: theme.dark }}>{card.body}</p>
+          </div>
+        ) : (
+          <div className="mt-4 text-center">
+            <p className="text-xs opacity-50" style={{ color: theme.dark }}>카드뉴스를 재생성하면<br/>상세 구성이 표시됩니다</p>
           </div>
         )}
       </div>
@@ -433,13 +442,9 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
   const handleGenerateAI = async (card: CardSlide) => {
     setAiLoading(prev => ({ ...prev, [card.order]: true }))
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/generate-card-image`, {
+      const res = await fetch(`/api/generate-card-image`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token ?? ''}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           image_prompt: card.image_prompt ?? `Real estate property photo, professional, high quality`,
           project_id: projectId,
