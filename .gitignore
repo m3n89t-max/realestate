@@ -40,6 +40,12 @@ tsconfig.tsbuildinfo
 dist/
 dist-agent/
 
+# Supabase temp files
+supabase/.temp/
+
+# Local screenshots / temp images
+public/images/부동산상권분석api/
+
 # Agent package output
 release-agent/
 realestate-agent-setup.zip
