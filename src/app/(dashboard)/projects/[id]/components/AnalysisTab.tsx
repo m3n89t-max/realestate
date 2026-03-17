@@ -5,7 +5,7 @@ import {
   MapPin, TrendingUp, Building2, Target, FileText,
   Loader2, CheckCircle2, AlertCircle, RefreshCw, ChevronDown, ChevronUp,
   Train, ShoppingCart, Hospital, GraduationCap, Coffee, Pill, Landmark,
-  ExternalLink, Store
+  ExternalLink, Store, BarChart3, UtensilsCrossed, BookOpen, Home as HomeIcon
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
@@ -281,15 +281,156 @@ function POISection({ poi_data }: { poi_data: Record<string, POIItem[]> }) {
   )
 }
 
+// ── 카카오 업종 밀집도 분석 ──────────────────────────────────
+const KAKAO_CAT_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string; bg: string }> = {
+  CE7: { label: '카페',        icon: <Coffee size={14} />,          color: 'text-amber-700',  bg: 'bg-amber-50 border-amber-200' },
+  FD6: { label: '음식점',      icon: <UtensilsCrossed size={14} />, color: 'text-orange-700', bg: 'bg-orange-50 border-orange-200' },
+  HP8: { label: '병원',        icon: <Hospital size={14} />,        color: 'text-red-700',    bg: 'bg-red-50 border-red-200' },
+  AC5: { label: '학원',        icon: <BookOpen size={14} />,        color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200' },
+  CS2: { label: '편의점',      icon: <ShoppingCart size={14} />,    color: 'text-green-700',  bg: 'bg-green-50 border-green-200' },
+  AG2: { label: '부동산',      icon: <HomeIcon size={14} />,        color: 'text-blue-700',   bg: 'bg-blue-50 border-blue-200' },
+  PM9: { label: '약국',        icon: <Pill size={14} />,            color: 'text-pink-700',   bg: 'bg-pink-50 border-pink-200' },
+}
+
+function densityScore(counts: { total_count: number }[]): { score: number; label: string; color: string } {
+  const total = counts.reduce((s, c) => s + c.total_count, 0)
+  if (total >= 200) return { score: total, label: '매우 높음', color: 'text-red-600' }
+  if (total >= 100) return { score: total, label: '높음',     color: 'text-orange-600' }
+  if (total >= 50)  return { score: total, label: '보통',     color: 'text-yellow-600' }
+  return             { score: total, label: '낮음',     color: 'text-gray-500' }
+}
+
+function KakaoDensityPanel({ kakao_density, projectId, lat, lng }: {
+  kakao_density: any
+  projectId: string
+  lat: number | null
+  lng: number | null
+}) {
+  const [loading, setLoading] = useState(false)
+  const [expanded, setExpanded] = useState<string | null>(null)
+
+  const analyze = async () => {
+    if (!lat || !lng) { toast.error('좌표가 없습니다'); return }
+    setLoading(true)
+    try {
+      const res = await fetch('/api/kakao-poi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_id: projectId }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? '분석 실패')
+      toast.success('업종 밀집도 분석이 완료되었습니다')
+      window.location.reload()
+    } catch (e: any) {
+      toast.error(e.message ?? '분석 실패')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (!kakao_density) {
+    return (
+      <div className="flex flex-col items-center justify-center py-5 text-center gap-2">
+        <BarChart3 size={28} className="text-gray-200" />
+        <p className="text-xs text-gray-400">반경 500m 업종 밀집도 미분석</p>
+        <button onClick={analyze} disabled={loading || !lat} className="btn-secondary text-xs py-1.5 px-3">
+          {loading ? <><Loader2 size={12} className="animate-spin" />분석 중...</> : <><BarChart3 size={12} />업종 밀집도 분석</>}
+        </button>
+      </div>
+    )
+  }
+
+  const { categories, radius_m = 500, collected_at } = kakao_density
+  const catEntries = Object.entries(KAKAO_CAT_CONFIG).map(([code, cfg]) => ({
+    code, cfg,
+    data: categories?.[code] ?? { label: cfg.label, total_count: 0, items: [] },
+  }))
+  const density = densityScore(catEntries.map(e => e.data))
+  const maxCount = Math.max(...catEntries.map(e => e.data.total_count), 1)
+  const collectedDate = collected_at ? new Date(collected_at).toISOString().slice(0, 10).replace(/-/g, '.') : ''
+
+  return (
+    <div className="space-y-3">
+      {/* 헤더 */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <BarChart3 size={14} className="text-brand-500" />
+          <span className="text-xs font-semibold text-gray-600">반경 {radius_m}m 업종 밀집도</span>
+          <span className={`text-xs font-bold ${density.color}`}>{density.label}</span>
+        </div>
+        <button onClick={analyze} disabled={loading} className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
+          {loading ? <Loader2 size={10} className="animate-spin" /> : <RefreshCw size={10} />}
+          재분석
+        </button>
+      </div>
+
+      {/* 업종 카드 그리드 */}
+      <div className="grid grid-cols-4 gap-1.5">
+        {catEntries.map(({ code, cfg, data }) => (
+          <button
+            key={code}
+            onClick={() => setExpanded(expanded === code ? null : code)}
+            className={`flex flex-col items-center gap-1 p-2 rounded-lg border text-center transition-all ${cfg.bg} ${expanded === code ? 'ring-2 ring-brand-300' : ''}`}
+          >
+            <span className={cfg.color}>{cfg.icon}</span>
+            <span className="text-xs text-gray-600">{cfg.label}</span>
+            <span className={`text-base font-bold ${cfg.color}`}>{data.total_count.toLocaleString()}</span>
+            <span className="text-xs text-gray-400">개</span>
+          </button>
+        ))}
+      </div>
+
+      {/* 바 차트 */}
+      <div className="space-y-1">
+        {catEntries.sort((a, b) => b.data.total_count - a.data.total_count).map(({ code, cfg, data }) => (
+          <div key={code} className="flex items-center gap-2 text-xs">
+            <span className={`w-12 flex-shrink-0 text-right ${cfg.color}`}>{cfg.label}</span>
+            <div className="flex-1 bg-gray-100 rounded-full h-1.5">
+              <div
+                className={`h-1.5 rounded-full ${cfg.bg.split(' ')[0].replace('bg-', 'bg-').replace('50', '400')}`}
+                style={{ width: `${(data.total_count / maxCount) * 100}%` }}
+              />
+            </div>
+            <span className="w-8 text-right text-gray-500">{data.total_count}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* 선택 업종 상세 목록 */}
+      {expanded && categories?.[expanded]?.items?.length > 0 && (
+        <div className="border border-gray-100 rounded-lg p-3 bg-gray-50">
+          <p className="text-xs font-semibold text-gray-600 mb-2">
+            {KAKAO_CAT_CONFIG[expanded]?.label} 가까운 순
+          </p>
+          <div className="space-y-1.5">
+            {categories[expanded].items.slice(0, 8).map((item: any, i: number) => (
+              <div key={i} className="flex items-center justify-between text-xs">
+                <span className="text-gray-700 truncate flex-1">{item.name}</span>
+                <span className="text-gray-400 flex-shrink-0 ml-2">{item.distance_m}m</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {collectedDate && (
+        <p className="text-xs text-gray-300 text-right">카카오맵 기준 · {collectedDate}</p>
+      )}
+    </div>
+  )
+}
+
 // ── 지도 섹션 ─────────────────────────────────────────────────
 function MapSection({
-  lat, lng, poi_data, real_price_data, projectId,
+  lat, lng, poi_data, real_price_data, projectId, kakao_density,
 }: {
   lat: number | null
   lng: number | null
   poi_data: Record<string, POIItem[]> | null
   real_price_data: RealPriceItem[] | null
   projectId: string
+  kakao_density: any
 }) {
   const [loading, setLoading] = useState(false)
   const supabase = createClient()
@@ -376,6 +517,11 @@ function MapSection({
           <span className="text-sm font-bold text-red-600">{formatAmount(maxPrice)}</span>
         </div>
       )}
+
+      {/* 업종 밀집도 */}
+      <div className="border-t pt-3">
+        <KakaoDensityPanel kakao_density={kakao_density} projectId={projectId} lat={lat} lng={lng} />
+      </div>
     </div>
   )
 }
@@ -770,6 +916,7 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
             poi_data={project.poi_data}
             real_price_data={isCommercial ? null : project.real_price_data}
             projectId={projectId}
+            kakao_density={project.kakao_density}
           />
         </div>
 

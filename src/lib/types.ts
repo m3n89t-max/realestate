@@ -57,6 +57,18 @@ export interface POIItem {
   phone?: string | null
 }
 
+export interface KakaoDensityCategory {
+  label: string
+  total_count: number
+  items: { name: string; address: string; distance_m: number; phone?: string }[]
+}
+
+export interface KakaoDensity {
+  radius_m: number
+  collected_at: string
+  categories: Record<string, KakaoDensityCategory>
+}
+
 export interface LandUseItem {
   zone_name:  string | null
   zone_code:  string | null
@@ -137,6 +149,7 @@ export interface Project {
   building_condition?: string | null
   floor_composition?: string | null
   rental_status?: string | null
+  kakao_density?: KakaoDensity | null
   created_at: string
   updated_at: string
 }
