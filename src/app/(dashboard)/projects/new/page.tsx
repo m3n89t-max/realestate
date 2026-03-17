@@ -99,6 +99,9 @@ interface FormData {
   total_floors: string
   direction: string
   features: string[]
+  building_condition: string
+  floor_composition: string
+  rental_status: string
   note: string
 }
 
@@ -121,6 +124,9 @@ export default function NewProjectPage() {
     total_floors: '',
     direction: '',
     features: [],
+    building_condition: '',
+    floor_composition: '',
+    rental_status: '',
     note: '',
   })
 
@@ -220,6 +226,9 @@ export default function NewProjectPage() {
             total_floors: form.total_floors ? parseInt(form.total_floors) : null,
             direction: form.direction || null,
             features: form.features,
+            building_condition: form.building_condition || null,
+            floor_composition: form.floor_composition || null,
+            rental_status: form.rental_status || null,
             note: form.note || null,
             status: 'draft',
           })
@@ -552,16 +561,69 @@ export default function NewProjectPage() {
               </div>
             </div>
 
-            {/* 메모 */}
-            <div>
-              <label className="label">내부 메모 (선택)</label>
-              <textarea
-                value={form.note}
-                onChange={e => handleChange('note', e.target.value)}
-                placeholder="추가 정보나 특이사항을 입력하세요"
-                rows={3}
-                className="input resize-none"
-              />
+            {/* 현장 관찰 메모 */}
+            <div className="border-t pt-5">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-base">📋</span>
+                <h3 className="font-semibold text-gray-800">현장 관찰 메모</h3>
+                <span className="text-xs text-gray-400 ml-1">현장 방문 후 직접 확인한 내용 - AI 콘텐츠 품질에 직결됩니다</span>
+              </div>
+
+              {/* 건물 상태 */}
+              <div className="mb-4">
+                <label className="label">건물 상태</label>
+                <div className="flex gap-2 flex-wrap">
+                  {['신축', '양호', '보통', '노후'].map(cond => (
+                    <button
+                      key={cond}
+                      type="button"
+                      onClick={() => handleChange('building_condition', form.building_condition === cond ? '' : cond)}
+                      className={`px-4 py-2 rounded-lg text-sm border transition-colors ${form.building_condition === cond
+                        ? 'bg-brand-600 text-white border-brand-600'
+                        : 'border-gray-200 text-gray-600 hover:border-brand-300'
+                        }`}
+                    >
+                      {cond}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 층별 구성 */}
+              <div className="mb-4">
+                <label className="label">층별 구성</label>
+                <textarea
+                  value={form.floor_composition}
+                  onChange={e => handleChange('floor_composition', e.target.value)}
+                  placeholder={`예시:\n1층: 편의점 (임대중, 보증금 1000/월세 150)\n2층: 사무실 (공실)\n3층: 주택`}
+                  rows={3}
+                  className="input resize-none text-sm"
+                />
+              </div>
+
+              {/* 임대 현황 */}
+              <div className="mb-4">
+                <label className="label">임대 현황</label>
+                <textarea
+                  value={form.rental_status}
+                  onChange={e => handleChange('rental_status', e.target.value)}
+                  placeholder={`예시:\n1층 편의점 임대중 - 보증금 1000만/월세 150만, 계약만료 2026.06\n2층 공실 (전 입주자 이사 완료)\n수익률: 약 4.5% 예상`}
+                  rows={3}
+                  className="input resize-none text-sm"
+                />
+              </div>
+
+              {/* 현장 종합 메모 */}
+              <div>
+                <label className="label">현장 종합 메모</label>
+                <textarea
+                  value={form.note}
+                  onChange={e => handleChange('note', e.target.value)}
+                  placeholder={`현장에서 직접 보고 느낀 것을 자유롭게 적어주세요.\n\n예시:\n- 건물 외관: 외벽 도색 상태 양호, 주차 4대 가능\n- 내부 상태: 전체 리모델링 완료 (2023년), 신규 욕실/주방\n- 주변 환경: 이면도로 위치, 유동인구 적당, 맞은편 공원\n- 장점: 대로변 접근 용이, 버스정류장 30m\n- 주의사항: 3층 누수 흔적 있음 (수리 완료 확인 필요)`}
+                  rows={5}
+                  className="input resize-none text-sm"
+                />
+              </div>
             </div>
           </div>
         )}

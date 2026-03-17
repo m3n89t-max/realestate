@@ -134,6 +134,9 @@ export interface Project {
   land_use_data?: LandUseItem[] | null
   real_price_data?: RealPriceItem[] | null
   commercial_data?: CommercialData | null
+  building_condition?: string | null
+  floor_composition?: string | null
+  rental_status?: string | null
   created_at: string
   updated_at: string
 }

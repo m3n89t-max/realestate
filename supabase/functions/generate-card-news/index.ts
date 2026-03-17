@@ -191,11 +191,21 @@ Deno.serve(async (req) => {
 
 주소: ${address}
 유형: ${propertyType}
-가격: ${priceText}
+가격: ${priceText}${project.deposit ? ` / 보증금 ${Math.floor(project.deposit / 10000)}만원` : ''}${project.monthly_rent ? ` / 월세 ${Math.floor(project.monthly_rent / 10000)}만원` : ''}${project.key_money ? ` / 권리금 ${Math.floor(project.key_money / 10000)}만원` : ''}
 면적: ${project.area ? `${project.area}㎡` : '미정'}
 층수: ${project.floor ? `${project.floor}층` : '미정'}
 방향: ${project.direction ?? '미정'}
-특징: ${(project.features ?? []).join(', ')}
+건물 상태: ${project.building_condition || '미기재'}
+특징: ${(project.features ?? []).join(', ') || '미기재'}
+
+[층별 구성 - 공인중개사 직접 기록]
+${project.floor_composition?.trim() || '정보 없음 - 3장 spec_grid는 알려진 내용만 기재'}
+
+[임대 현황 - 공인중개사 직접 기록]
+${project.rental_status?.trim() || '정보 없음 - 4장 임대현황은 억지로 채우지 말 것'}
+
+[공인중개사 현장 메모 - 최우선 반영]
+${project.note?.trim() || '없음'}
 
 입지 장점:
 ${advantages || '입지 정보 없음'}${photoAnalysis ? `\n\n[AI 사진 분석 결과]\n${photoAnalysis}` : ''}

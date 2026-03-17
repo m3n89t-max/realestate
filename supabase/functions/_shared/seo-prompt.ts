@@ -4,11 +4,18 @@ export interface BlogPromptContext {
   address: string
   property_type: string
   price?: number
+  monthly_rent?: number
+  deposit?: number
+  key_money?: number
   area?: number
   floor?: number
   total_floors?: number
   direction?: string
   features?: string[]
+  building_condition?: string | null
+  floor_composition?: string | null
+  rental_status?: string | null
+  note?: string | null
   location_advantages?: string[]
   nearby_facilities?: Record<string, unknown>
   style: 'informative' | 'investment' | 'lifestyle'
@@ -61,6 +68,12 @@ export function buildBlogSystemPrompt(): string {
 
 7. 키워드를 전반적으로 자연스럽게 분포시킬 것
 
+8. ⚠️ 데이터 없음 → 생략 원칙:
+   - 제공된 데이터에 없는 정보는 절대 추측하거나 지어내지 말 것
+   - 임대현황·층별구성·수익률 등 정보가 없으면 해당 섹션을 짧게 "자세한 내용은 중개사에게 문의하세요"로 마무리
+   - 입지 분석 결과가 "없음"이면 주소만으로 추론 가능한 내용만 기재하고 확실하지 않은 내용은 "~로 알려져 있습니다" 형태로 표현
+   - 현장 메모(공인중개사가 직접 방문해 기록한 내용)가 있으면 그 내용을 최우선으로 반영할 것
+
 [출력 형식: JSON]
 {
   "titles": ["제목1", "제목2", "제목3", "제목4", "제목5"],
@@ -88,20 +101,32 @@ export function buildBlogUserPrompt(ctx: BlogPromptContext): string {
     lifestyle: '라이프스타일 중심의 감성적 글. 동네 분위기/생활 편의/커뮤니티 강조.',
   }[ctx.style]
 
+  const billions = ctx.price ? Math.floor(ctx.price / 100000000) : 0
+  const tenThousands = ctx.price ? Math.floor((ctx.price % 100000000) / 10000) : 0
   const priceText = ctx.price
-    ? `${Math.floor(ctx.price / 100000000)}억 ${Math.floor((ctx.price % 100000000) / 10000) > 0 ? Math.floor((ctx.price % 100000000) / 10000) + '만원' : ''}`
+    ? [billions > 0 ? `${billions}억` : '', tenThousands > 0 ? `${tenThousands}만원` : ''].filter(Boolean).join(' ') || `${ctx.price.toLocaleString()}원`
     : '가격 협의'
+
+  const priceLines: string[] = [`- 매매가: ${priceText}`]
+  if (ctx.deposit) {
+    const db = Math.floor(ctx.deposit / 100000000)
+    const dm = Math.floor((ctx.deposit % 100000000) / 10000)
+    priceLines.push(`- 보증금: ${[db > 0 ? `${db}억` : '', dm > 0 ? `${dm}만원` : ''].filter(Boolean).join(' ')}`)
+  }
+  if (ctx.monthly_rent) priceLines.push(`- 월세: ${Math.floor(ctx.monthly_rent / 10000)}만원`)
+  if (ctx.key_money) priceLines.push(`- 권리금: ${Math.floor(ctx.key_money / 10000)}만원`)
 
   return `다음 매물 정보로 SEO 최적화 부동산 블로그 글을 작성하세요.
 
 [매물 기본 정보]
 - 주소: ${ctx.address}
 - 매물 유형: ${ctx.property_type}
-- 가격: ${priceText}
+${priceLines.join('\n')}
 - 전용면적: ${ctx.area ? `${ctx.area}㎡ (약 ${(ctx.area / 3.3058).toFixed(1)}평)` : '정보 없음'}
 - 층수: ${ctx.floor && ctx.total_floors ? `${ctx.floor}층 / 전체 ${ctx.total_floors}층` : '정보 없음'}
 - 방향: ${ctx.direction ?? '정보 없음'}
 - 특징: ${ctx.features?.join(', ') ?? '없음'}
+- 건물 상태: ${ctx.building_condition || '정보 없음'}
 
 [매물 사진 - 본문에 반드시 삽입]
 ${ctx.photo_urls && ctx.photo_urls.length > 0
@@ -109,8 +134,17 @@ ${ctx.photo_urls && ctx.photo_urls.length > 0
       : '(등록된 사진 없음)'}
 ※ 사진은 반드시 관련 섹션 본문 중간에 배치하고 글 마지막에 몰아두지 마세요. 각 사진은 해당 공간(거실→실내구조, 외관→매물개요, 뷰→입지장점 등) 설명 뒤에 즉시 삽입하고, 아래에 *▲ 설명* 캡션을 추가하세요.
 
+[층별 구성]
+${ctx.floor_composition?.trim() || '정보 없음 - 해당 섹션은 "상세 구성은 중개사에게 문의하세요"로 간략히 처리'}
+
+[임대 현황]
+${ctx.rental_status?.trim() || '정보 없음 - 임대수익 관련 내용은 추정치 없이 "문의 바랍니다"로 처리'}
+
+[공인중개사 현장 메모 - 직접 방문 관찰 내용, 최우선 반영]
+${ctx.note?.trim() || '없음'}
+
 [입지 분석 결과]
-${ctx.location_advantages?.map((a, i) => `${i + 1}. ${a}`).join('\n') ?? '입지 분석 결과 없음 (주소 기반으로 추론하여 작성)'}
+${ctx.location_advantages?.map((a, i) => `${i + 1}. ${a}`).join('\n') || '입지 분석 결과 없음 - 주소 기반으로 추론 가능한 내용만 기재하고, 불확실한 내용은 "~로 알려져 있습니다" 형태로 표현'}
 
 [글 스타일]
 ${styleGuide}
