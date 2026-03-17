@@ -17,6 +17,17 @@ function buildInstagramSystemPrompt(): string {
 5장(interior): 내부 특징 체크포인트 3~4개
 6장(cta): 행동유도 + 가격 + 해시태그 5개
 
+[image_prompt 작성 규칙 - 매우 중요]
+- 각 카드의 image_prompt는 반드시 실제 매물 정보(유형, 지역, 특징)를 구체적으로 반영해야 함
+- 플레이스홀더([지역명], [유형] 등) 절대 사용 금지 — 실제 값으로 채울 것
+- 매물 유형별 가이드:
+  * 상가/상업시설: "Korean commercial building exterior, street-level shops, urban neighborhood"
+  * 아파트: "Modern Korean apartment complex exterior, residential high-rise"
+  * 단독주택/빌라: "Korean residential house exterior, neighborhood street view"
+  * 토지: "Open land plot, Korean countryside or urban area"
+- 지역명을 영문으로 포함 (예: Jeju Aewol, Gangnam Seoul, Busan Haeundae)
+- 항상 마지막에 추가: "professional real estate photography, no text, no watermarks, high quality"
+
 [출력 JSON - 반드시 이 구조]
 {"cards":[
   {
@@ -25,14 +36,14 @@ function buildInstagramSystemPrompt(): string {
     "subtitle":"특장점 나열 (20자 이내)",
     "price_badge":"희망 매매가: OO억",
     "checkpoints":["특징1","특징2","특징3"],
-    "image_prompt":"Professional real estate exterior photo, [specific style], bright lighting, no text overlays"
+    "image_prompt":"[매물유형에 맞는 외관 사진 프롬프트, 지역명 포함, professional real estate photography, no text, no watermarks]"
   },
   {
     "card_number":2,"layout":"location",
     "title":"위치","address":"전체 주소",
     "checkpoints":["위치강점1","위치강점2","위치강점3"],
     "body":"한줄 부가 설명(20자 이내)",
-    "image_prompt":"Aerial or street view of [region] neighborhood, sunny, no text"
+    "image_prompt":"[지역명] neighborhood street view, Korean urban or rural scenery, daytime, sunny, no text, no watermarks, high quality"
   },
   {
     "card_number":3,"layout":"composition",
@@ -42,7 +53,7 @@ function buildInstagramSystemPrompt(): string {
       {"label":"2층 이상","value":"세부 구성 (줄바꿈 가능)"}
     ],
     "points":["추가포인트1","추가포인트2"],
-    "image_prompt":"Clean building interior or commercial street, modern, bright, no text"
+    "image_prompt":"[매물유형] interior or commercial environment, clean modern space, bright lighting, no text, no watermarks, high quality"
   },
   {
     "card_number":4,"layout":"investment",
@@ -50,13 +61,13 @@ function buildInstagramSystemPrompt(): string {
     "highlight":"핵심 한 줄 (예: 현재 4실 임대중)",
     "body":"부가 설명(30자 이내)",
     "points":["포인트1","포인트2"],
-    "image_prompt":"Commercial building exterior, professional photography, no text"
+    "image_prompt":"[매물유형] building exterior showing investment potential, [지역명] area, professional photography, no text, no watermarks"
   },
   {
     "card_number":5,"layout":"interior",
     "title":"내부 사진 또는 실거주 매력",
     "checkpoints":["내부특징1","내부특징2","내부특징3","추가특징(선택)"],
-    "image_prompt":"Bright clean interior room, natural light, modern, no text"
+    "image_prompt":"[매물유형] interior room, natural light, clean and modern condition, no text, no watermarks, high quality photography"
   },
   {
     "card_number":6,"layout":"cta",
@@ -64,7 +75,7 @@ function buildInstagramSystemPrompt(): string {
     "price_badge":"희망 매매가: OO억",
     "cta":"지금 바로 문의하세요",
     "hashtags":["#태그1","#태그2","#태그3","#태그4","#태그5"],
-    "image_prompt":"Beautiful property exterior, golden hour lighting, no text"
+    "image_prompt":"[매물유형] exterior, [지역명], golden hour warm lighting, inviting atmosphere, no text, no watermarks, high quality"
   }
 ]}`
 }
@@ -167,10 +178,15 @@ Deno.serve(async (req) => {
       }
     }
 
+    const propertyType = project.property_type ?? '아파트'
+    const address = project.address ?? ''
+    // 주소에서 지역명 추출 (image_prompt 생성용)
+    const regionHint = address.split(' ').slice(0, 3).join(' ')
+
     const userPrompt = `다음 매물로 ${platform === 'instagram' ? '인스타그램' : '카카오톡'} 카드뉴스 6장을 생성하세요:
 
-주소: ${project.address}
-유형: ${project.property_type ?? '아파트'}
+주소: ${address}
+유형: ${propertyType}
 가격: ${priceText}
 면적: ${project.area ? `${project.area}㎡` : '미정'}
 층수: ${project.floor ? `${project.floor}층` : '미정'}
@@ -178,7 +194,12 @@ Deno.serve(async (req) => {
 특징: ${(project.features ?? []).join(', ')}
 
 입지 장점:
-${advantages || '입지 정보 없음'}${photoAnalysis ? `\n\n[AI 사진 분석 결과]\n${photoAnalysis}` : ''}`
+${advantages || '입지 정보 없음'}${photoAnalysis ? `\n\n[AI 사진 분석 결과]\n${photoAnalysis}` : ''}
+
+[image_prompt 작성 지침]
+- 매물 유형 "${propertyType}", 지역 "${regionHint}" 을 반드시 반영할 것
+- 각 카드 image_prompt에서 [매물유형], [지역명] 플레이스홀더를 실제 값으로 대체할 것
+- 예: "[매물유형]" → "${propertyType} building", "[지역명]" → "${regionHint}"`
 
     const systemPrompt = platform === 'instagram'
       ? buildInstagramSystemPrompt()
