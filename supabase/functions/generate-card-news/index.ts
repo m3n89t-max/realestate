@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, handleCors } from '../_shared/cors.ts'
 import { getAuthenticatedUser, getOrgId, checkQuota } from '../_shared/auth.ts'
-import { callOpenAI } from '../_shared/openai.ts'
+import { callOpenAI, callOpenAIVision } from '../_shared/openai.ts'
 
 type Platform = 'instagram' | 'kakao'
 
@@ -102,7 +102,7 @@ Deno.serve(async (req) => {
     const orgId = await getOrgId(supabaseClient, user.id)
     await checkQuota(supabaseClient, orgId, 'generation')
 
-    const { project_id, platform = 'instagram' as Platform } = await req.json()
+    const { project_id, platform = 'instagram' as Platform, asset_urls = [] } = await req.json()
     if (!project_id) throw new Error('project_id가 필요합니다')
     if (platform !== 'instagram' && platform !== 'kakao') {
       throw new Error('platform은 instagram 또는 kakao 이어야 합니다')
@@ -141,6 +141,32 @@ Deno.serve(async (req) => {
     const advantages = (location?.advantages ?? []).slice(0, 5)
       .map((a: string, i: number) => `${i + 1}. ${a}`).join('\n')
 
+    // 사진 Vision 분석 (최대 4장)
+    let photoAnalysis = ''
+    const photoUrls: string[] = Array.isArray(asset_urls) ? asset_urls.slice(0, 4) : []
+    if (photoUrls.length > 0) {
+      try {
+        photoAnalysis = await callOpenAIVision([
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: '이 부동산 매물 사진들을 분석해주세요. 다음을 한국어로 간략히 설명하세요 (각 항목 1~2문장):\n1) 건물/공간 외관 특징\n2) 내부 상태 및 컨디션\n3) 눈에 띄는 강점\n4) 개선이 필요한 부분 (있다면)'
+              },
+              ...photoUrls.map(url => ({
+                type: 'image_url' as const,
+                image_url: { url, detail: 'low' as const }
+              }))
+            ]
+          }
+        ], { maxTokens: 600, temperature: 0.3 })
+        console.log('[generate-card-news] 사진 분석 완료')
+      } catch (e) {
+        console.warn('[generate-card-news] 사진 분석 실패 (무시):', e)
+      }
+    }
+
     const userPrompt = `다음 매물로 ${platform === 'instagram' ? '인스타그램' : '카카오톡'} 카드뉴스 6장을 생성하세요:
 
 주소: ${project.address}
@@ -152,7 +178,7 @@ Deno.serve(async (req) => {
 특징: ${(project.features ?? []).join(', ')}
 
 입지 장점:
-${advantages || '입지 정보 없음'}`
+${advantages || '입지 정보 없음'}${photoAnalysis ? `\n\n[AI 사진 분석 결과]\n${photoAnalysis}` : ''}`
 
     const systemPrompt = platform === 'instagram'
       ? buildInstagramSystemPrompt()

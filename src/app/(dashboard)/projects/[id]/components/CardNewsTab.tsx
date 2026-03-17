@@ -34,6 +34,15 @@ interface CardSlide {
   image_prompt?: string
 }
 
+const PHOTO_FILTERS = [
+  { id: 'original', label: '원본',   css: '' },
+  { id: 'vivid',    label: '선명',   css: 'brightness(1.05) contrast(1.12) saturate(1.25)' },
+  { id: 'bright',   label: '밝게',   css: 'brightness(1.18) contrast(1.05) saturate(1.1)' },
+  { id: 'warm',     label: '따뜻',   css: 'brightness(1.05) saturate(1.15) sepia(0.18)' },
+  { id: 'cool',     label: '쿨',     css: 'brightness(1.05) saturate(0.85) hue-rotate(12deg)' },
+  { id: 'drama',    label: '드라마', css: 'brightness(0.95) contrast(1.25) saturate(1.2)' },
+]
+
 const COLOR_THEMES = [
   { id: 'emerald', label: '에메랄드', accent: '#10b981', dark: '#064e3b', light: '#d1fae5', mid: '#059669' },
   { id: 'blue',    label: '블루',     accent: '#3b82f6', dark: '#1e3a8a', light: '#dbeafe', mid: '#2563eb' },
@@ -73,11 +82,11 @@ function assignPhoto(order: number, assets: any[]): string | undefined {
 }
 
 // ── Card 1: Cover ──────────────────────────────────────────────
-function CoverCard({ card, theme, photo }: { card: CardSlide; theme: Theme; photo?: string }) {
+function CoverCard({ card, theme, photo, filterCss }: { card: CardSlide; theme: Theme; photo?: string; filterCss?: string }) {
   return (
     <div className="relative aspect-square rounded-2xl overflow-hidden shadow-xl">
       {photo
-        ? <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        ? <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={filterCss ? { filter: filterCss } : undefined} />
         : <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${theme.dark}, ${theme.accent})` }} />
       }
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
@@ -111,11 +120,11 @@ function CoverCard({ card, theme, photo }: { card: CardSlide; theme: Theme; phot
 }
 
 // ── Card 2: Location ────────────────────────────────────────────
-function LocationCard({ card, theme, photo }: { card: CardSlide; theme: Theme; photo?: string }) {
+function LocationCard({ card, theme, photo, filterCss }: { card: CardSlide; theme: Theme; photo?: string; filterCss?: string }) {
   return (
     <div className="relative aspect-square rounded-2xl overflow-hidden shadow-xl">
       {photo
-        ? <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        ? <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={filterCss ? { filter: filterCss } : undefined} />
         : <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${theme.dark}, ${theme.accent})` }} />
       }
       <div className="absolute inset-0 bg-gradient-to-b from-black/75 via-black/20 to-black/65" />
@@ -214,11 +223,11 @@ function CompositionCard({ card, theme, photo }: { card: CardSlide; theme: Theme
 }
 
 // ── Card 4: Investment / Rental ─────────────────────────────────
-function InvestmentCard({ card, theme, photo }: { card: CardSlide; theme: Theme; photo?: string }) {
+function InvestmentCard({ card, theme, photo, filterCss }: { card: CardSlide; theme: Theme; photo?: string; filterCss?: string }) {
   return (
     <div className="relative aspect-square rounded-2xl overflow-hidden shadow-xl">
       {photo
-        ? <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        ? <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={filterCss ? { filter: filterCss } : undefined} />
         : <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${theme.dark}, ${theme.accent})` }} />
       }
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/55" />
@@ -255,11 +264,11 @@ function InvestmentCard({ card, theme, photo }: { card: CardSlide; theme: Theme;
 }
 
 // ── Card 5: Interior / Living ───────────────────────────────────
-function InteriorCard({ card, theme, photo }: { card: CardSlide; theme: Theme; photo?: string }) {
+function InteriorCard({ card, theme, photo, filterCss }: { card: CardSlide; theme: Theme; photo?: string; filterCss?: string }) {
   return (
     <div className="relative aspect-square rounded-2xl overflow-hidden shadow-xl">
       {photo
-        ? <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        ? <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={filterCss ? { filter: filterCss } : undefined} />
         : <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${theme.dark}, ${theme.accent})` }} />
       }
       <div className="absolute inset-0 bg-gradient-to-t from-black/88 via-black/25 to-transparent" />
@@ -291,11 +300,11 @@ function InteriorCard({ card, theme, photo }: { card: CardSlide; theme: Theme; p
 }
 
 // ── Card 6: CTA ─────────────────────────────────────────────────
-function CtaCard({ card, theme, photo }: { card: CardSlide; theme: Theme; photo?: string }) {
+function CtaCard({ card, theme, photo, filterCss }: { card: CardSlide; theme: Theme; photo?: string; filterCss?: string }) {
   return (
     <div className="relative aspect-square rounded-2xl overflow-hidden shadow-xl">
       {photo
-        ? <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        ? <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={filterCss ? { filter: filterCss } : undefined} />
         : <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${theme.dark}, ${theme.accent})` }} />
       }
       <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-black/88" />
@@ -330,7 +339,7 @@ function CtaCard({ card, theme, photo }: { card: CardSlide; theme: Theme; photo?
 
 // ── Dispatcher ──────────────────────────────────────────────────
 function CardPreview({
-  card, theme, photo, aiPhoto, onGenerateAI, aiLoading,
+  card, theme, photo, aiPhoto, onGenerateAI, aiLoading, filterCss,
 }: {
   card: CardSlide
   theme: Theme
@@ -338,9 +347,10 @@ function CardPreview({
   aiPhoto?: string
   onGenerateAI?: () => void
   aiLoading?: boolean
+  filterCss?: string
 }) {
   const bg = aiPhoto || photo
-  const props = { card, theme, photo: bg }
+  const props = { card, theme, photo: bg, filterCss: aiPhoto ? undefined : filterCss }
 
   let content: React.ReactNode
   switch (card.layout) {
@@ -385,6 +395,7 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
   const supabase = createClient()
   const [generating, setGenerating] = useState(false)
   const [colorTheme, setColorTheme] = useState('emerald')
+  const [photoFilter, setPhotoFilter] = useState('original')
   const [selectedId, setSelectedId] = useState<string | null>(contents[0]?.id ?? null)
   const [aiPhotos, setAiPhotos] = useState<Record<number, string>>({})
   const [aiLoading, setAiLoading] = useState<Record<number, boolean>>({})
@@ -424,6 +435,7 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
         toast.error('로그인이 필요합니다. 페이지를 새로고침해주세요.')
         return
       }
+      const asset_urls = assets.slice(0, 4).map((a: any) => a.file_url).filter(Boolean)
       const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/generate-card-news`, {
         method: 'POST',
         headers: {
@@ -431,7 +443,7 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
           'Authorization': `Bearer ${session.access_token}`,
           'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
         },
-        body: JSON.stringify({ project_id: projectId }),
+        body: JSON.stringify({ project_id: projectId, asset_urls }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? `생성 실패 (${res.status})`)
@@ -473,6 +485,27 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
       <div className="space-y-4">
         <div className="card p-4">
           <h3 className="text-sm font-semibold text-gray-700 mb-3">카드뉴스 설정</h3>
+
+          {/* 사진 필터 */}
+          <div className="mb-4">
+            <label className="label text-xs">사진 필터</label>
+            <div className="grid grid-cols-3 gap-1.5">
+              {PHOTO_FILTERS.map(f => (
+                <button
+                  key={f.id}
+                  onClick={() => setPhotoFilter(f.id)}
+                  className={cn(
+                    'py-1.5 text-xs rounded-lg border font-medium transition-all',
+                    photoFilter === f.id
+                      ? 'bg-gray-800 text-white border-gray-800'
+                      : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                  )}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
           <div className="mb-4">
             <label className="label text-xs">색상 테마</label>
@@ -588,6 +621,7 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
                   aiPhoto={aiPhotos[card.order]}
                   onGenerateAI={() => handleGenerateAI(card)}
                   aiLoading={aiLoading[card.order]}
+                  filterCss={PHOTO_FILTERS.find(f => f.id === photoFilter)?.css}
                 />
               ))}
             </div>
