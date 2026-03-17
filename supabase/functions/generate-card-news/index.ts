@@ -14,6 +14,7 @@ function buildInstagramSystemPrompt(): string {
 - checkpoints: 매물의 실제 강점을 간결하고 임팩트 있게 (15자 이내)
 - image_prompt: 이 매물의 실제 지역·건물유형·외관·분위기를 영어로 구체적 묘사 (generic 금지)
 - 사진 분석 결과가 있으면 내부/외관 특징에 반드시 반영
+- ⚠️ 데이터 없음 → 생략 원칙: 제공된 데이터에 없는 정보는 절대 추측하거나 지어내지 말 것. 임대현황이 없으면 4장에 "임대 정보 없음"이라 쓰거나 알고 있는 정보만 기재. 층별 구성 모르면 spec_grid에 "미확인" 대신 알려진 내용만 기재. 빈 checkpoints/points는 실제 근거 있는 것만 포함하되 1개라도 무방
 
 [image_prompt 작성 규칙 - 매우 중요]
 ❌ 나쁜 예: "Professional real estate exterior photo, bright lighting"
@@ -84,6 +85,7 @@ function buildKakaoSystemPrompt(): string {
   return `당신은 부동산 카카오톡 카드뉴스 제작 전문가입니다.
 입지 분석 및 매물 정보를 바탕으로 정확히 6장의 카드뉴스 텍스트를 JSON 객체로 생성하세요.
 카카오톡에 맞게 더 간결하고 정보 중심의 Bullet point 형식으로 작성하세요.
+⚠️ 데이터에 없는 내용은 절대 추측하거나 지어내지 말 것. 근거 있는 정보만 포함하고, 없으면 해당 항목을 빈 배열이나 짧은 실제 내용으로 처리하세요.
 
 [카드 6장 필수 구성 - 이 흐름을 반드시 준수]
 1장: Hook (시선을 끄는 카피 한 줄)

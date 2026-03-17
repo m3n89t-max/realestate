@@ -75,7 +75,7 @@ function extractItems(data: any): any[] {
 
 async function fetchCommercialZones(serviceKey: string, lat: number, lng: number): Promise<ZoneItem[]> {
   const url = buildApiUrl('storeZoneInRadius', serviceKey, {
-    pageNo: '1', numOfRows: '20', radius: '1000',
+    pageNo: '1', numOfRows: '20', radius: '500',
     cx: String(lng), cy: String(lat), type: 'json',
   })
   console.log('[analyze-commercial] zones URL:', url.replace(serviceKey, serviceKey.slice(0, 8) + '...'))
@@ -93,7 +93,7 @@ async function fetchCommercialZones(serviceKey: string, lat: number, lng: number
 
 async function fetchNearbyStores(serviceKey: string, lat: number, lng: number): Promise<StoreItem[]> {
   const url = buildApiUrl('storeListInRadius', serviceKey, {
-    pageNo: '1', numOfRows: '100', radius: '1000',
+    pageNo: '1', numOfRows: '100', radius: '500',
     cx: String(lng), cy: String(lat), type: 'json',
   })
   console.log('[analyze-commercial] stores URL:', url.replace(serviceKey, serviceKey.slice(0, 8) + '...'))
@@ -188,7 +188,7 @@ Deno.serve(async (req) => {
       zones,
       stores,
       store_count_by_category: storeCounts,
-      radius_m: 1000,
+      radius_m: 500,
       collected_at: new Date().toISOString(),
     }
 

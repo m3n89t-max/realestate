@@ -92,6 +92,8 @@ interface FormData {
   property_type: PropertyType | ''
   price: string
   monthly_rent: string
+  deposit: string
+  key_money: string
   area: string
   floor: string
   total_floors: string
@@ -112,6 +114,8 @@ export default function NewProjectPage() {
     property_type: '',
     price: '',
     monthly_rent: '',
+    deposit: '',
+    key_money: '',
     area: '',
     floor: '',
     total_floors: '',
@@ -207,8 +211,10 @@ export default function NewProjectPage() {
             lat,
             lng,
             property_type: form.property_type || null,
-            price: form.price ? parseInt(form.price.replace(/,/g, '')) : null,
-            monthly_rent: form.monthly_rent ? parseInt(form.monthly_rent.replace(/,/g, '')) : null,
+            price: form.price ? parseInt(form.price.replace(/,/g, '')) * 10000 : null,
+            monthly_rent: form.monthly_rent ? parseInt(form.monthly_rent.replace(/,/g, '')) * 10000 : null,
+            deposit: form.deposit ? parseInt(form.deposit.replace(/,/g, '')) * 10000 : null,
+            key_money: form.key_money ? parseInt(form.key_money.replace(/,/g, '')) * 10000 : null,
             area: form.area ? parseFloat(form.area) : null,
             floor: form.floor ? parseInt(form.floor) : null,
             total_floors: form.total_floors ? parseInt(form.total_floors) : null,
@@ -440,11 +446,31 @@ export default function NewProjectPage() {
                 />
               </div>
               <div>
+                <label className="label">보증금 (만원, 해당시)</label>
+                <input
+                  value={form.deposit}
+                  onChange={e => handleChange('deposit', e.target.value)}
+                  placeholder="5000"
+                  className="input"
+                  type="number"
+                />
+              </div>
+              <div>
                 <label className="label">월세 (만원, 해당시)</label>
                 <input
                   value={form.monthly_rent}
                   onChange={e => handleChange('monthly_rent', e.target.value)}
                   placeholder="150"
+                  className="input"
+                  type="number"
+                />
+              </div>
+              <div>
+                <label className="label">권리금 (만원, 해당시)</label>
+                <input
+                  value={form.key_money}
+                  onChange={e => handleChange('key_money', e.target.value)}
+                  placeholder="3000"
                   className="input"
                   type="number"
                 />

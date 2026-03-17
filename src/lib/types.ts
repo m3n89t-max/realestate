@@ -120,6 +120,8 @@ export interface Project {
   property_type?: PropertyType
   price?: number
   monthly_rent?: number
+  deposit?: number
+  key_money?: number
   area?: number
   floor?: number
   total_floors?: number
