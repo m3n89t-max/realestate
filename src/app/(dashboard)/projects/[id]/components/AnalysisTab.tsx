@@ -241,7 +241,11 @@ function AIAnalysisReport({ analysis, projectId, hasCoords, hasPOI, hasData, isC
 // ── POI 섹션 ─────────────────────────────────────────────────
 function POISection({ poi_data }: { poi_data: Record<string, POIItem[]> }) {
   const entries = SHOW_POI
-    .map(key => ({ key, cfg: POI_CONFIG[key], items: poi_data[key] ?? [] }))
+    .map(key => ({
+      key,
+      cfg: POI_CONFIG[key],
+      items: (poi_data[key] ?? []).filter(item => (item.distance_m ?? 0) <= 500),
+    }))
     .filter(e => e.items.length > 0)
 
   if (entries.length === 0) return (
@@ -423,14 +427,13 @@ function KakaoDensityPanel({ kakao_density, projectId, lat, lng }: {
 
 // ── 지도 섹션 ─────────────────────────────────────────────────
 function MapSection({
-  lat, lng, poi_data, real_price_data, projectId, kakao_density,
+  lat, lng, poi_data, real_price_data, projectId,
 }: {
   lat: number | null
   lng: number | null
   poi_data: Record<string, POIItem[]> | null
   real_price_data: RealPriceItem[] | null
   projectId: string
-  kakao_density: any
 }) {
   const [loading, setLoading] = useState(false)
   const supabase = createClient()
@@ -467,8 +470,8 @@ function MapSection({
     </div>
   )
 
-  const poiSummary = SHOW_POI.slice(0, 6).map(key => {
-    const items = poi_data?.[key] ?? []
+  const poiSummary = SHOW_POI.map(key => {
+    const items = (poi_data?.[key] ?? []).filter(item => (item.distance_m ?? 0) <= 500)
     const nearest = items[0]
     return nearest ? { key, cfg: POI_CONFIG[key], nearest } : null
   }).filter(Boolean) as { key: string; cfg: typeof POI_CONFIG[string]; nearest: POIItem }[]
@@ -480,7 +483,7 @@ function MapSection({
   return (
     <div className="space-y-3">
       <div className="rounded-xl overflow-hidden border border-gray-100 relative">
-        <KakaoMap lat={lat} lng={lng} level={4} style={{ width: '100%', height: 260 }} />
+        <KakaoMap lat={lat} lng={lng} level={4} style={{ width: '100%', height: 380 }} />
         <a
           href={`https://map.kakao.com/link/map/${lat},${lng}`}
           target="_blank"
@@ -493,7 +496,7 @@ function MapSection({
       </div>
 
       {poiSummary.length > 0 && (
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="grid grid-cols-4 gap-1.5">
           {poiSummary.map(({ key, cfg, nearest }) => (
             <div key={key} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
               <span className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${cfg.color}`}>
@@ -517,11 +520,6 @@ function MapSection({
           <span className="text-sm font-bold text-red-600">{formatAmount(maxPrice)}</span>
         </div>
       )}
-
-      {/* 업종 밀집도 */}
-      <div className="border-t pt-3">
-        <KakaoDensityPanel kakao_density={kakao_density} projectId={projectId} lat={lat} lng={lng} />
-      </div>
     </div>
   )
 }
@@ -890,13 +888,14 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
         isCommercial={isCommercial}
       />
 
-      {/* 수집 데이터 3단 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {/* 수집 데이터 - Row 1: POI + 상권분석 (2열) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* POI */}
         <div className="card p-5">
           <h3 className="section-title mb-4 flex items-center gap-2">
             <MapPin size={15} className="text-brand-500" />
             주변 시설 (POI)
+            <span className="ml-auto text-xs text-gray-400 font-normal">반경 500m</span>
           </h3>
           {hasPOI
             ? <POISection poi_data={project.poi_data} />
@@ -904,35 +903,50 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
           }
         </div>
 
-        {/* 지도 */}
-        <div className="card p-5">
-          <h3 className="section-title mb-4 flex items-center gap-2">
-            <MapPin size={15} className="text-brand-500" />
-            매물 위치
-          </h3>
-          <MapSection
-            lat={project.lat}
-            lng={project.lng}
-            poi_data={project.poi_data}
-            real_price_data={isCommercial ? null : project.real_price_data}
-            projectId={projectId}
-            kakao_density={project.kakao_density}
-          />
-        </div>
-
-        {/* 실거래가 또는 상권 분석 */}
-        <div className="card p-5">
-          <h3 className="section-title mb-4 flex items-center gap-2">
+        {/* 상권분석 + 업종 밀집도 */}
+        <div className="card p-5 space-y-5">
+          <div>
+            <h3 className="section-title mb-4 flex items-center gap-2">
+              {isCommercial
+                ? <><Store size={15} className="text-orange-500" /> 상권 분석</>
+                : <><TrendingUp size={15} className="text-brand-500" /> 부동산 데이터 (실거래가)</>
+              }
+            </h3>
             {isCommercial
-              ? <><Store size={15} className="text-orange-500" /> 상권 분석</>
-              : <><TrendingUp size={15} className="text-brand-500" /> 부동산 데이터 (실거래가)</>
+              ? <CommercialSection commercial_data={project.commercial_data} projectId={projectId} />
+              : <RealPriceSection real_price_data={project.real_price_data ?? []} projectId={projectId} legalDong={project.legal_dong} />
             }
-          </h3>
-          {isCommercial
-            ? <CommercialSection commercial_data={project.commercial_data} projectId={projectId} />
-            : <RealPriceSection real_price_data={project.real_price_data ?? []} projectId={projectId} legalDong={project.legal_dong} />
-          }
+          </div>
+
+          <div className="border-t pt-4">
+            <h3 className="section-title mb-3 flex items-center gap-2">
+              <BarChart3 size={15} className="text-brand-500" />
+              업종 밀집도 분석
+              <span className="ml-auto text-xs text-gray-400 font-normal">반경 500m · 카카오맵</span>
+            </h3>
+            <KakaoDensityPanel
+              kakao_density={project.kakao_density}
+              projectId={projectId}
+              lat={project.lat}
+              lng={project.lng}
+            />
+          </div>
         </div>
+      </div>
+
+      {/* Row 2: 지도 (전체 폭, 확대) */}
+      <div className="card p-5">
+        <h3 className="section-title mb-4 flex items-center gap-2">
+          <MapPin size={15} className="text-brand-500" />
+          매물 위치
+        </h3>
+        <MapSection
+          lat={project.lat}
+          lng={project.lng}
+          poi_data={project.poi_data}
+          real_price_data={isCommercial ? null : project.real_price_data}
+          projectId={projectId}
+        />
       </div>
     </div>
   )
