@@ -10,7 +10,7 @@ export type ContentType = 'blog' | 'card_news' | 'video_script' | 'location_anal
 export type TaskType = 'naver_upload' | 'youtube_upload' | 'building_register' | 'seumteo_api' | 'video_render' | 'pdf_merge'
 export type TaskStatus = 'pending' | 'running' | 'success' | 'failed' | 'retrying' | 'cancelled'
 export type AssetType = 'image' | 'video' | 'document' | 'card_news'
-export type DocumentType = 'building_register' | 'floor_plan' | 'permit_history' | 'risk_report' | 'package_pdf'
+export type DocumentType = 'building_register' | 'cadastral_map' | 'floor_plan' | 'permit_history' | 'risk_report' | 'package_pdf'
 
 // ============================================================
 // DB 엔티티 타입
