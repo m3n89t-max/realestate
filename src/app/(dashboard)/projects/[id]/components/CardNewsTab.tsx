@@ -394,6 +394,7 @@ function CardPreview({
 export default function CardNewsTab({ projectId, contents, assets }: CardNewsTabProps) {
   const supabase = createClient()
   const [generating, setGenerating] = useState(false)
+  const [platform, setPlatform] = useState<'instagram' | 'kakao'>('instagram')
   const [colorTheme, setColorTheme] = useState('emerald')
   const [photoFilter, setPhotoFilter] = useState('original')
   const [selectedId, setSelectedId] = useState<string | null>(contents[0]?.id ?? null)
@@ -443,7 +444,7 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
           'Authorization': `Bearer ${session.access_token}`,
           'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
         },
-        body: JSON.stringify({ project_id: projectId, asset_urls }),
+        body: JSON.stringify({ project_id: projectId, asset_urls, platform }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? `생성 실패 (${res.status})`)
@@ -487,6 +488,31 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
           <h3 className="text-sm font-semibold text-gray-700 mb-3">카드뉴스 설정</h3>
 
           {/* 사진 필터 */}
+          {/* 플랫폼 선택 */}
+          <div className="mb-4">
+            <label className="label text-xs">플랫폼</label>
+            <div className="grid grid-cols-2 gap-1.5">
+              {[
+                { id: 'instagram', label: '인스타그램', icon: '📸' },
+                { id: 'kakao',     label: '카카오톡',   icon: '💬' },
+              ].map(p => (
+                <button
+                  key={p.id}
+                  onClick={() => setPlatform(p.id as 'instagram' | 'kakao')}
+                  className={cn(
+                    'py-2 text-xs rounded-lg border font-medium transition-all flex items-center justify-center gap-1.5',
+                    platform === p.id
+                      ? 'bg-brand-600 text-white border-brand-600'
+                      : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                  )}
+                >
+                  <span>{p.icon}</span>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="mb-4">
             <label className="label text-xs">사진 필터</label>
             <div className="grid grid-cols-3 gap-1.5">
@@ -532,7 +558,7 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
           <button onClick={handleGenerate} disabled={generating} className="btn-primary w-full justify-center">
             {generating
               ? <><Loader2 size={14} className="animate-spin" /> 생성중...</>
-              : <><Wand2 size={15} /> 카드뉴스 생성</>
+              : <><Wand2 size={15} /> {platform === 'kakao' ? '카카오 ' : '인스타 '}카드뉴스 생성</>
             }
           </button>
         </div>

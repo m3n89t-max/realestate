@@ -17,6 +17,7 @@ import TasksTab from './components/TasksTab'
 import ProjectActions from './components/ProjectActions'
 import PhotoGallery from './components/PhotoGallery'
 import AnalysisTab from './components/AnalysisTab'
+import PackageTab from './components/PackageTab'
 
 interface Params {
   id: string
@@ -266,15 +267,14 @@ export default async function ProjectDetailPage({
       )}
 
       {tab === 'package' && (
-        <div className="card p-8 text-center">
-          <Download size={40} className="mx-auto text-gray-200 mb-3" />
-          <p className="text-gray-600 font-medium">거래 서류팩 자동 생성</p>
-          <p className="text-sm text-gray-400 mt-1">건축물대장 + 서류 요약 + 마케팅 자료를 하나의 PDF로 병합합니다</p>
-          <button className="btn-primary mt-4">
-            <Download size={16} />
-            패키지 PDF 생성
-          </button>
-        </div>
+        <PackageTab
+          projectId={id}
+          project={project}
+          blogContents={blogContents}
+          cardNewsContents={cardNewsContents}
+          documents={documents ?? []}
+          assets={assets ?? []}
+        />
       )}
     </div>
   )

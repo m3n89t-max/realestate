@@ -24,18 +24,20 @@ export default async function DashboardPage() {
   const orgId = membership?.org_id
 
   // 병렬로 데이터 로드
-  const [projectsResult, usageResult, tasksResult, agentResult] = await Promise.all([
+  const [projectsResult, usageResult, tasksResult, agentResult, completedTasksResult] = await Promise.all([
     supabase.from('projects').select('*').eq('org_id', orgId).neq('status', 'archived')
       .order('created_at', { ascending: false }).limit(8),
     supabase.rpc('get_org_usage', { p_org_id: orgId }).single(),
     supabase.from('tasks').select('status').eq('org_id', orgId)
       .in('status', ['pending', 'running', 'retrying']),
     supabase.from('agent_connections').select('status, last_seen_at').eq('org_id', orgId).limit(1).single(),
+    supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('status', 'success'),
   ])
 
   const projects = projectsResult.data ?? []
   const usage = usageResult.data as Record<string, number> | null
   const pendingTasks = (tasksResult.data ?? []).length
+  const completedTasks = completedTasksResult.count ?? 0
 
   // 에이전트 상태 계산 (2분 초과 시 오프라인)
   let agentStatus: 'online' | 'offline' | 'busy' = 'offline'
@@ -72,7 +74,7 @@ export default async function DashboardPage() {
     },
     {
       label: '완료된 작업',
-      value: '—',
+      value: completedTasks,
       icon: <CheckCircle size={20} className="text-brand-500" />,
       bg: 'bg-brand-50',
     },

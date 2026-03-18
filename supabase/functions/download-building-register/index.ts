@@ -102,28 +102,49 @@ Deno.serve(async (req) => {
       .eq('id', project_id)
       .single()
 
+    let docId: string | null = null
     if (projectData) {
-      await adminClient.from('documents').upsert({
+      const { data: savedDoc } = await adminClient.from('documents').upsert({
         project_id,
         org_id:    projectData.org_id,
         type:      'building_register',
         status:    'completed',
         raw_data:  results,
+        raw_text:  formatRawText(results),
         summary:   formatSummary(results.title),
         fetched_at: new Date().toISOString(),
-      }, { onConflict: 'project_id,type' })
+      }, { onConflict: 'project_id,type' }).select('id').single()
+      docId = savedDoc?.id ?? null
+    }
+
+    // ── AI 요약 자동 실행 ──────────────────────────────────────
+    if (docId) {
+      try {
+        const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+        await fetch(`${supabaseUrl}/functions/v1/analyze-document`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          },
+          body: JSON.stringify({ document_id: docId }),
+        })
+        console.log('[download-building-register] AI 요약 자동 실행 완료')
+      } catch (aiErr) {
+        console.warn('[download-building-register] AI 요약 실패 (비필수):', aiErr)
+      }
     }
 
     // task → success
     if (task_id) {
       await adminClient.from('tasks').update({
         status:       'success',
-        result:       { api_data: results },
+        result:       { api_data: results, doc_id: docId },
         completed_at: new Date().toISOString(),
       }).eq('id', task_id)
     }
 
-    return new Response(JSON.stringify({ success: true, data: results }), {
+    return new Response(JSON.stringify({ success: true, data: results, doc_id: docId }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
 
@@ -163,6 +184,50 @@ async function callBuildingApi(
   }
 
   return json?.response?.body?.items?.item ?? []
+}
+
+// ── AI 분석용 raw_text 생성 ────────────────────────────────────
+function formatRawText(results: Record<string, any>): string {
+  const lines: string[] = ['=== 건축물대장 원문 데이터 ===\n']
+
+  if (Array.isArray(results.title) && results.title.length > 0) {
+    lines.push('[표제부]')
+    const t = results.title[0]
+    lines.push(`건물명: ${t.bldNm ?? '-'}`)
+    lines.push(`주용도: ${t.mainPurpsCdNm ?? '-'}`)
+    lines.push(`부용도: ${t.etcPurps ?? '-'}`)
+    lines.push(`구조: ${t.strctCdNm ?? '-'}`)
+    lines.push(`지붕: ${t.roofCdNm ?? '-'}`)
+    lines.push(`연면적: ${t.totArea ?? '-'}㎡`)
+    lines.push(`건축면적: ${t.archArea ?? '-'}㎡`)
+    lines.push(`대지면적: ${t.platArea ?? '-'}㎡`)
+    lines.push(`건폐율: ${t.bcRat ?? '-'}%`)
+    lines.push(`용적률: ${t.vlRat ?? '-'}%`)
+    lines.push(`사용승인일: ${t.useAprDay ?? '-'}`)
+    lines.push(`착공일: ${t.stcnsDay ?? '-'}`)
+    lines.push(`지상층수: ${t.grndFlrCnt ?? '-'}층`)
+    lines.push(`지하층수: ${t.ugrndFlrCnt ?? '-'}층`)
+    lines.push(`승강기: ${t.rideUseElvtCnt ?? 0}대(승용) + ${t.emgenUseElvtCnt ?? 0}대(비상)`)
+    lines.push(`주차대수: 기계식 ${t.indrMechUtcnt ?? 0}대 + 옥외 ${t.oudrMechUtcnt ?? 0}대 + 자주식 ${t.indrAutoUtcnt ?? 0}대`)
+    lines.push(`위반건축물: ${t.vltnBldYn === 'Y' ? '있음 ⚠️' : '없음'}`)
+    lines.push(`현장관리인: ${t.siteMgmtSttus ?? '-'}`)
+  }
+
+  if (Array.isArray(results.floors) && results.floors.length > 0) {
+    lines.push('\n[층별개요]')
+    for (const f of results.floors.slice(0, 20)) {
+      lines.push(`  ${f.flrNoNm ?? f.flrNo}층: ${f.mainPurpsCdNm ?? '-'} ${f.area ?? '-'}㎡`)
+    }
+  }
+
+  if (Array.isArray(results.exclusive) && results.exclusive.length > 0) {
+    lines.push('\n[전유부]')
+    for (const e of results.exclusive.slice(0, 10)) {
+      lines.push(`  ${e.flrNoNm}층 ${e.hoNm ?? ''}: ${e.mainPurpsCdNm ?? '-'} ${e.area ?? '-'}㎡`)
+    }
+  }
+
+  return lines.join('\n')
 }
 
 // ── 표제부 요약 텍스트 생성 ────────────────────────────────────
