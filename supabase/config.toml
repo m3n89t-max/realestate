@@ -33,3 +33,45 @@ double_confirm_changes = true
 
 [analytics]
 enabled = false
+
+[functions.analyze-location]
+verify_jwt = false
+
+[functions.analyze-commercial]
+verify_jwt = false
+
+[functions.analyze-document]
+verify_jwt = false
+
+[functions.collect-real-price]
+verify_jwt = false
+
+[functions.download-building-register]
+verify_jwt = false
+
+[functions.download-cadastral-map]
+verify_jwt = false
+
+[functions.generate-blog]
+verify_jwt = false
+
+[functions.generate-card-image]
+verify_jwt = false
+
+[functions.generate-card-news]
+verify_jwt = false
+
+[functions.generate-shorts-script]
+verify_jwt = false
+
+[functions.normalize-parcel]
+verify_jwt = false
+
+[functions.seumteo-api]
+verify_jwt = false
+
+[functions.validate-license]
+verify_jwt = false
+
+[functions.webhook-agent]
+verify_jwt = false
