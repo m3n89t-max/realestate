@@ -90,6 +90,7 @@ const COMMON_FEATURES = [
 interface FormData {
   address: string
   property_type: PropertyType | ''
+  transaction_type: 'sale' | 'jeonse' | 'monthly_rent'
   price: string
   monthly_rent: string
   deposit: string
@@ -115,6 +116,7 @@ export default function NewProjectPage() {
   const [form, setForm] = useState<FormData>({
     address: '',
     property_type: '',
+    transaction_type: 'sale',
     price: '',
     monthly_rent: '',
     deposit: '',
@@ -217,6 +219,7 @@ export default function NewProjectPage() {
             lat,
             lng,
             property_type: form.property_type || null,
+            transaction_type: form.transaction_type,
             price: form.price ? parseInt(form.price.replace(/,/g, '')) * 10000 : null,
             monthly_rent: form.monthly_rent ? parseInt(form.monthly_rent.replace(/,/g, '')) * 10000 : null,
             deposit: form.deposit ? parseInt(form.deposit.replace(/,/g, '')) * 10000 : null,
@@ -442,48 +445,94 @@ export default function NewProjectPage() {
               </div>
             </div>
 
-            {/* 가격 */}
+            {/* 거래 유형 */}
+            <div>
+              <label className="label">거래 유형 *</label>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  ['sale', '🏷️ 매매', '매매가'],
+                  ['jeonse', '🔑 전세', '전세 보증금'],
+                  ['monthly_rent', '📋 월세', '보증금 + 월세'],
+                ] as const).map(([val, label, desc]) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => handleChange('transaction_type', val)}
+                    className={`p-3 rounded-lg border-2 text-sm font-medium transition-colors flex flex-col items-center gap-0.5 ${form.transaction_type === val
+                      ? 'border-brand-500 bg-brand-50 text-brand-700'
+                      : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                    }`}
+                  >
+                    <span className="text-base">{label}</span>
+                    <span className="text-[10px] font-normal text-gray-400">{desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 가격 - 거래 유형에 따라 조건부 표시 */}
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="label">매매가 (만원)</label>
-                <input
-                  value={form.price}
-                  onChange={e => handleChange('price', e.target.value)}
-                  placeholder="85000"
-                  className="input"
-                  type="number"
-                />
-              </div>
-              <div>
-                <label className="label">보증금 (만원, 해당시)</label>
-                <input
-                  value={form.deposit}
-                  onChange={e => handleChange('deposit', e.target.value)}
-                  placeholder="5000"
-                  className="input"
-                  type="number"
-                />
-              </div>
-              <div>
-                <label className="label">월세 (만원, 해당시)</label>
-                <input
-                  value={form.monthly_rent}
-                  onChange={e => handleChange('monthly_rent', e.target.value)}
-                  placeholder="150"
-                  className="input"
-                  type="number"
-                />
-              </div>
-              <div>
-                <label className="label">권리금 (만원, 해당시)</label>
-                <input
-                  value={form.key_money}
-                  onChange={e => handleChange('key_money', e.target.value)}
-                  placeholder="3000"
-                  className="input"
-                  type="number"
-                />
-              </div>
+              {form.transaction_type === 'sale' && (
+                <div className="col-span-2">
+                  <label className="label">매매가 (만원)</label>
+                  <input
+                    value={form.price}
+                    onChange={e => handleChange('price', e.target.value)}
+                    placeholder="85000"
+                    className="input"
+                    type="number"
+                  />
+                </div>
+              )}
+              {form.transaction_type === 'jeonse' && (
+                <div className="col-span-2">
+                  <label className="label">전세 보증금 (만원)</label>
+                  <input
+                    value={form.deposit}
+                    onChange={e => handleChange('deposit', e.target.value)}
+                    placeholder="30000"
+                    className="input"
+                    type="number"
+                  />
+                </div>
+              )}
+              {form.transaction_type === 'monthly_rent' && (
+                <>
+                  <div>
+                    <label className="label">보증금 (만원)</label>
+                    <input
+                      value={form.deposit}
+                      onChange={e => handleChange('deposit', e.target.value)}
+                      placeholder="5000"
+                      className="input"
+                      type="number"
+                    />
+                  </div>
+                  <div>
+                    <label className="label">월세 (만원)</label>
+                    <input
+                      value={form.monthly_rent}
+                      onChange={e => handleChange('monthly_rent', e.target.value)}
+                      placeholder="150"
+                      className="input"
+                      type="number"
+                    />
+                  </div>
+                </>
+              )}
+              {/* 권리금 - 상가/사무실에서만 표시 */}
+              {(form.property_type === 'commercial') && (
+                <div className="col-span-2">
+                  <label className="label">권리금 (만원, 해당시)</label>
+                  <input
+                    value={form.key_money}
+                    onChange={e => handleChange('key_money', e.target.value)}
+                    placeholder="3000"
+                    className="input"
+                    type="number"
+                  />
+                </div>
+              )}
             </div>
 
             {/* 면적 및 층수 */}

@@ -19,6 +19,7 @@ export interface BlogPromptContext {
   location_advantages?: string[]
   nearby_facilities?: Record<string, unknown>
   style: 'informative' | 'investment' | 'lifestyle'
+  transaction_type?: 'sale' | 'jeonse' | 'monthly_rent'
   tone?: 'professional' | 'friendly' | 'passionate' | 'storytelling' | 'analytical'
   photo_urls?: { url: string; alt: string; category?: string }[]
 }
@@ -110,19 +111,26 @@ export function buildBlogUserPrompt(ctx: BlogPromptContext): string {
     analytical: '분석적인 말투: 데이터와 수치 중심의 냉철하고 객관적인 문체. "~에 따르면", "~대비 ~% 수준", "시세 분석 결과" 등 근거 중심 표현 사용. 감정보다 팩트로 설득.',
   }[ctx.tone ?? 'professional']
 
-  const billions = ctx.price ? Math.floor(ctx.price / 100000000) : 0
-  const tenThousands = ctx.price ? Math.floor((ctx.price % 100000000) / 10000) : 0
-  const priceText = ctx.price
-    ? [billions > 0 ? `${billions}억` : '', tenThousands > 0 ? `${tenThousands}만원` : ''].filter(Boolean).join(' ') || `${ctx.price.toLocaleString()}원`
-    : '가격 협의'
-
-  const priceLines: string[] = [`- 매매가: ${priceText}`]
-  if (ctx.deposit) {
-    const db = Math.floor(ctx.deposit / 100000000)
-    const dm = Math.floor((ctx.deposit % 100000000) / 10000)
-    priceLines.push(`- 보증금: ${[db > 0 ? `${db}억` : '', dm > 0 ? `${dm}만원` : ''].filter(Boolean).join(' ')}`)
+  const fmtWon = (v: number) => {
+    const billions = Math.floor(v / 100000000)
+    const tenThousands = Math.floor((v % 100000000) / 10000)
+    return [billions > 0 ? `${billions}억` : '', tenThousands > 0 ? `${tenThousands}만원` : ''].filter(Boolean).join(' ') || `${v.toLocaleString()}원`
   }
-  if (ctx.monthly_rent) priceLines.push(`- 월세: ${Math.floor(ctx.monthly_rent / 10000)}만원`)
+
+  const txType = ctx.transaction_type ?? (ctx.price ? 'sale' : ctx.monthly_rent ? 'monthly_rent' : ctx.deposit ? 'jeonse' : 'sale')
+  const priceLines: string[] = []
+
+  if (txType === 'sale') {
+    priceLines.push(`- 거래 유형: 매매`)
+    priceLines.push(`- 매매가: ${ctx.price ? fmtWon(ctx.price) : '가격 협의'}`)
+  } else if (txType === 'jeonse') {
+    priceLines.push(`- 거래 유형: 전세`)
+    priceLines.push(`- 전세 보증금: ${ctx.deposit ? fmtWon(ctx.deposit) : '협의'}`)
+  } else if (txType === 'monthly_rent') {
+    priceLines.push(`- 거래 유형: 월세`)
+    if (ctx.deposit) priceLines.push(`- 보증금: ${fmtWon(ctx.deposit)}`)
+    if (ctx.monthly_rent) priceLines.push(`- 월세: ${Math.floor(ctx.monthly_rent / 10000)}만원`)
+  }
   if (ctx.key_money) priceLines.push(`- 권리금: ${Math.floor(ctx.key_money / 10000)}만원`)
 
   return `다음 매물 정보로 SEO 최적화 부동산 블로그 글을 작성하세요.

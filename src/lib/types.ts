@@ -130,6 +130,7 @@ export interface Project {
   ji?: string
   legal_dong?: string
   property_type?: PropertyType
+  transaction_type?: 'sale' | 'jeonse' | 'monthly_rent'
   price?: number
   monthly_rent?: number
   deposit?: number

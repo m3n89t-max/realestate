@@ -141,6 +141,7 @@ Deno.serve(async (req) => {
       nearby_facilities: location?.nearby_facilities,
       style,
       tone,
+      transaction_type: project.transaction_type,
       photo_urls: (assets ?? []).map((a: any) => ({
         url: a.file_url,
         alt: a.alt_text || a.category || '매물사진',
