@@ -1,10 +1,164 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Video, Copy, Check, Loader2, Download, ChevronLeft, ChevronRight, Play, Pause, FileText, FileJson } from 'lucide-react'
+import { Video, Copy, Check, Loader2, Download, ChevronLeft, ChevronRight, Play, Pause, FileText, FileJson, Film, Clapperboard } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
 import { cn } from '@/lib/utils'
+
+/* ── Canvas 텍스트 줄바꿈 유틸 ── */
+function wrapText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  lineHeight: number,
+  align: CanvasTextAlign = 'center'
+): number {
+  ctx.textAlign = align
+  const chars = text.split('')
+  let line = ''
+  let curY = y
+  for (const ch of chars) {
+    const test = line + ch
+    if (ctx.measureText(test).width > maxWidth && line !== '') {
+      ctx.fillText(line, x, curY)
+      line = ch
+      curY += lineHeight
+    } else {
+      line = test
+    }
+  }
+  if (line) ctx.fillText(line, x, curY)
+  ctx.textAlign = 'left'
+  return curY + lineHeight
+}
+
+/* ── Canvas에 둥근 사각형 그리기 ── */
+function fillRoundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number, h: number, r: number
+) {
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.lineTo(x + w - r, y)
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r)
+  ctx.lineTo(x + w, y + h - r)
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
+  ctx.lineTo(x + r, y + h)
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r)
+  ctx.lineTo(x, y + r)
+  ctx.quadraticCurveTo(x, y, x + r, y)
+  ctx.closePath()
+  ctx.fill()
+}
+
+/* ── 각 장면을 720×1280 캔버스에 렌더링 ── */
+function drawSceneToCanvas(
+  canvas: HTMLCanvasElement,
+  scene: Scene,
+  hook: string,
+  totalScenes: number,
+  globalProgress: number // 0~1
+) {
+  const ctx = canvas.getContext('2d')!
+  const W = canvas.width
+  const H = canvas.height
+
+  const PALETTES = [
+    ['#0f0c29', '#302b63', '#24243e'],
+    ['#0f2027', '#203a43', '#2c5364'],
+    ['#1a1a2e', '#16213e', '#0f3460'],
+    ['#200122', '#6f0000', '#3d0000'],
+    ['#0d0d0d', '#1c1c1c', '#1a1a2e'],
+    ['#0f2027', '#1a1a2e', '#0f0c29'],
+  ]
+  const ACCENTS = ['#00d4aa', '#00bcd4', '#4fc3f7', '#ef5350', '#7e57c2', '#ff8f00']
+  const palette = PALETTES[(scene.scene_number - 1) % PALETTES.length]
+  const accent = ACCENTS[(scene.scene_number - 1) % ACCENTS.length]
+
+  // Background gradient
+  const grad = ctx.createLinearGradient(0, 0, 0, H)
+  palette.forEach((c, i) => grad.addColorStop(i / (palette.length - 1), c))
+  ctx.fillStyle = grad
+  ctx.fillRect(0, 0, W, H)
+
+  // Subtle vignette
+  const vig = ctx.createRadialGradient(W / 2, H / 2, H * 0.2, W / 2, H / 2, H * 0.8)
+  vig.addColorStop(0, 'transparent')
+  vig.addColorStop(1, 'rgba(0,0,0,0.55)')
+  ctx.fillStyle = vig
+  ctx.fillRect(0, 0, W, H)
+
+  // Top accent stripe
+  ctx.fillStyle = accent
+  ctx.fillRect(0, 0, W, 8)
+
+  // Scene badge (top left)
+  ctx.fillStyle = `${accent}cc`
+  fillRoundRect(ctx, 30, 35, 140, 48, 24)
+  ctx.fillStyle = '#ffffff'
+  ctx.font = 'bold 26px "Malgun Gothic", "Apple SD Gothic Neo", sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText(`장면 ${scene.scene_number}`, 100, 67)
+
+  // Duration badge (top right)
+  ctx.fillStyle = 'rgba(255,255,255,0.18)'
+  fillRoundRect(ctx, W - 130, 35, 100, 44, 22)
+  ctx.fillStyle = 'rgba(255,255,255,0.8)'
+  ctx.font = '22px "Malgun Gothic", sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText(`${scene.duration_sec}초`, W - 80, 64)
+
+  // Scene progress dots (top center)
+  const dotR = 7
+  const dotSpacing = 28
+  const dotsStartX = W / 2 - ((totalScenes - 1) * dotSpacing) / 2
+  for (let i = 0; i < totalScenes; i++) {
+    ctx.beginPath()
+    ctx.arc(dotsStartX + i * dotSpacing, 58, dotR, 0, Math.PI * 2)
+    ctx.fillStyle = i === scene.scene_number - 1 ? accent : 'rgba(255,255,255,0.3)'
+    ctx.fill()
+  }
+
+  // Hook (scene 1 only)
+  if (scene.scene_number === 1 && hook) {
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'
+    fillRoundRect(ctx, 30, 200, W - 60, 160, 20)
+    ctx.fillStyle = '#FFD700'
+    ctx.font = 'bold 38px "Malgun Gothic", "Apple SD Gothic Neo", sans-serif'
+    wrapText(ctx, `"${hook}"`, W / 2, 255, W - 100, 52)
+  }
+
+  // Visual description (center, dim hint)
+  ctx.fillStyle = 'rgba(255,255,255,0.22)'
+  ctx.font = '28px "Malgun Gothic", sans-serif'
+  wrapText(ctx, scene.visual_description, W / 2, H / 2 - 60, W - 80, 40)
+
+  // Narration overlay (bottom)
+  const narH = scene.cta ? 300 : 260
+  const narY = H - narH - 60
+  ctx.fillStyle = 'rgba(0,0,0,0.72)'
+  fillRoundRect(ctx, 24, narY, W - 48, narH, 24)
+
+  ctx.fillStyle = '#ffffff'
+  ctx.font = 'bold 36px "Malgun Gothic", "Apple SD Gothic Neo", sans-serif'
+  wrapText(ctx, scene.narration, W / 2, narY + 55, W - 90, 48)
+
+  if (scene.cta) {
+    ctx.fillStyle = '#FFD700'
+    ctx.font = 'bold 28px "Malgun Gothic", sans-serif'
+    wrapText(ctx, `📞 ${scene.cta}`, W / 2, narY + narH - 55, W - 90, 36)
+  }
+
+  // Bottom progress bar
+  ctx.fillStyle = 'rgba(255,255,255,0.15)'
+  ctx.fillRect(0, H - 10, W, 10)
+  ctx.fillStyle = accent
+  ctx.fillRect(0, H - 10, W * globalProgress, 10)
+  ctx.textAlign = 'left'
+}
 
 interface Scene {
   scene_number: number
@@ -180,6 +334,9 @@ export default function ShortsTab({ projectId }: ShortsTabProps) {
   const [script, setScript] = useState<ShortsScript | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
   const [activeScene, setActiveScene] = useState(0)
+  const [rendering, setRendering] = useState(false)
+  const [renderProgress, setRenderProgress] = useState(0)
+  const [renderScene, setRenderScene] = useState(0)
 
   const handleGenerate = async () => {
     setGenerating(true)
@@ -251,6 +408,90 @@ export default function ShortsTab({ projectId }: ShortsTabProps) {
     toast.success('JSON 파일로 저장되었습니다')
   }
 
+  const renderVideo = async () => {
+    if (!script || rendering) return
+    const scenes = script.scenes ?? []
+    if (scenes.length === 0) { toast.error('스크립트가 없습니다'); return }
+
+    setRendering(true)
+    setRenderProgress(0)
+    setRenderScene(1)
+    toast('영상 렌더링을 시작합니다. 약 60초가 소요됩니다.', { icon: '🎬', duration: 4000 })
+
+    try {
+      const W = 720, H = 1280
+      const canvas = document.createElement('canvas')
+      canvas.width = W
+      canvas.height = H
+
+      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+        ? 'video/webm;codecs=vp9'
+        : MediaRecorder.isTypeSupported('video/webm')
+          ? 'video/webm'
+          : null
+
+      if (!mimeType) {
+        toast.error('이 브라우저는 영상 녹화를 지원하지 않습니다. Chrome을 사용해주세요.')
+        setRendering(false)
+        return
+      }
+
+      const stream = canvas.captureStream(30)
+      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 6_000_000 })
+      const chunks: Blob[] = []
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data) }
+
+      const finished = new Promise<void>((resolve) => {
+        recorder.onstop = () => {
+          const blob = new Blob(chunks, { type: 'video/webm' })
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = `shorts-${projectId}.webm`
+          a.click()
+          setTimeout(() => URL.revokeObjectURL(url), 2000)
+          resolve()
+        }
+      })
+
+      recorder.start(200)
+
+      const totalDuration = scenes.reduce((s, sc) => s + sc.duration_sec, 0)
+      let elapsed = 0
+
+      for (let si = 0; si < scenes.length; si++) {
+        const scene = scenes[si]
+        setRenderScene(scene.scene_number)
+
+        const frameDuration = 1000 / 30 // ~33ms per frame
+        const frames = scene.duration_sec * 30
+
+        for (let f = 0; f < frames; f++) {
+          const globalProgress = (elapsed + (f / 30)) / totalDuration
+          drawSceneToCanvas(canvas, scene, script.hook, scenes.length, globalProgress)
+
+          const pct = Math.round(((elapsed + f / 30) / totalDuration) * 100)
+          setRenderProgress(pct)
+
+          await new Promise(r => setTimeout(r, frameDuration))
+        }
+        elapsed += scene.duration_sec
+      }
+
+      setRenderProgress(100)
+      recorder.stop()
+      await finished
+      toast.success('영상 다운로드가 시작됩니다! (.webm → YouTube/CapCut 업로드 가능)')
+    } catch (err) {
+      console.error('[renderVideo]', err)
+      toast.error('영상 렌더링에 실패했습니다')
+    } finally {
+      setRendering(false)
+      setRenderProgress(0)
+      setRenderScene(0)
+    }
+  }
+
   return (
     <div className="space-y-5">
       {/* 생성 컨트롤 */}
@@ -274,9 +515,19 @@ export default function ShortsTab({ projectId }: ShortsTabProps) {
                   <FileJson size={13} />
                   JSON
                 </button>
+                <button
+                  onClick={renderVideo}
+                  disabled={rendering}
+                  className={cn('btn-secondary gap-1.5', rendering ? 'opacity-60' : 'border-orange-300 text-orange-600 hover:bg-orange-50')}
+                >
+                  {rendering
+                    ? <><Loader2 size={13} className="animate-spin" /> 렌더링 {renderProgress}%</>
+                    : <><Film size={13} /> 영상 제작</>
+                  }
+                </button>
               </>
             )}
-            <button onClick={handleGenerate} disabled={generating} className="btn-primary">
+            <button onClick={handleGenerate} disabled={generating || rendering} className="btn-primary">
               {generating
                 ? <><Loader2 size={14} className="animate-spin" /> 생성중...</>
                 : <><Video size={14} /> 스크립트 생성</>
@@ -298,6 +549,26 @@ export default function ShortsTab({ projectId }: ShortsTabProps) {
         <div className="card p-12 text-center">
           <Loader2 size={32} className="mx-auto text-brand-400 animate-spin mb-3" />
           <p className="text-gray-500 font-medium">AI가 스크립트를 작성 중입니다...</p>
+        </div>
+      )}
+
+      {rendering && (
+        <div className="card p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <Clapperboard size={20} className="text-orange-500 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-gray-800">영상 렌더링 중... 장면 {renderScene} / {(script?.scenes ?? []).length}</p>
+              <p className="text-xs text-gray-400 mt-0.5">브라우저 탭을 닫지 마세요 · 약 {script?.total_duration_sec ?? 60}초 소요</p>
+            </div>
+            <span className="text-lg font-black text-orange-500">{renderProgress}%</span>
+          </div>
+          <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-orange-400 to-orange-600 rounded-full transition-all duration-300"
+              style={{ width: `${renderProgress}%` }}
+            />
+          </div>
+          <p className="text-xs text-gray-400 mt-2 text-center">렌더링 완료 시 자동으로 .webm 파일이 다운로드됩니다</p>
         </div>
       )}
 
