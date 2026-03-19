@@ -73,40 +73,39 @@ function WorkflowStatus({ steps }: { steps: WorkflowStep[] }) {
 }
 
 // ── AI 분석 보고서 섹션 ───────────────────────────────────────
-function AIAnalysisReport({ analysis, projectId, hasCoords, hasPOI, hasData, isCommercial }: {
+function AIAnalysisReport({ analysis, projectId, hasCoords, hasPOI, hasData, isCommercial, hasKakaoDensity }: {
   analysis: any
   projectId: string
   hasCoords: boolean
   hasPOI: boolean
   hasData: boolean
   isCommercial: boolean
+  hasKakaoDensity: boolean
 }) {
   const [loading, setLoading] = useState(false)
   const supabase = createClient()
 
   const prereqs = [
     { label: '좌표 변환', done: hasCoords },
-    { label: 'POI 수집',  done: hasPOI, auto: true },
+    { label: 'POI 수집',  done: hasPOI },
     { label: isCommercial ? '상권 데이터' : '부동산 데이터', done: hasData },
+    { label: '업종 밀집도', done: hasKakaoDensity },
   ]
-  // 좌표만 있으면 분석 가능 (POI는 analyze-location 내부에서 자동 수집)
-  const canAnalyze = hasCoords
+  // 모든 데이터가 수집되어야 분석 가능 (사용자 요청)
+  const canAnalyze = prereqs.every(p => p.done)
 
   const runAnalysis = async () => {
     if (!canAnalyze) return
     setLoading(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/analyze-location`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token ?? ''}`,
-        },
-        body: JSON.stringify({ project_id: projectId }),
+      const { data, error } = await supabase.functions.invoke('analyze-location', {
+        body: { project_id: projectId },
+        headers: session?.access_token
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : undefined,
       })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? '분석 실패')
+      if (error) throw new Error(error.message ?? '분석 실패')
       toast.success('AI 입지 분석이 완료되었습니다')
       window.location.reload()
     } catch (err: any) {
@@ -121,7 +120,7 @@ function AIAnalysisReport({ analysis, projectId, hasCoords, hasPOI, hasData, isC
       <div className="card p-8 text-center border-2 border-dashed border-gray-200">
         <MapPin size={36} className="mx-auto text-gray-300 mb-3" />
         <p className="font-medium text-gray-600 mb-1">AI 입지 분석 미실행</p>
-        <p className="text-sm text-gray-400 mb-3">주소 좌표 확인 후 실행하세요. POI는 자동 수집되며 {isCommercial ? '상권' : '실거래가'} 데이터가 있으면 함께 분석합니다</p>
+        <p className="text-sm text-gray-400 mb-3">모든 선행 데이터를 수집한 후 분석을 실행하세요. 종합적인 정보를 바탕으로 분석합니다.</p>
 
         <div className="flex items-center justify-center gap-3 mb-5">
           {prereqs.map((p, i) => (
@@ -442,15 +441,13 @@ function MapSection({
     setLoading(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/analyze-location`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token ?? ''}`,
-        },
-        body: JSON.stringify({ project_id: projectId }),
+      const { error } = await supabase.functions.invoke('analyze-location', {
+        body: { project_id: projectId },
+        headers: session?.access_token
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : undefined,
       })
-      if (!res.ok) throw new Error('실패')
+      if (error) throw new Error('실패')
       toast.success('분석 완료')
       window.location.reload()
     } catch {
@@ -886,6 +883,7 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
         hasPOI={hasPOI}
         hasData={hasData}
         isCommercial={isCommercial}
+        hasKakaoDensity={!!project.kakao_density}
       />
 
       {/* 수집 데이터 - Row 1: POI + 상권분석 (2열) */}
