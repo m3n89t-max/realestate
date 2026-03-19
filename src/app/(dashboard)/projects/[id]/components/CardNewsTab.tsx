@@ -484,7 +484,7 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
   const [activeSlide, setActiveSlide] = useState(0)
   const [copied, setCopied] = useState(false)
   const [customInstructions, setCustomInstructions] = useState('')
-  const [showInstructions, setShowInstructions] = useState(false)
+  const [showInstructions, setShowInstructions] = useState(true)
 
   const selected = contents.find(c => c.id === selectedId)
   const rawContent = selected?.content ? JSON.parse(selected.content) : null
