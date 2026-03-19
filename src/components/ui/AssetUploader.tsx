@@ -33,9 +33,12 @@ const FileIcon = ({ type }: { type: string }) => {
 }
 
 export default function AssetUploader({
-  accept = { 'image/*': ['.jpg', '.jpeg', '.png', '.webp'] },
+  accept = {
+    'image/*': ['.jpg', '.jpeg', '.png', '.webp'],
+    'video/*': ['.mp4', '.mov', '.avi', '.webm'],
+  },
   maxFiles = 20,
-  maxSize = 10 * 1024 * 1024,
+  maxSize = 200 * 1024 * 1024,
   onUpload,
   className,
 }: AssetUploaderProps) {
@@ -130,7 +133,10 @@ export default function AssetUploader({
               {isDragActive ? '파일을 여기에 놓으세요' : '클릭하거나 파일을 드래그하세요'}
             </p>
             <p className="text-xs text-gray-400 mt-1">
-              JPG, PNG, WEBP · 최대 {maxFiles}개 · 파일당 최대 {formatSize(maxSize)}
+              JPG, PNG, WEBP · MP4, MOV, AVI, WEBM
+            </p>
+            <p className="text-xs text-gray-400">
+              최대 {maxFiles}개 · 파일당 최대 {formatSize(maxSize)}
             </p>
           </div>
         </div>

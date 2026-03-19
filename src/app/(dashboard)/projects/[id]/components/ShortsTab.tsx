@@ -61,11 +61,11 @@ export default function ShortsTab({ projectId }: ShortsTabProps) {
     const lines = [
       `[후킹] ${script.hook}`,
       '',
-      ...script.scenes.map(s =>
+      ...(script.scenes ?? []).map(s =>
         `[장면 ${s.scene_number} - ${s.duration_sec}초]\n화면: ${s.visual_description}\n나레이션: ${s.narration}${s.cta ? `\nCTA: ${s.cta}` : ''}`
       ),
       '',
-      `[해시태그] ${script.hashtags.join(' ')}`,
+      `[해시태그] ${(script.hashtags ?? []).join(' ')}`,
     ]
     const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' })
     const url = URL.createObjectURL(blob)
@@ -135,7 +135,7 @@ export default function ShortsTab({ projectId }: ShortsTabProps) {
 
           {/* 장면 카드 */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {script.scenes.map(scene => (
+            {(script.scenes ?? []).map(scene => (
               <div key={scene.scene_number} className="card p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className={cn(
@@ -190,7 +190,7 @@ export default function ShortsTab({ projectId }: ShortsTabProps) {
               </button>
             </div>
             <div className="flex flex-wrap gap-1.5">
-              {script.hashtags.map(tag => (
+              {(script.hashtags ?? []).map(tag => (
                 <span key={tag} className="px-2.5 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
                   {tag}
                 </span>

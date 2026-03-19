@@ -24,11 +24,18 @@ Deno.serve(async (req) => {
       .single()
     if (pError || !project) throw new Error('프로젝트를 찾을 수 없습니다')
 
-    const { data: location } = await supabaseClient
-      .from('location_analyses')
-      .select('advantages, analysis_text')
-      .eq('project_id', project_id)
-      .single()
+    const [{ data: location }, { data: assets }] = await Promise.all([
+      supabaseClient
+        .from('location_analyses')
+        .select('advantages, analysis_text')
+        .eq('project_id', project_id)
+        .single(),
+      supabaseClient
+        .from('assets')
+        .select('file_url, type, file_name, sort_order')
+        .eq('project_id', project_id)
+        .order('sort_order'),
+    ])
 
     const maskedAddress = maskPersonalInfo(project.address ?? '')
     const priceText = project.price
@@ -39,6 +46,14 @@ Deno.serve(async (req) => {
       ? `\n입지 장점: ${(location.advantages ?? []).join(', ')}\n입지 요약: ${location.analysis_text ?? ''}`
       : ''
 
+    const imageAssets = (assets ?? []).filter(a => a.type === 'image').slice(0, 6)
+    const videoAssets = (assets ?? []).filter(a => a.type === 'video')
+
+    const assetInfo = [
+      imageAssets.length > 0 ? `업로드된 사진 ${imageAssets.length}장 (카드뉴스·썸네일 활용 가능)` : '',
+      videoAssets.length > 0 ? `업로드된 동영상 ${videoAssets.length}개 (${videoAssets.map(v => v.file_name).join(', ')}) - 쇼츠 편집 소스로 활용 가능` : '',
+    ].filter(Boolean).join('\n')
+
     const userPrompt = `다음 매물에 대한 유튜브 쇼츠 스크립트를 작성하세요:
 
 주소: ${maskedAddress}
@@ -48,18 +63,32 @@ Deno.serve(async (req) => {
 층수: ${project.floor ? `${project.floor}층` : ''}
 방향: ${project.direction ?? ''}
 특징: ${(project.features ?? []).join(', ')}${locationInfo}
+${assetInfo ? `\n[업로드된 미디어]\n${assetInfo}` : ''}
 
 [작성 가이드]
 1. hook은 시청자가 멈춰보게 만드는 강렬한 첫 문장
 2. 장면1: 매물 핵심 소개 / 장면2-4: 주요 장점 / 장면5: 투자 가치 / 장면6: CTA
-3. 해시태그 10개 이상 (지역명, 매물유형 포함)`
+3. visual_description에 업로드된 사진/동영상 활용 방법을 구체적으로 지시할 것
+4. 해시태그 15개 이상 (지역명, 매물유형, 투자 키워드 포함)`
+
+    // 업로드된 사진이 있으면 vision 분석 포함
+    const messages: { role: string; content: string | { type: string; text?: string; image_url?: { url: string } }[] }[] = [
+      { role: 'system', content: buildShortsSystemPrompt() },
+    ]
+
+    if (imageAssets.length > 0) {
+      const contentParts: { type: string; text?: string; image_url?: { url: string } }[] = [
+        { type: 'text', text: userPrompt },
+        ...imageAssets.map(a => ({ type: 'image_url', image_url: { url: a.file_url } })),
+      ]
+      messages.push({ role: 'user', content: contentParts as never })
+    } else {
+      messages.push({ role: 'user', content: userPrompt })
+    }
 
     const responseText = await callOpenAI(
-      [
-        { role: 'system', content: buildShortsSystemPrompt() },
-        { role: 'user', content: userPrompt },
-      ],
-      { responseFormat: 'json', maxTokens: 2000, temperature: 0.8 }
+      messages as never,
+      { responseFormat: 'json', maxTokens: 2500, temperature: 0.8 }
     )
 
     const script = JSON.parse(responseText)

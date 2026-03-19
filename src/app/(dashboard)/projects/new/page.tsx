@@ -67,7 +67,7 @@ async function geocodeAddress(address: string): Promise<{ lat: number; lng: numb
 
 const STEPS = [
   { id: 'basic', title: '기본 정보', description: '주소 및 매물 유형' },
-  { id: 'photos', title: '사진 업로드', description: '매물 사진 추가' },
+  { id: 'photos', title: '사진/동영상', description: '매물 사진 · 동영상 추가' },
   { id: 'analysis', title: '입지 분석', description: 'AI 입지 분석 실행' },
 ]
 
@@ -633,12 +633,25 @@ export default function NewProjectPage() {
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-brand-600 mb-4">
               <Home size={18} />
-              <h2 className="font-semibold">사진 업로드</h2>
+              <h2 className="font-semibold">사진 &amp; 동영상 업로드</h2>
             </div>
             <p className="text-sm text-gray-500">
-              사진을 업로드하면 카테고리별로 자동 분류됩니다. 카드뉴스 및 영상 제작에 활용됩니다.
+              사진과 동영상을 함께 업로드하세요. AI가 실제 매물 이미지를 분석하여 카드뉴스 · 쇼츠 스크립트 품질을 높입니다.
             </p>
-            <AssetUploader maxFiles={30} maxSize={20 * 1024 * 1024} onUpload={handleUpload} />
+            <div className="flex gap-3 text-xs text-gray-500 bg-gray-50 rounded-lg p-3">
+              <span className="text-blue-500 font-medium">사진</span> 카드뉴스 배경 · AI 비전 분석
+              <span className="mx-1">·</span>
+              <span className="text-purple-500 font-medium">동영상</span> 쇼츠 편집 소스 · 장면 구성 참고
+            </div>
+            <AssetUploader
+              accept={{
+                'image/*': ['.jpg', '.jpeg', '.png', '.webp'],
+                'video/*': ['.mp4', '.mov', '.avi', '.webm'],
+              }}
+              maxFiles={30}
+              maxSize={200 * 1024 * 1024}
+              onUpload={handleUpload}
+            />
           </div>
         )}
 
