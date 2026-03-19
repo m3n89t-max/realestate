@@ -238,48 +238,82 @@ function AIAnalysisReport({ analysis, projectId, hasCoords, hasPOI, hasData, isC
 }
 
 // ── POI 섹션 ─────────────────────────────────────────────────
-function POISection({ poi_data }: { poi_data: Record<string, POIItem[]> }) {
+function POISection({ poi_data, projectId, lat, lng }: {
+  poi_data: Record<string, POIItem[]> | null
+  projectId: string
+  lat: number | null
+  lng: number | null
+}) {
+  const [loading, setLoading] = useState(false)
+
+  const collect = async () => {
+    if (!lat || !lng) { toast.error('좌표가 없습니다. 지도에서 주변 정보를 찾을 수 없습니다.'); return }
+    setLoading(true)
+    try {
+      const res = await fetch('/api/poi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_id: projectId }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? '수집 실패')
+      toast.success('주변 시설(POI) 수집이 완료되었습니다')
+      window.location.reload()
+    } catch (e: any) {
+      toast.error(e.message ?? 'POI 수집 실패')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const entries = SHOW_POI
     .map(key => ({
       key,
       cfg: POI_CONFIG[key],
-      items: (poi_data[key] ?? []).filter(item => (item.distance_m ?? 0) <= 500),
+      items: (poi_data?.[key] ?? []).filter(item => (item.distance_m ?? 0) <= 500),
     }))
     .filter(e => e.items.length > 0)
 
   if (entries.length === 0) return (
-    <div className="text-center py-6 text-gray-400 text-sm">POI 데이터 없음</div>
+    <div className="text-center py-6 space-y-3">
+      <MapPin size={32} className="mx-auto text-gray-200" />
+      <p className="text-sm text-gray-400">POI 데이터 없음</p>
+      <button onClick={collect} disabled={loading || !lat} className="btn-primary text-xs py-1.5 w-full justify-center">
+        {loading ? <><Loader2 size={12} className="animate-spin" /> 수집 중...</> : <><RefreshCw size={12} /> POI 수집</>}
+      </button>
+    </div>
   )
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-      {entries.map(({ key, cfg, items }) => {
-        const nearest = items[0]
-        return (
-          <div key={key} className="border border-gray-100 rounded-lg p-3">
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${cfg.color}`}>
-                {cfg.icon}
-              </span>
-              <span className="text-xs font-semibold text-gray-600">{cfg.label}</span>
-              <span className="ml-auto text-xs text-gray-400">{items.length}개</span>
-            </div>
-            <p className="text-sm font-medium text-gray-800 truncate">{nearest.name}</p>
-            <p className="text-xs text-gray-400 mt-0.5">
-              {nearest.distance_m ? `${distanceLabel(nearest.distance_m)} · 도보 ${walkMin(nearest.distance_m)}분` : '위치 정보 없음'}
-            </p>
-            {items.length > 1 && (
-              <div className="mt-1.5 space-y-0.5">
-                {items.slice(1, 3).map((it, i) => (
-                  <p key={i} className="text-xs text-gray-400 truncate">
-                    {it.name}{it.distance_m ? ` · ${distanceLabel(it.distance_m)}` : ''}
-                  </p>
-                ))}
+    <div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-3 mb-4">
+        {entries.map(({ key, cfg, items }) => {
+          const nearest = items[0]
+          return (
+            <div key={key} className="border border-gray-100 rounded-lg p-3 bg-white">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${cfg.color}`}>
+                  {cfg.icon}
+                </span>
+                <span className="text-xs font-semibold text-gray-600">{cfg.label}</span>
+                <span className="ml-auto text-xs text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded-full font-medium">{items.length}개</span>
               </div>
-            )}
-          </div>
-        )
-      })}
+              <p className="text-sm font-medium text-gray-800 truncate">{nearest.name}</p>
+              <p className="text-xs text-gray-400 mt-1">
+                {nearest.distance_m ? `${distanceLabel(nearest.distance_m)} · 도보 ${walkMin(nearest.distance_m)}분` : '위치 정보 없음'}
+              </p>
+            </div>
+          )
+        })}
+      </div>
+      <button
+        onClick={collect}
+        disabled={loading}
+        className="w-full text-xs text-gray-400 hover:text-gray-600 flex items-center justify-center gap-1 border-t border-gray-100 pt-3"
+      >
+        {loading ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+        데이터 갱신
+      </button>
     </div>
   )
 }
@@ -865,74 +899,17 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
       <div className="card p-4">
         <p className="text-xs text-gray-400 mb-3 font-medium uppercase tracking-wide">데이터 수집 현황</p>
         <WorkflowStatus steps={workflowSteps} />
-        {(!hasPOI || !hasData) && (
-          <div className="flex items-center gap-2 mt-3 p-2.5 bg-amber-50 rounded-lg">
-            <AlertCircle size={13} className="text-amber-500 flex-shrink-0" />
-            <p className="text-xs text-amber-700">
-              일부 데이터가 수집되지 않았습니다. {isCommercial ? '상권 데이터 수집 버튼을 눌러 수집하세요.' : '새 매물 등록 시 주소를 다시 입력하면 재수집됩니다.'}
+        {(!hasPOI || !hasData || !project.kakao_density) && (
+          <div className="flex items-center gap-2 mt-3 p-2.5 bg-brand-50 rounded-lg border border-brand-100">
+            <AlertCircle size={13} className="text-brand-600 flex-shrink-0" />
+            <p className="text-xs text-brand-700 font-medium">
+              모든 데이터를 수집해야 최종 AI 분석이 가능합니다. 아래 단계별 수집 버튼을 클릭하세요.
             </p>
           </div>
         )}
       </div>
 
-      {/* AI 분석 보고서 */}
-      <AIAnalysisReport
-        analysis={locationAnalysis}
-        projectId={projectId}
-        hasCoords={!!(project.lat && project.lng)}
-        hasPOI={hasPOI}
-        hasData={hasData}
-        isCommercial={isCommercial}
-        hasKakaoDensity={!!project.kakao_density}
-      />
-
-      {/* 수집 데이터 - Row 1: POI + 상권분석 (2열) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* POI */}
-        <div className="card p-5">
-          <h3 className="section-title mb-4 flex items-center gap-2">
-            <MapPin size={15} className="text-brand-500" />
-            주변 시설 (POI)
-            <span className="ml-auto text-xs text-gray-400 font-normal">반경 500m</span>
-          </h3>
-          {hasPOI
-            ? <POISection poi_data={project.poi_data} />
-            : <div className="text-center py-6 text-gray-400 text-sm">데이터 없음</div>
-          }
-        </div>
-
-        {/* 상권분석 + 업종 밀집도 */}
-        <div className="card p-5 space-y-5">
-          <div>
-            <h3 className="section-title mb-4 flex items-center gap-2">
-              {isCommercial
-                ? <><Store size={15} className="text-orange-500" /> 상권 분석</>
-                : <><TrendingUp size={15} className="text-brand-500" /> 부동산 데이터 (실거래가)</>
-              }
-            </h3>
-            {isCommercial
-              ? <CommercialSection commercial_data={project.commercial_data} projectId={projectId} />
-              : <RealPriceSection real_price_data={project.real_price_data ?? []} projectId={projectId} legalDong={project.legal_dong} />
-            }
-          </div>
-
-          <div className="border-t pt-4">
-            <h3 className="section-title mb-3 flex items-center gap-2">
-              <BarChart3 size={15} className="text-brand-500" />
-              업종 밀집도 분석
-              <span className="ml-auto text-xs text-gray-400 font-normal">반경 500m · 카카오맵</span>
-            </h3>
-            <KakaoDensityPanel
-              kakao_density={project.kakao_density}
-              projectId={projectId}
-              lat={project.lat}
-              lng={project.lng}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Row 2: 지도 (전체 폭, 확대) */}
+      {/* 지도 (상단 배치) */}
       <div className="card p-5">
         <h3 className="section-title mb-4 flex items-center gap-2">
           <MapPin size={15} className="text-brand-500" />
@@ -945,6 +922,69 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
           real_price_data={isCommercial ? null : project.real_price_data}
           projectId={projectId}
         />
+      </div>
+
+      {/* 수집 데이터 (Step 1, 2, 3) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Step 1: POI */}
+        <div className="card p-5 flex flex-col bg-gray-50/50">
+          <h3 className="section-title flex items-center gap-2 mb-4">
+            <span className="w-5 h-5 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-xs font-bold shadow-sm">1</span>
+            주변 시설 (POI)
+          </h3>
+          <div className="flex-1 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+            <POISection poi_data={project.poi_data} projectId={projectId} lat={project.lat} lng={project.lng} />
+          </div>
+        </div>
+
+        {/* Step 2: 상권분석 / 부동산데이터 */}
+        <div className="card p-5 flex flex-col bg-gray-50/50">
+          <h3 className="section-title flex items-center gap-2 mb-4">
+            <span className="w-5 h-5 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xs font-bold shadow-sm">2</span>
+            {isCommercial ? '상권 데이터' : '부동산 데이터'}
+          </h3>
+          <div className="flex-1 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+            {isCommercial
+              ? <CommercialSection commercial_data={project.commercial_data} projectId={projectId} />
+              : <RealPriceSection real_price_data={project.real_price_data ?? []} projectId={projectId} legalDong={project.legal_dong} />
+            }
+          </div>
+        </div>
+
+        {/* Step 3: 업종 밀집도 */}
+        <div className="card p-5 flex flex-col bg-gray-50/50">
+          <h3 className="section-title flex items-center gap-2 mb-4">
+            <span className="w-5 h-5 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-xs font-bold shadow-sm">3</span>
+            업종 밀집도
+          </h3>
+          <div className="flex-1 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+            <KakaoDensityPanel
+              kakao_density={project.kakao_density}
+              projectId={projectId}
+              lat={project.lat}
+              lng={project.lng}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* 최종 단계: AI 분석 보고서 (하단 배치) */}
+      <div className="relative mt-10">
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-5 py-1.5 rounded-full text-xs font-bold shadow-md z-10 flex items-center gap-2">
+          <CheckCircle2 size={14} className="text-green-400" />
+          최종 단계: AI 입지 분석
+        </div>
+        <div className="card p-6 pt-10 border-2 border-brand-200 bg-brand-50/30 relative">
+          <AIAnalysisReport
+            analysis={locationAnalysis}
+            projectId={projectId}
+            hasCoords={!!(project.lat && project.lng)}
+            hasPOI={hasPOI}
+            hasData={hasData}
+            isCommercial={isCommercial}
+            hasKakaoDensity={!!project.kakao_density}
+          />
+        </div>
       </div>
     </div>
   )
