@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Video, Copy, Check, Loader2, Download, ChevronLeft, ChevronRight, Play, Pause, FileText, FileJson, Film, Clapperboard } from 'lucide-react'
+import { Video, Copy, Check, Loader2, Download, ChevronLeft, ChevronRight, Play, Pause, FileText, FileJson, Film, Clapperboard, MessageSquarePlus, ChevronDown } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
 import { cn } from '@/lib/utils'
@@ -384,6 +384,8 @@ export default function ShortsTab({ projectId, assets = [] }: ShortsTabProps) {
   const [rendering, setRendering] = useState(false)
   const [renderProgress, setRenderProgress] = useState(0)
   const [renderScene, setRenderScene] = useState(0)
+  const [customInstructions, setCustomInstructions] = useState('')
+  const [showInstructions, setShowInstructions] = useState(false)
 
   const handleGenerate = async () => {
     setGenerating(true)
@@ -400,7 +402,7 @@ export default function ShortsTab({ projectId, assets = [] }: ShortsTabProps) {
           'Authorization': `Bearer ${session.access_token}`,
           'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
         },
-        body: JSON.stringify({ project_id: projectId }),
+        body: JSON.stringify({ project_id: projectId, custom_instructions: customInstructions.trim() }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? '생성에 실패했습니다')
@@ -651,6 +653,16 @@ export default function ShortsTab({ projectId, assets = [] }: ShortsTabProps) {
                 </button>
               </>
             )}
+            {/* 추가 지시사항 토글 */}
+            <button
+              onClick={() => setShowInstructions(s => !s)}
+              className={cn('btn-secondary text-xs gap-1.5', showInstructions && 'bg-amber-50 border-amber-300 text-amber-700')}
+            >
+              <MessageSquarePlus size={13} />
+              추가 지시사항
+              <ChevronDown size={12} className={cn('transition-transform', showInstructions && 'rotate-180')} />
+            </button>
+
             <button onClick={handleGenerate} disabled={generating || rendering} className="btn-primary">
               {generating
                 ? <><Loader2 size={14} className="animate-spin" /> 생성중...</>
@@ -658,6 +670,39 @@ export default function ShortsTab({ projectId, assets = [] }: ShortsTabProps) {
               }
             </button>
           </div>
+
+          {/* 추가 지시사항 패널 */}
+          {showInstructions && (
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {[
+                  '주차 강조',
+                  '역세권 집중',
+                  '투자 수익률 부각',
+                  '신축 강점 언급',
+                  '실거주 가족 타겟',
+                  '상업시설 입점 언급',
+                  '조용한 주거환경 강조',
+                ].map(chip => (
+                  <button
+                    key={chip}
+                    onClick={() => setCustomInstructions(prev => prev ? `${prev}, ${chip}` : chip)}
+                    className="px-2.5 py-1 text-[11px] rounded-full border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors"
+                  >
+                    + {chip}
+                  </button>
+                ))}
+              </div>
+              <textarea
+                value={customInstructions}
+                onChange={e => setCustomInstructions(e.target.value)}
+                placeholder="공인중개사 추가 지시사항을 입력하세요&#10;예) 주차 3대 가능 강조, 1층 편의점 입점 포인트로 언급, 역까지 도보 5분 강조"
+                rows={3}
+                className="w-full text-sm border border-amber-200 rounded-xl px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-amber-300 bg-amber-50/50 placeholder:text-gray-400"
+              />
+              <p className="text-[11px] text-gray-400 mt-1">입력한 내용이 AI 스크립트 생성에 최우선으로 반영됩니다</p>
+            </div>
+          )}
         </div>
       </div>
 

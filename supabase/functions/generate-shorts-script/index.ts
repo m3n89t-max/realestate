@@ -14,7 +14,7 @@ Deno.serve(async (req) => {
     const { user, supabaseClient } = await getAuthenticatedUser(req)
     const orgId = await getOrgId(supabaseClient, user.id)
 
-    const { project_id } = await req.json()
+    const { project_id, custom_instructions = '' } = await req.json()
     if (!project_id) throw new Error('project_id가 필요합니다')
 
     const { data: project, error: pError } = await supabaseClient
@@ -69,7 +69,7 @@ ${assetInfo ? `\n[업로드된 미디어]\n${assetInfo}` : ''}
 1. hook은 시청자가 멈춰보게 만드는 강렬한 첫 문장
 2. 장면1: 매물 핵심 소개 / 장면2-4: 주요 장점 / 장면5: 투자 가치 / 장면6: CTA
 3. visual_description에 업로드된 사진/동영상 활용 방법을 구체적으로 지시할 것
-4. 해시태그 15개 이상 (지역명, 매물유형, 투자 키워드 포함)`
+4. 해시태그 15개 이상 (지역명, 매물유형, 투자 키워드 포함)${custom_instructions ? `\n\n[공인중개사 추가 지시사항 - 반드시 최우선으로 반영]\n${custom_instructions}` : ''}`
 
     // 업로드된 사진이 있으면 vision 분석 포함
     const messages: { role: string; content: string | { type: string; text?: string; image_url?: { url: string } }[] }[] = [

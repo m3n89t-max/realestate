@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
     const orgId = await getOrgId(supabaseClient, user.id)
     await checkQuota(supabaseClient, orgId, 'generation')
 
-    const { project_id, platform = 'instagram' as Platform, asset_urls = [] } = await req.json()
+    const { project_id, platform = 'instagram' as Platform, asset_urls = [], custom_instructions = '' } = await req.json()
     if (!project_id) throw new Error('project_id가 필요합니다')
     if (platform !== 'instagram' && platform !== 'kakao') {
       throw new Error('platform은 instagram 또는 kakao 이어야 합니다')
@@ -213,7 +213,7 @@ ${advantages || '입지 정보 없음'}${photoAnalysis ? `\n\n[AI 사진 분석 
 [image_prompt 작성 지침]
 - 매물 유형 "${propertyType}", 지역 "${regionHint}" 을 반드시 반영할 것
 - 각 카드 image_prompt에서 [매물유형], [지역명] 플레이스홀더를 실제 값으로 대체할 것
-- 예: "[매물유형]" → "${propertyType} building", "[지역명]" → "${regionHint}"`
+- 예: "[매물유형]" → "${propertyType} building", "[지역명]" → "${regionHint}"${custom_instructions ? `\n\n[공인중개사 추가 지시사항 - 반드시 최우선으로 반영]\n${custom_instructions}` : ''}`
 
     const systemPrompt = platform === 'instagram'
       ? buildInstagramSystemPrompt()

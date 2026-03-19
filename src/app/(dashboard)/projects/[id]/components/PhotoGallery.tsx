@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
-import { X, ChevronLeft, ChevronRight, Upload } from 'lucide-react'
+import { X, ChevronLeft, ChevronRight, Upload, PlayCircle } from 'lucide-react'
 
 interface Asset {
     id: string
     file_url: string
+    type?: string
 }
 
 export default function PhotoGallery({ assets }: { assets: Asset[] }) {
@@ -74,13 +75,26 @@ export default function PhotoGallery({ assets }: { assets: Asset[] }) {
                             className="relative aspect-[4/3] rounded-lg overflow-hidden border border-stone-200 group cursor-pointer"
                             onClick={() => openLightbox(idx)}
                         >
-                            <Image
-                                src={asset.file_url}
-                                alt={`매물 사진 ${idx + 1}`}
-                                fill
-                                className="object-cover group-hover:scale-105 transition-transform duration-300"
-                                sizes="(max-width: 768px) 50vw, 300px"
-                            />
+                            {asset.type === 'video' ? (
+                                <>
+                                    <video
+                                        src={asset.file_url}
+                                        className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300"
+                                        preload="metadata"
+                                    />
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                        <PlayCircle className="text-white w-10 h-10 opacity-80 drop-shadow-md" />
+                                    </div>
+                                </>
+                            ) : (
+                                <Image
+                                    src={asset.file_url}
+                                    alt={`매물 사진 ${idx + 1}`}
+                                    fill
+                                    className="object-cover group-hover:scale-105 transition-transform duration-300"
+                                    sizes="(max-width: 768px) 50vw, 300px"
+                                />
+                            )}
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 pointer-events-none" />
                         </div>
                     ))}
@@ -116,14 +130,23 @@ export default function PhotoGallery({ assets }: { assets: Asset[] }) {
                     )}
 
                     <div className="relative w-full max-w-6xl h-[85vh] px-4 sm:px-20" onClick={e => e.stopPropagation()}>
-                        <Image
-                            src={assets[selectedIndex].file_url}
-                            alt={`확대된 사진 ${selectedIndex + 1}`}
-                            fill
-                            className="object-contain"
-                            sizes="100vw"
-                            priority
-                        />
+                        {assets[selectedIndex].type === 'video' ? (
+                            <video
+                                src={assets[selectedIndex].file_url}
+                                className="w-full h-full object-contain"
+                                controls
+                                autoPlay
+                            />
+                        ) : (
+                            <Image
+                                src={assets[selectedIndex].file_url}
+                                alt={`확대된 사진 ${selectedIndex + 1}`}
+                                fill
+                                className="object-contain"
+                                sizes="100vw"
+                                priority
+                            />
+                        )}
                     </div>
 
                     {assets.length > 1 && (
