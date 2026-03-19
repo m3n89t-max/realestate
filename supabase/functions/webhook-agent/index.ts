@@ -255,6 +255,18 @@ Deno.serve(async (req) => {
         })
       }
 
+      case 'get_recent_tasks': {
+        const { data: recentTasks } = await adminClient
+          .from('tasks')
+          .select('id, type, status, error_code, error_message, created_at, started_at, completed_at')
+          .eq('org_id', agent.org_id)
+          .order('created_at', { ascending: false })
+          .limit(10)
+        return new Response(JSON.stringify({ success: true, tasks: recentTasks ?? [] }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
       case 'claim_task': {
         // 작업 claim (Optimistic Lock — 서비스 롤로 RLS 우회)
         const { task_id } = data

@@ -68,6 +68,7 @@ export async function uploadYoutube(
 
     // 3. 유튜브 스튜디오에서 업로드
     const browser = await chromium.launch({
+        channel: 'msedge',
         headless: false,
         args: ['--start-maximized'],
     });

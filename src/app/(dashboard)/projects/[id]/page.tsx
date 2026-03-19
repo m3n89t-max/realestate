@@ -120,9 +120,10 @@ export default async function ProjectDetailPage({
             <Link
               href={`/projects/${id}?tab=blog`}
               className="btn-primary"
+              title="블로그 탭에서 업로드 버튼을 클릭하세요"
             >
               <Upload size={14} />
-              네이버 업로드
+              블로그 탭으로
             </Link>
           </div>
         </div>

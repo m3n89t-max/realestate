@@ -43,6 +43,7 @@ export async function uploadNaverBlog(
     // 3. 브라우저 실행 (저장된 세션 복원)
     const storageState = existsSync(NAVER_SESSION_PATH) ? NAVER_SESSION_PATH : undefined;
     const browser = await chromium.launch({
+        channel: 'msedge',
         headless: false,
         args: ['--start-maximized'],
     });

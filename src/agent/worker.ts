@@ -52,7 +52,7 @@ const AGENT_TASK_TYPES = [
 ];
 
 const HEARTBEAT_INTERVAL = 30_000; // 30초
-const POLL_INTERVAL = 30_000;      // Realtime 실패 시 폴백 폴링 30초
+const POLL_INTERVAL = 5_000;       // 5초마다 폴링 (Realtime은 anon key RLS 제한으로 미작동)
 
 // ============================================================
 // Main Agent Class

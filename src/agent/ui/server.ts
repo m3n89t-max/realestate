@@ -70,14 +70,15 @@ export function startUIServer() {
                     };
                     fs.writeFileSync(path.join(targetDir, 'credentials.json'), JSON.stringify(credsData, null, 2));
 
-                    // 2. Update agent_key in config.json
+                    // 2. Update agent_key in config.json (create if not exists)
                     if (data.agent_key !== undefined) {
                         const configPath = path.join(targetDir, 'config.json');
+                        let config: Record<string, any> = {};
                         if (fs.existsSync(configPath)) {
-                            const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-                            config.agent_key = data.agent_key;
-                            fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+                            try { config = JSON.parse(fs.readFileSync(configPath, 'utf-8')); } catch { }
                         }
+                        config.agent_key = data.agent_key;
+                        fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
                     }
 
                     res.writeHead(200, { 'Content-Type': 'application/json' });

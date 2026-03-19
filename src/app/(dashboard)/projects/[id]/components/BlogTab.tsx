@@ -158,7 +158,10 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
   }
 
   const handleNaverUpload = async () => {
-    if (!selectedId || !selected) return
+    if (!selectedId || !selected) {
+      toast.error('업로드할 블로그 글을 먼저 생성해주세요')
+      return
+    }
     setUploading(true)
     try {
       const { error } = await supabase.from('tasks').insert({
@@ -403,13 +406,16 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
             <button
               onClick={handleNaverUpload}
               disabled={uploading}
-              className="btn-secondary w-full justify-center text-green-700 border-green-200 hover:bg-green-50"
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm bg-green-600 hover:bg-green-700 text-white disabled:opacity-60 transition-colors shadow-sm"
             >
               {uploading
-                ? <><Loader2 size={14} className="animate-spin" /> 등록 중...</>
-                : <><Upload size={14} /> 네이버 블로그 업로드</>
+                ? <><Loader2 size={15} className="animate-spin" /> 업로드 등록 중...</>
+                : <><Upload size={15} /> 📤 네이버 블로그 자동 업로드</>
               }
             </button>
+            {!uploading && (
+              <p className="text-[11px] text-gray-400 text-center mt-1">로컬 에이전트가 자동으로 업로드합니다</p>
+            )}
             {selected?.is_published && selected.published_url && (
               <a
                 href={selected.published_url}

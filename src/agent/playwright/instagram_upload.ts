@@ -73,6 +73,7 @@ export async function uploadInstagram(
 
     // 4. Instagram 웹에서 업로드 (모바일 에뮬레이션)
     const browser = await chromium.launch({
+        channel: 'msedge',
         headless: false,
         args: ['--start-maximized'],
     });

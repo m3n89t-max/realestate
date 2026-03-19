@@ -636,7 +636,8 @@ export default function NewProjectPage() {
               <h2 className="font-semibold">사진 &amp; 동영상 업로드</h2>
             </div>
             <p className="text-sm text-gray-500">
-              사진과 동영상을 함께 업로드하세요. AI가 실제 매물 이미지를 분석하여 카드뉴스 · 쇼츠 스크립트 품질을 높입니다.
+              사진과 동영상을 함께 업로드하세요. AI가 실제 매물 이미지를 분석하여 카드뉴스 · 쇼츠 스크립트 품질을 높입니다.<br />
+              <strong className="text-brand-600 mt-1 inline-block">※ 첫 번째로 업로드하는 파일(사진/동영상)이 대표 썸네일로 자동 지정됩니다.</strong>
             </p>
             <div className="flex gap-3 text-xs text-gray-500 bg-gray-50 rounded-lg p-3">
               <span className="text-blue-500 font-medium">사진</span> 카드뉴스 배경 · AI 비전 분석

@@ -19,6 +19,7 @@ export async function downloadCadastralMap(
     }
 
     const browser = await chromium.launch({
+        channel: 'msedge',
         headless: false,
         args: ['--start-maximized'],
     });
