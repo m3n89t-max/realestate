@@ -84,6 +84,7 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
   const [generating, setGenerating] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [style, setStyle] = useState<'informative' | 'investment' | 'lifestyle'>('informative')
+  const [tone, setTone] = useState<'professional' | 'friendly' | 'passionate' | 'storytelling' | 'analytical'>('professional')
   const [selectedId, setSelectedId] = useState<string | null>(contents[0]?.id ?? null)
   const [editContent, setEditContent] = useState<string>(contents[0]?.content ?? '')
   const [copiedTitle, setCopiedTitle] = useState<string | null>(null)
@@ -142,7 +143,7 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token ?? ''}`,
         },
-        body: JSON.stringify({ project_id: projectId, style }),
+        body: JSON.stringify({ project_id: projectId, style, tone }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? '생성 실패')
@@ -289,6 +290,33 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
                   )}
                 >
                   {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mb-3">
+            <label className="label text-xs">말투</label>
+            <div className="grid grid-cols-1 gap-1.5">
+              {([
+                ['professional', '🎩 전문가형', '격식 있고 신뢰감 있는 합쇼체'],
+                ['friendly', '😊 친근한형', '편안하고 자연스러운 해요체'],
+                ['passionate', '🔥 열정형', '적극 추천하는 에너지 넘치는 문체'],
+                ['storytelling', '📖 스토리텔링형', '일상 장면을 그리는 감성적 문체'],
+                ['analytical', '📊 분석형', '데이터·수치 중심의 냉철한 문체'],
+              ] as const).map(([val, label, desc]) => (
+                <button
+                  key={val}
+                  onClick={() => setTone(val)}
+                  className={cn(
+                    'py-2 px-2.5 text-left rounded-lg border transition-colors',
+                    tone === val
+                      ? 'bg-brand-50 border-brand-400 text-brand-700'
+                      : 'border-gray-200 text-gray-600 hover:border-brand-200'
+                  )}
+                >
+                  <div className="text-xs font-medium">{label}</div>
+                  <div className="text-[10px] text-gray-400 mt-0.5">{desc}</div>
                 </button>
               ))}
             </div>

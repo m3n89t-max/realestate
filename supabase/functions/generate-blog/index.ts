@@ -16,7 +16,7 @@ Deno.serve(async (req) => {
 
     // 요청 파싱
     const body = await req.json()
-    const { project_id, style = 'informative', titles_only = false, content_id } = body
+    const { project_id, style = 'informative', tone = 'professional', titles_only = false, content_id } = body
 
     // ── titles_only 모드: 기존 콘텐츠에 제목 5개만 재생성 ──────────────────
     if (titles_only && content_id) {
@@ -140,6 +140,7 @@ Deno.serve(async (req) => {
       location_advantages: location?.advantages,
       nearby_facilities: location?.nearby_facilities,
       style,
+      tone,
       photo_urls: (assets ?? []).map((a: any) => ({
         url: a.file_url,
         alt: a.alt_text || a.category || '매물사진',

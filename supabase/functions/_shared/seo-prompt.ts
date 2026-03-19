@@ -19,6 +19,7 @@ export interface BlogPromptContext {
   location_advantages?: string[]
   nearby_facilities?: Record<string, unknown>
   style: 'informative' | 'investment' | 'lifestyle'
+  tone?: 'professional' | 'friendly' | 'passionate' | 'storytelling' | 'analytical'
   photo_urls?: { url: string; alt: string; category?: string }[]
 }
 
@@ -101,6 +102,14 @@ export function buildBlogUserPrompt(ctx: BlogPromptContext): string {
     lifestyle: '라이프스타일 중심의 감성적 글. 동네 분위기/생활 편의/커뮤니티 강조.',
   }[ctx.style]
 
+  const toneGuide = {
+    professional: '전문가 말투: 신뢰감 있고 격식 있는 문체. "~입니다", "~합니다" 등 합쇼체 사용. 공인중개사의 전문성을 드러내는 어휘 활용.',
+    friendly: '친근한 말투: 독자와 대화하듯 편안하고 부드러운 문체. "~에요", "~이에요" 등 해요체 사용. 이웃에게 소개하듯 자연스럽게.',
+    passionate: '열정적인 말투: 적극적으로 매물을 추천하는 에너지 넘치는 문체. 감탄사와 강조 표현 적극 활용. "정말", "꼭", "놓치면 안 돼요" 등의 표현 사용.',
+    storytelling: '스토리텔링 말투: 이야기를 들려주듯 감성적이고 생동감 있는 문체. 가상의 일상 장면("아침에 눈을 뜨면...", "퇴근 후 돌아오는 길...")을 그려내며 독자의 감정을 자극.',
+    analytical: '분석적인 말투: 데이터와 수치 중심의 냉철하고 객관적인 문체. "~에 따르면", "~대비 ~% 수준", "시세 분석 결과" 등 근거 중심 표현 사용. 감정보다 팩트로 설득.',
+  }[ctx.tone ?? 'professional']
+
   const billions = ctx.price ? Math.floor(ctx.price / 100000000) : 0
   const tenThousands = ctx.price ? Math.floor((ctx.price % 100000000) / 10000) : 0
   const priceText = ctx.price
@@ -148,6 +157,9 @@ ${ctx.location_advantages?.map((a, i) => `${i + 1}. ${a}`).join('\n') || '입지
 
 [글 스타일]
 ${styleGuide}
+
+[말투]
+${toneGuide}
 
 [지역 분석 지침]
 - 지역명에서 자치구, 행정동, 아파트명을 파악하여 해당 지역의 특성을 반영
