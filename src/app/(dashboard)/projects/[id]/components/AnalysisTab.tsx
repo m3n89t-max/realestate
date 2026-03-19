@@ -116,7 +116,7 @@ function AIAnalysisReport({ analysis, projectId, hasCoords, hasPOI, hasData, isC
     }
   }
 
-  if (!analysis) {
+  if (!analysis || !analysis.analysis_text) {
     return (
       <div className="card p-8 text-center border-2 border-dashed border-gray-200">
         <MapPin size={36} className="mx-auto text-gray-300 mb-3" />
