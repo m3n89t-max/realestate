@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Wand2, Copy, Check, ChevronDown, ChevronUp, AlertCircle, Upload, Loader2 } from 'lucide-react'
+import { Wand2, Copy, Check, ChevronDown, ChevronUp, AlertCircle, Upload, Loader2, PlayCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { GeneratedContent, SeoScore } from '@/lib/types'
 import toast from 'react-hot-toast'
@@ -477,7 +477,16 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
                 onClick={() => insertImage(asset.file_url, asset.alt_text || asset.category || '매물사진')}
                 className="relative aspect-square rounded-lg overflow-hidden border border-gray-100 hover:border-brand-500 transition-colors group"
               >
-                <img src={asset.file_url} alt="" className="object-cover w-full h-full" />
+                {asset.type === 'video' ? (
+                  <>
+                    <video src={asset.file_url} className="object-cover w-full h-full" preload="metadata" />
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <PlayCircle className="text-white w-6 h-6 opacity-80 drop-shadow-md" />
+                    </div>
+                  </>
+                ) : (
+                  <img src={asset.file_url} alt="" className="object-cover w-full h-full" />
+                )}
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
                   <span className="text-[10px] text-white font-medium">삽입</span>
                 </div>
@@ -627,9 +636,15 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
                   {editContent.split('\n').map((line, i) => {
                     const imgMatch = line.match(/!\[(.*?)\]\((.*?)\)/)
                     if (imgMatch) {
+                      const url = imgMatch[2];
+                      const isVideo = url.match(/\.(mp4|mov|avi|webm)(?:\?.*)?$/i);
                       return (
                         <div key={i} className="my-4">
-                          <img src={imgMatch[2]} alt={imgMatch[1]} className="rounded-lg border border-gray-200 max-w-full" />
+                          {isVideo ? (
+                            <video src={url} controls className="rounded-lg border border-gray-200 max-w-full w-full" />
+                          ) : (
+                            <img src={url} alt={imgMatch[1]} className="rounded-lg border border-gray-200 max-w-full" />
+                          )}
                           <p className="text-center text-xs text-gray-400 mt-1">{imgMatch[1]}</p>
                         </div>
                       )
