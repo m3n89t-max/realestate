@@ -54,13 +54,30 @@ function fillRoundRect(
   ctx.fill()
 }
 
+/* ── 이미지/비디오를 캔버스에 center-crop으로 채우기 ── */
+function drawMediaCover(
+  ctx: CanvasRenderingContext2D,
+  media: HTMLImageElement | HTMLVideoElement,
+  W: number,
+  H: number
+) {
+  const srcW = media instanceof HTMLVideoElement ? media.videoWidth : (media as HTMLImageElement).naturalWidth
+  const srcH = media instanceof HTMLVideoElement ? media.videoHeight : (media as HTMLImageElement).naturalHeight
+  if (!srcW || !srcH) return
+  const scale = Math.max(W / srcW, H / srcH)
+  const dw = srcW * scale
+  const dh = srcH * scale
+  ctx.drawImage(media, (W - dw) / 2, (H - dh) / 2, dw, dh)
+}
+
 /* ── 각 장면을 720×1280 캔버스에 렌더링 ── */
 function drawSceneToCanvas(
   canvas: HTMLCanvasElement,
   scene: Scene,
   hook: string,
   totalScenes: number,
-  globalProgress: number // 0~1
+  globalProgress: number, // 0~1
+  background?: HTMLImageElement | HTMLVideoElement | null
 ) {
   const ctx = canvas.getContext('2d')!
   const W = canvas.width
@@ -78,18 +95,39 @@ function drawSceneToCanvas(
   const palette = PALETTES[(scene.scene_number - 1) % PALETTES.length]
   const accent = ACCENTS[(scene.scene_number - 1) % ACCENTS.length]
 
-  // Background gradient
-  const grad = ctx.createLinearGradient(0, 0, 0, H)
-  palette.forEach((c, i) => grad.addColorStop(i / (palette.length - 1), c))
-  ctx.fillStyle = grad
-  ctx.fillRect(0, 0, W, H)
+  if (background) {
+    // 실제 매물 사진/영상 배경 (center-crop)
+    drawMediaCover(ctx, background, W, H)
+  } else {
+    // 배경 없을 때 그라디언트 폴백
+    const grad = ctx.createLinearGradient(0, 0, 0, H)
+    palette.forEach((c, i) => grad.addColorStop(i / (palette.length - 1), c))
+    ctx.fillStyle = grad
+    ctx.fillRect(0, 0, W, H)
+  }
 
-  // Subtle vignette
-  const vig = ctx.createRadialGradient(W / 2, H / 2, H * 0.2, W / 2, H / 2, H * 0.8)
-  vig.addColorStop(0, 'transparent')
-  vig.addColorStop(1, 'rgba(0,0,0,0.55)')
-  ctx.fillStyle = vig
-  ctx.fillRect(0, 0, W, H)
+  // 어두운 오버레이 (사진이 있으면 그라디언트 오버레이, 없으면 비네트)
+  if (background) {
+    // Top dark gradient (for badges)
+    const topGrad = ctx.createLinearGradient(0, 0, 0, H * 0.4)
+    topGrad.addColorStop(0, 'rgba(0,0,0,0.7)')
+    topGrad.addColorStop(1, 'rgba(0,0,0,0)')
+    ctx.fillStyle = topGrad
+    ctx.fillRect(0, 0, W, H * 0.4)
+    // Bottom dark gradient (for narration)
+    const botGrad = ctx.createLinearGradient(0, H * 0.5, 0, H)
+    botGrad.addColorStop(0, 'rgba(0,0,0,0)')
+    botGrad.addColorStop(1, 'rgba(0,0,0,0.85)')
+    ctx.fillStyle = botGrad
+    ctx.fillRect(0, H * 0.5, W, H * 0.5)
+  } else {
+    // Subtle vignette for gradient background
+    const vig = ctx.createRadialGradient(W / 2, H / 2, H * 0.2, W / 2, H / 2, H * 0.8)
+    vig.addColorStop(0, 'transparent')
+    vig.addColorStop(1, 'rgba(0,0,0,0.55)')
+    ctx.fillStyle = vig
+    ctx.fillRect(0, 0, W, H)
+  }
 
   // Top accent stripe
   ctx.fillStyle = accent
@@ -177,13 +215,15 @@ interface ShortsScript {
 
 interface ShortsTabProps {
   projectId: string
+  assets?: { file_url: string; type: string; file_name?: string; is_cover?: boolean }[]
 }
 
 /* ── 폰 미리보기 컴포넌트 ── */
-function PhonePreview({ script, activeScene, onScene }: {
+function PhonePreview({ script, activeScene, onScene, photos = [] }: {
   script: ShortsScript
   activeScene: number
   onScene: (i: number) => void
+  photos?: string[]
 }) {
   const scenes = script.scenes ?? []
   const scene = scenes[activeScene]
@@ -215,6 +255,8 @@ function PhonePreview({ script, activeScene, onScene }: {
     'from-gray-900 via-gray-800 to-slate-900',
   ]
   const bg = gradients[activeScene % gradients.length]
+  // 장면별 배경 사진 (있는 경우)
+  const scenePhoto = photos.length > 0 ? photos[activeScene % photos.length] : null
 
   return (
     <div className="flex flex-col items-center gap-4 sticky top-4">
@@ -243,8 +285,13 @@ function PhonePreview({ script, activeScene, onScene }: {
           ))}
         </div>
 
-        {/* Background gradient */}
-        <div className={cn('absolute inset-0 bg-gradient-to-b', bg)} />
+        {/* Background: 매물 사진 or 그라디언트 */}
+        {scenePhoto
+          ? <img src={scenePhoto} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          : <div className={cn('absolute inset-0 bg-gradient-to-b', bg)} />
+        }
+        {/* 사진 위 어두운 오버레이 */}
+        {scenePhoto && <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/50" />}
 
         {/* Scene badge */}
         <div className="absolute top-9 left-3 z-20">
@@ -328,7 +375,7 @@ function PhonePreview({ script, activeScene, onScene }: {
 }
 
 /* ── 메인 컴포넌트 ── */
-export default function ShortsTab({ projectId }: ShortsTabProps) {
+export default function ShortsTab({ projectId, assets = [] }: ShortsTabProps) {
   const supabase = createClient()
   const [generating, setGenerating] = useState(false)
   const [script, setScript] = useState<ShortsScript | null>(null)
@@ -416,7 +463,9 @@ export default function ShortsTab({ projectId }: ShortsTabProps) {
     setRendering(true)
     setRenderProgress(0)
     setRenderScene(1)
-    toast('영상 렌더링을 시작합니다. 약 60초가 소요됩니다.', { icon: '🎬', duration: 4000 })
+
+    const hasMedia = assets.length > 0
+    toast(`영상 렌더링을 시작합니다. 약 ${script.total_duration_sec ?? 60}초가 소요됩니다.`, { icon: '🎬', duration: 4000 })
 
     try {
       const W = 720, H = 1280
@@ -436,8 +485,77 @@ export default function ShortsTab({ projectId }: ShortsTabProps) {
         return
       }
 
+      // ── 매물 사진/영상 preload ──
+      const imageAssets = assets.filter(a => a.type === 'image' || !a.type)
+      const videoAssets = assets.filter(a => a.type === 'video')
+
+      // 사진 preload (CORS anonymous)
+      const loadedImages: (HTMLImageElement | null)[] = await Promise.all(
+        imageAssets.slice(0, 8).map(a =>
+          new Promise<HTMLImageElement | null>(resolve => {
+            const img = new window.Image()
+            img.crossOrigin = 'anonymous'
+            img.onload = () => resolve(img)
+            img.onerror = () => {
+              // CORS 실패 시 crossOrigin 없이 재시도 (오버레이만 표시)
+              const img2 = new window.Image()
+              img2.onload = () => resolve(img2)
+              img2.onerror = () => resolve(null)
+              img2.src = a.file_url
+            }
+            img.src = a.file_url + (a.file_url.includes('?') ? '&' : '?') + 't=' + Date.now()
+          })
+        )
+      )
+
+      // 동영상 preload
+      const loadedVideos: (HTMLVideoElement | null)[] = await Promise.all(
+        videoAssets.slice(0, 3).map(a =>
+          new Promise<HTMLVideoElement | null>(resolve => {
+            const vid = document.createElement('video')
+            vid.crossOrigin = 'anonymous'
+            vid.muted = true
+            vid.playsInline = true
+            vid.loop = true
+            const timer = setTimeout(() => resolve(null), 8000) // 8초 타임아웃
+            vid.oncanplay = () => { clearTimeout(timer); resolve(vid) }
+            vid.onerror = () => { clearTimeout(timer); resolve(null) }
+            vid.src = a.file_url
+            vid.load()
+          })
+        )
+      )
+
+      // 유효한 미디어만 필터
+      const photos = loadedImages.filter(Boolean) as HTMLImageElement[]
+      const videos = loadedVideos.filter(Boolean) as HTMLVideoElement[]
+
+      // 동영상 재생 시작
+      for (const vid of videos) {
+        try { await vid.play() } catch { /* muted라 괜찮음 */ }
+      }
+
+      // 장면별 배경 미디어 결정
+      // 동영상이 있으면 중간 장면(2~4)에 동영상 사용, 나머지는 사진 순환
+      const getBackground = (sceneNum: number): HTMLImageElement | HTMLVideoElement | null => {
+        if (!hasMedia) return null
+        // 동영상: 장면 2, 3, 4에 우선 배치
+        if (videos.length > 0 && sceneNum >= 2 && sceneNum <= 4) {
+          return videos[(sceneNum - 2) % videos.length]
+        }
+        // 사진: 장면 순서대로 순환 배치
+        if (photos.length > 0) {
+          // 커버 사진 우선 (장면 1, 6), 나머지는 순환
+          const cover = assets.find(a => a.is_cover)
+          const coverImg = cover ? photos.find(p => (p as any).src?.includes(cover.file_url.split('/').pop() ?? '')) ?? photos[0] : photos[0]
+          if (sceneNum === 1 || sceneNum === 6) return coverImg
+          return photos[(sceneNum - 1) % photos.length]
+        }
+        return null
+      }
+
       const stream = canvas.captureStream(30)
-      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 6_000_000 })
+      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 })
       const chunks: Blob[] = []
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data) }
 
@@ -462,17 +580,15 @@ export default function ShortsTab({ projectId }: ShortsTabProps) {
       for (let si = 0; si < scenes.length; si++) {
         const scene = scenes[si]
         setRenderScene(scene.scene_number)
+        const bg = getBackground(scene.scene_number)
 
         const frameDuration = 1000 / 30 // ~33ms per frame
         const frames = scene.duration_sec * 30
 
         for (let f = 0; f < frames; f++) {
           const globalProgress = (elapsed + (f / 30)) / totalDuration
-          drawSceneToCanvas(canvas, scene, script.hook, scenes.length, globalProgress)
-
-          const pct = Math.round(((elapsed + f / 30) / totalDuration) * 100)
-          setRenderProgress(pct)
-
+          drawSceneToCanvas(canvas, scene, script.hook, scenes.length, globalProgress, bg)
+          setRenderProgress(Math.round(globalProgress * 100))
           await new Promise(r => setTimeout(r, frameDuration))
         }
         elapsed += scene.duration_sec
@@ -481,7 +597,7 @@ export default function ShortsTab({ projectId }: ShortsTabProps) {
       setRenderProgress(100)
       recorder.stop()
       await finished
-      toast.success('영상 다운로드가 시작됩니다! (.webm → YouTube/CapCut 업로드 가능)')
+      toast.success('영상 다운로드 완료! (.webm → YouTube/CapCut 업로드 가능)')
     } catch (err) {
       console.error('[renderVideo]', err)
       toast.error('영상 렌더링에 실패했습니다')
@@ -502,7 +618,15 @@ export default function ShortsTab({ projectId }: ShortsTabProps) {
               <Video size={16} className="text-brand-500" />
               유튜브 쇼츠 스크립트
             </h3>
-            <p className="text-sm text-gray-400 mt-0.5">60초 6장면 쇼츠 스크립트를 AI가 자동 생성합니다</p>
+            <p className="text-sm text-gray-400 mt-0.5">
+              60초 6장면 쇼츠 스크립트를 AI가 자동 생성합니다
+              {assets.length > 0 && (
+                <span className="ml-2 text-brand-500 font-medium">
+                  · 사진 {assets.filter(a => a.type === 'image' || !a.type).length}장
+                  {assets.filter(a => a.type === 'video').length > 0 && ` · 동영상 ${assets.filter(a => a.type === 'video').length}개`} 포함 예정
+                </span>
+              )}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             {script && (
@@ -652,6 +776,7 @@ export default function ShortsTab({ projectId }: ShortsTabProps) {
                 script={script}
                 activeScene={activeScene}
                 onScene={setActiveScene}
+                photos={assets.filter(a => a.type === 'image' || !a.type).map(a => a.file_url)}
               />
             </div>
           </div>
@@ -662,6 +787,7 @@ export default function ShortsTab({ projectId }: ShortsTabProps) {
               script={script}
               activeScene={activeScene}
               onScene={setActiveScene}
+              photos={assets.filter(a => a.type === 'image' || !a.type).map(a => a.file_url)}
             />
           </div>
 

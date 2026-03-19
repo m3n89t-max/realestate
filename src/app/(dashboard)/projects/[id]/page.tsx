@@ -259,7 +259,7 @@ export default async function ProjectDetailPage({
       )}
 
       {tab === 'shorts' && (
-        <ShortsTab projectId={id} />
+        <ShortsTab projectId={id} assets={assets ?? []} />
       )}
 
       {tab === 'tasks' && (
