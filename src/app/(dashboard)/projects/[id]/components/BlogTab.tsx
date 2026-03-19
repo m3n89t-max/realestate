@@ -492,7 +492,7 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
         {/* 사진 라이브러리 */}
         <div className="card p-4">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-gray-700">매물 사진 라이브러리</h3>
+            <h3 className="text-sm font-semibold text-gray-700">사진/동영상 라이브러리</h3>
             <button
               onClick={() => setShowPhotoLibrary(!showPhotoLibrary)}
               className="text-xs text-brand-600 hover:underline"
@@ -534,11 +534,11 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
           <div className="mt-4">
             <label className="btn-secondary w-full justify-center text-xs cursor-pointer">
               <Upload size={12} />
-              새 사진 업로드 & 삽입
+              사진/동영상 업로드 & 삽입
               <input
                 type="file"
                 className="hidden"
-                accept="image/*"
+                accept="image/*,video/*"
                 onChange={handleQuickUpload}
                 disabled={uploading}
               />

@@ -4,7 +4,7 @@ import { useState } from 'react'
 import {
   Wand2, Download, Image as ImageIcon, Sparkles, Loader2,
   Building2, MapPin, TrendingUp, Home, Phone,
-  ChevronLeft, ChevronRight, Copy, Check, MessageSquarePlus, ChevronDown,
+  ChevronLeft, ChevronRight, Copy, Check,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { GeneratedContent } from '@/lib/types'
@@ -483,8 +483,7 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
   const [aiLoading, setAiLoading] = useState<Record<number, boolean>>({})
   const [activeSlide, setActiveSlide] = useState(0)
   const [copied, setCopied] = useState(false)
-  const [customInstructions, setCustomInstructions] = useState('')
-  const [showInstructions, setShowInstructions] = useState(true)
+  const [editedCards, setEditedCards] = useState<Record<number, Partial<CardSlide>>>({})
 
   const selected = contents.find(c => c.id === selectedId)
   const rawContent = selected?.content ? JSON.parse(selected.content) : null
@@ -521,6 +520,19 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
   const theme = COLOR_THEMES.find(t => t.id === colorTheme) ?? COLOR_THEMES[0]
   const filterCss = PHOTO_FILTERS.find(f => f.id === photoFilter)?.css
 
+  const mergeCard = (card: CardSlide): CardSlide => ({
+    ...card,
+    ...(editedCards[card.order] ?? {}),
+  })
+
+  const updateCard = (order: number, updates: Partial<CardSlide>) => {
+    setEditedCards(prev => ({ ...prev, [order]: { ...(prev[order] ?? {}), ...updates } }))
+  }
+
+  const resetCard = (order: number) => {
+    setEditedCards(prev => { const n = { ...prev }; delete n[order]; return n })
+  }
+
   const handleGenerate = async () => {
     setGenerating(true)
     try {
@@ -534,7 +546,7 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
           'Authorization': `Bearer ${session.access_token}`,
           'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
         },
-        body: JSON.stringify({ project_id: projectId, asset_urls, platform, custom_instructions: customInstructions.trim() }),
+        body: JSON.stringify({ project_id: projectId, asset_urls, platform }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? `생성 실패 (${res.status})`)
@@ -658,16 +670,6 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
             </select>
           )}
 
-          {/* 추가 지시사항 토글 */}
-          <button
-            onClick={() => setShowInstructions(s => !s)}
-            className={cn('btn-secondary text-xs gap-1.5', showInstructions && 'bg-amber-50 border-amber-300 text-amber-700')}
-          >
-            <MessageSquarePlus size={13} />
-            추가 지시사항
-            <ChevronDown size={12} className={cn('transition-transform', showInstructions && 'rotate-180')} />
-          </button>
-
           {/* 생성 버튼 */}
           <button onClick={handleGenerate} disabled={generating} className="btn-primary">
             {generating
@@ -677,38 +679,6 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
           </button>
         </div>
 
-        {/* 추가 지시사항 패널 */}
-        {showInstructions && (
-          <div className="mt-3 pt-3 border-t border-gray-100">
-            <div className="flex flex-wrap gap-1.5 mb-2">
-              {[
-                '주차 3대 가능 강조',
-                '1층 편의점 입점 언급',
-                '역세권 강조',
-                '신축 건물 강조',
-                '투자 수익률 중심으로',
-                '실거주 가족 타겟',
-                '리모델링 여지 언급',
-              ].map(chip => (
-                <button
-                  key={chip}
-                  onClick={() => setCustomInstructions(prev => prev ? `${prev}, ${chip}` : chip)}
-                  className="px-2.5 py-1 text-[11px] rounded-full border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors"
-                >
-                  + {chip}
-                </button>
-              ))}
-            </div>
-            <textarea
-              value={customInstructions}
-              onChange={e => setCustomInstructions(e.target.value)}
-              placeholder="공인중개사 추가 지시사항을 입력하세요&#10;예) 주차 3대 가능 강조, 1층 편의점 입점 중요 포인트로, 역까지 도보 5분 언급"
-              rows={3}
-              className="w-full text-sm border border-amber-200 rounded-xl px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-amber-300 bg-amber-50/50 placeholder:text-gray-400"
-            />
-            <p className="text-[11px] text-gray-400 mt-1">입력한 내용이 AI 생성에 최우선으로 반영됩니다</p>
-          </div>
-        )}
       </div>
 
       {slides.length === 0 ? (
@@ -825,7 +795,7 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
               <div className="max-w-[420px] mx-auto">
                 {slides[activeSlide] && (
                   <CardPreview
-                    card={slides[activeSlide]}
+                    card={mergeCard(slides[activeSlide])}
                     theme={theme}
                     photo={assignPhoto(slides[activeSlide].order, assets)}
                     aiPhoto={aiPhotos[slides[activeSlide].order]}
@@ -849,6 +819,86 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
               </div>
             </div>
 
+            {/* ── 텍스트 직접 편집 패널 ── */}
+            {slides[activeSlide] && (() => {
+              const card = mergeCard(slides[activeSlide])
+              const { order, layout } = card
+              const upd = (field: keyof CardSlide, val: any) => updateCard(order, { [field]: val } as Partial<CardSlide>)
+
+              const inp = (label: string, field: keyof CardSlide) => (
+                <div key={String(field)}>
+                  <label className="text-[10px] text-gray-400 mb-0.5 block">{label}</label>
+                  <input
+                    type="text"
+                    value={(card[field] as string) ?? ''}
+                    onChange={e => upd(field, e.target.value)}
+                    className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-brand-400"
+                  />
+                </div>
+              )
+
+              const listInp = (label: string, field: keyof CardSlide, max: number) => {
+                const items: string[] = (card[field] as string[]) ?? []
+                return (
+                  <div key={String(field)}>
+                    <label className="text-[10px] text-gray-400 mb-0.5 block">{label}</label>
+                    <div className="space-y-1">
+                      {Array.from({ length: max }, (_, i) => (
+                        <input
+                          key={i}
+                          type="text"
+                          value={items[i] ?? ''}
+                          placeholder={`항목 ${i + 1}`}
+                          onChange={e => {
+                            const next = [...items]
+                            next[i] = e.target.value
+                            upd(field, next)
+                          }}
+                          className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-brand-400"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )
+              }
+
+              const fields: React.ReactNode = platform === 'kakao'
+                ? order === 1
+                  ? <><div className="col-span-2">{inp('헤드라인', 'headline')}</div>{inp('가격', 'price')}{inp('위치', 'location')}</>
+                  : order === 6
+                    ? <>{inp('제목', 'title')}{inp('CTA 버튼', 'cta')}{inp('전화번호', 'phone')}{inp('카카오 ID', 'kakao_id')}</>
+                    : <><div className="col-span-2">{inp('섹션 제목', 'section')}</div><div className="col-span-2">{listInp('포인트', 'points', 4)}</div></>
+                : layout === 'cover'
+                  ? <><div className="col-span-2">{inp('제목', 'title')}</div>{inp('부제목', 'subtitle')}{inp('가격 배지', 'price_badge')}<div className="col-span-2">{listInp('핵심 포인트 (3개)', 'checkpoints', 3)}</div></>
+                  : layout === 'location'
+                    ? <><div className="col-span-2">{inp('제목', 'title')}</div>{inp('주소', 'address')}{inp('본문', 'body')}<div className="col-span-2">{listInp('입지 포인트 (4개)', 'checkpoints', 4)}</div></>
+                    : layout === 'composition'
+                      ? <><div className="col-span-2">{inp('제목', 'title')}</div><div className="col-span-2">{listInp('구성 항목 (4개)', 'points', 4)}</div></>
+                      : layout === 'investment'
+                        ? <><div className="col-span-2">{inp('제목', 'title')}</div>{inp('강조 문구', 'highlight')}{inp('본문', 'body')}<div className="col-span-2">{listInp('투자 포인트 (2개)', 'points', 2)}</div></>
+                        : layout === 'interior'
+                          ? <><div className="col-span-2">{inp('제목', 'title')}</div><div className="col-span-2">{listInp('내부 특징 (4개)', 'checkpoints', 4)}</div></>
+                          : layout === 'cta'
+                            ? <><div className="col-span-2">{inp('제목', 'title')}</div>{inp('가격 배지', 'price_badge')}{inp('CTA 버튼', 'cta')}<div className="col-span-2">{listInp('해시태그 (# 포함, 5개)', 'hashtags', 5)}</div></>
+                            : null
+
+              return (
+                <div className="card p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-sm font-semibold text-gray-700">
+                      ✏️ {SLIDE_LABELS[activeSlide] ?? `카드 ${activeSlide + 1}`} 텍스트 편집
+                    </h4>
+                    {editedCards[order] && (
+                      <button onClick={() => resetCard(order)} className="text-xs text-red-400 hover:text-red-600 transition-colors">
+                        초기화
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">{fields}</div>
+                </div>
+              )
+            })()}
+
             {/* 썸네일 스트립 */}
             <div>
               <p className="text-xs text-gray-400 mb-2">모든 카드 ({slides.length}장)</p>
@@ -860,7 +910,7 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
                     className={cn('rounded-xl overflow-hidden transition-all', activeSlide === i ? 'ring-2 ring-brand-500 ring-offset-2 scale-105' : 'opacity-70 hover:opacity-100')}
                   >
                     <CardPreview
-                      card={card}
+                      card={mergeCard(card)}
                       theme={theme}
                       photo={assignPhoto(card.order, assets)}
                       aiPhoto={aiPhotos[card.order]}

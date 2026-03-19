@@ -164,6 +164,22 @@ Deno.serve(async (req) => {
     // JSON 파싱
     const result = JSON.parse(responseText)
 
+    // 동영상 에셋 조회 후 블로그 본문 마지막에 삽입
+    const { data: videoAssets } = await supabaseClient
+      .from('assets')
+      .select('file_url, alt_text, category')
+      .eq('project_id', project_id)
+      .eq('type', 'video')
+      .limit(3)
+
+    if (videoAssets && videoAssets.length > 0) {
+      const videoMd = videoAssets
+        .map((v: any, i: number) =>
+          `![${v.alt_text || `매물 영상 ${i + 1}`}](${v.file_url})\n*▲ ${v.category || '매물'} 영상 - 실제 현장 모습을 영상으로 확인하세요*`
+        ).join('\n\n')
+      result.content = (result.content ?? '') + '\n\n## 📹 매물 영상\n\n' + videoMd
+    }
+
     // Supabase에 저장
     const { data: saved, error: saveError } = await supabaseClient
       .from('generated_contents')
