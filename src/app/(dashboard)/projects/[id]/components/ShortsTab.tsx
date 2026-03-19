@@ -35,15 +35,26 @@ export default function ShortsTab({ projectId }: ShortsTabProps) {
     setGenerating(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const { data, error } = await supabase.functions.invoke('generate-shorts-script', {
-        body: { project_id: projectId },
-        headers: { Authorization: `Bearer ${session?.access_token}` },
+      if (!session) {
+        toast.error('로그인이 필요합니다. 페이지를 새로고침해주세요.')
+        return
+      }
+      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/generate-shorts-script`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        },
+        body: JSON.stringify({ project_id: projectId }),
       })
-      if (error) throw error
-      setScript(data?.data ?? data)
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? '생성에 실패했습니다')
+      const data = json.data ?? json
+      setScript({ hook: data.hook, total_duration_sec: data.total_duration_sec ?? 60, scenes: data.scenes ?? [], hashtags: data.hashtags ?? [] })
       toast.success('쇼츠 스크립트가 생성되었습니다!')
-    } catch {
-      toast.error('생성에 실패했습니다. 잠시 후 다시 시도해주세요.')
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : '생성에 실패했습니다. 잠시 후 다시 시도해주세요.')
     } finally {
       setGenerating(false)
     }
