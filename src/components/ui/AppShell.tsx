@@ -5,7 +5,8 @@ import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import {
   Building2, Bell, Menu, X, ChevronDown, LogOut,
-  LayoutDashboard, FolderOpen, Wand2, FileText, ListTodo, Settings, BarChart3
+  LayoutDashboard, FolderOpen, Settings, BarChart3,
+  MapPin, Newspaper, LayoutGrid, Video, FileArchive
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -15,12 +16,33 @@ interface NavItem {
   icon: React.ReactNode
 }
 
-const navItems: NavItem[] = [
+interface SubNavItem {
+  href: string
+  label: string
+  icon: React.ReactNode
+}
+
+interface NavItemWithChildren extends NavItem {
+  children?: SubNavItem[]
+}
+
+const projectSubItems: SubNavItem[] = [
+  { href: '/projects', label: '전체 매물', icon: <FolderOpen size={14} /> },
+  { href: '/analysis', label: '입지분석', icon: <MapPin size={14} /> },
+  { href: '/blog', label: '블로그자동화', icon: <Newspaper size={14} /> },
+  { href: '/cardnews', label: '카드뉴스', icon: <LayoutGrid size={14} /> },
+  { href: '/shorts', label: '쇼츠', icon: <Video size={14} /> },
+  { href: '/docs', label: '서류', icon: <FileArchive size={14} /> },
+]
+
+const navItems: NavItemWithChildren[] = [
   { href: '/dashboard', label: '대시보드', icon: <LayoutDashboard size={20} /> },
-  { href: '/projects', label: '매물관리', icon: <FolderOpen size={20} /> },
-  { href: '/studio', label: '콘텐츠', icon: <Wand2 size={20} /> },
-  { href: '/docs', label: '서류', icon: <FileText size={20} /> },
-  { href: '/tasks', label: '작업', icon: <ListTodo size={20} /> },
+  {
+    href: '/projects',
+    label: '매물관리',
+    icon: <FolderOpen size={20} />,
+    children: projectSubItems,
+  },
   { href: '/usage', label: '사용량', icon: <BarChart3 size={20} /> },
 ]
 
@@ -49,6 +71,13 @@ export default function AppShell({ children, agentStatus = 'offline', orgName = 
       document.body.style.overflow = 'auto'
     }
   }, [isMobileMenuOpen])
+
+  const isProjectsGroupActive = pathname.startsWith('/projects') ||
+    pathname.startsWith('/analysis') ||
+    pathname.startsWith('/blog') ||
+    pathname.startsWith('/cardnews') ||
+    pathname.startsWith('/shorts') ||
+    pathname.startsWith('/docs')
 
   return (
     <div className="flex h-screen overflow-hidden bg-stone-50 font-sans text-stone-900">
@@ -99,6 +128,55 @@ export default function AppShell({ children, agentStatus = 'offline', orgName = 
               Workspace
             </p>
             {navItems.map((item) => {
+              if (item.children) {
+                const isParentActive = isProjectsGroupActive
+                return (
+                  <div key={item.href}>
+                    <Link
+                      href={item.href}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group",
+                        isParentActive
+                          ? "bg-stone-100 text-stone-900"
+                          : "text-stone-500 hover:text-stone-900 hover:bg-stone-50"
+                      )}
+                    >
+                      <span className={cn("shrink-0 transition-colors", isParentActive ? "text-stone-900" : "text-stone-400 group-hover:text-stone-600")}>
+                        {item.icon}
+                      </span>
+                      {item.label}
+                    </Link>
+                    {/* Sub-items: always visible */}
+                    <div className="ml-3 mt-0.5 mb-1 border-l-2 border-stone-100 pl-3 space-y-0.5">
+                      {item.children.map((sub) => {
+                        const isSubActive = sub.href === '/projects'
+                          ? pathname === '/projects' || pathname.startsWith('/projects/')
+                          : pathname.startsWith(sub.href)
+                        return (
+                          <Link
+                            key={sub.href}
+                            href={sub.href}
+                            onClick={() => setIsMobileMenuOpen(false)}
+                            className={cn(
+                              "flex items-center gap-2 pl-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 group",
+                              isSubActive
+                                ? "bg-stone-100 text-stone-900"
+                                : "text-stone-400 hover:text-stone-700 hover:bg-stone-50"
+                            )}
+                          >
+                            <span className={cn("shrink-0 transition-colors", isSubActive ? "text-stone-700" : "text-stone-300 group-hover:text-stone-500")}>
+                              {sub.icon}
+                            </span>
+                            {sub.label}
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              }
+
               const isActive = pathname.startsWith(item.href)
               return (
                 <Link
