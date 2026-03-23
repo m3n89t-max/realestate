@@ -758,6 +758,9 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
                       </div>
                     )
 
+                    // HTML 테이블 렌더링
+                    if (line.startsWith('<table')) return <div key={i} className="my-4 overflow-x-auto" dangerouslySetInnerHTML={{ __html: line }} />
+
                     // 리스트 항목 (선행 공백 허용)
                     if (line.match(/^\s*[-*]\s/)) return (
                       <div key={i} className="flex gap-2 mb-1 pl-4">
