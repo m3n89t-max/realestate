@@ -85,6 +85,8 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
   const [uploading, setUploading] = useState(false)
   const [style, setStyle] = useState<'informative' | 'investment' | 'lifestyle'>('informative')
   const [tone, setTone] = useState<'professional' | 'friendly' | 'passionate' | 'storytelling' | 'analytical'>('professional')
+  const [format, setFormat] = useState<'default' | 'storytelling' | 'summary' | 'qna'>('default')
+  const [focus, setFocus] = useState<'location' | 'investment' | 'interior' | 'price'>('location')
   const [selectedId, setSelectedId] = useState<string | null>(contents[0]?.id ?? null)
   const [editContent, setEditContent] = useState<string>(contents[0]?.content ?? '')
   const [copiedTitle, setCopiedTitle] = useState<string | null>(null)
@@ -143,7 +145,7 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token ?? ''}`,
         },
-        body: JSON.stringify({ project_id: projectId, style, tone }),
+        body: JSON.stringify({ project_id: projectId, style, tone, format, focus }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? '생성 실패')
@@ -269,29 +271,106 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
       <div className="space-y-4">
         {/* 생성 버튼 */}
         <div className="card p-4">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">블로그 글 생성</h3>
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">블로그 글 생성 옵션</h3>
 
-          <div className="mb-3">
-            <label className="label text-xs">글 스타일</label>
-            <div className="grid grid-cols-3 gap-1.5">
-              {([
-                ['informative', '정보형'],
-                ['investment', '투자형'],
-                ['lifestyle', '라이프'],
-              ] as const).map(([val, label]) => (
-                <button
-                  key={val}
-                  onClick={() => setStyle(val)}
-                  className={cn(
-                    'py-1.5 text-xs rounded-lg border font-medium transition-colors',
-                    style === val
-                      ? 'bg-brand-600 text-white border-brand-600'
-                      : 'border-gray-200 text-gray-600 hover:border-brand-300'
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
+          <div className="space-y-3 mb-4">
+            <div>
+              <label className="text-xs text-gray-500 mb-1.5 block font-medium">1. 기본 목적 (기존)</label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {([
+                  ['informative', '정보전달'],
+                  ['investment', '투자성'],
+                  ['lifestyle', '라이프'],
+                ] as const).map(([val, label]) => (
+                  <button
+                    key={val}
+                    onClick={() => setStyle(val)}
+                    className={cn(
+                      'py-1.5 text-xs rounded border font-medium transition-colors',
+                      style === val
+                        ? 'bg-brand-600 text-white border-brand-600'
+                        : 'border-gray-200 text-gray-600 hover:border-brand-300'
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-500 mb-1.5 block font-medium">2. 매물 강조 포인트</label>
+              <div className="grid grid-cols-4 gap-1.5">
+                {([
+                  ['location', '입지/교통'],
+                  ['investment', '투자가치'],
+                  ['interior', '내부구조'],
+                  ['price', '가격비교'],
+                ] as const).map(([val, label]) => (
+                  <button
+                    key={val}
+                    onClick={() => setFocus(val)}
+                    className={cn(
+                      'py-1 text-[11px] rounded border font-medium transition-colors',
+                      focus === val
+                        ? 'bg-brand-600 text-white border-brand-600'
+                        : 'border-gray-200 text-gray-600 hover:border-brand-300'
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-500 mb-1.5 block font-medium">3. 포스팅 어조(Tone)</label>
+              <div className="grid grid-cols-4 gap-1.5">
+                {([
+                  ['professional', '전문가형'],
+                  ['friendly', '친근한'],
+                  ['emotional', '감성적'],
+                  ['intuitive', '직관적'],
+                ] as const).map(([val, label]) => (
+                  <button
+                    key={val}
+                    onClick={() => setTone(val)}
+                    className={cn(
+                      'py-1 text-[11px] rounded border font-medium transition-colors',
+                      tone === val
+                        ? 'bg-brand-600 text-white border-brand-600'
+                        : 'border-gray-200 text-gray-600 hover:border-brand-300'
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-500 mb-1.5 block font-medium">4. 글쓰기 형식</label>
+              <div className="grid grid-cols-4 gap-1.5">
+                {([
+                  ['default', '기본형'],
+                  ['storytelling', '스토리텔링'],
+                  ['summary', '요약강조'],
+                  ['qna', 'Q&A형'],
+                ] as const).map(([val, label]) => (
+                  <button
+                    key={val}
+                    onClick={() => setFormat(val)}
+                    className={cn(
+                      'py-1 text-[11px] rounded border font-medium transition-colors',
+                      format === val
+                        ? 'bg-brand-600 text-white border-brand-600'
+                        : 'border-gray-200 text-gray-600 hover:border-brand-300'
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -603,22 +682,23 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
                         {displayed.map((title, i) => {
                           const isSelected = selectedTitle === title
                           return (
-                          <div key={i} className={cn("flex items-center gap-2 group rounded-lg px-1.5 py-1 transition-colors cursor-pointer",
-                            isSelected ? "bg-brand-50" : "hover:bg-gray-50"
-                          )} onClick={() => setSelectedTitle(isSelected ? null : title)}>
-                            <span className="text-xs text-gray-400 w-4 flex-shrink-0">{i + 1}.</span>
-                            <p className={cn("text-sm flex-1", isSelected ? "text-brand-700 font-medium" : "text-gray-700")}>{title}</p>
-                            <button
-                              onClick={e => { e.stopPropagation(); copyToClipboard(title, `title-${i}`) }}
-                              className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-gray-100 flex-shrink-0"
-                            >
-                              {copiedTitle === `title-${i}`
-                                ? <Check size={12} className="text-green-500" />
-                                : <Copy size={12} className="text-gray-400" />
-                              }
-                            </button>
-                          </div>
-                        )})}
+                            <div key={i} className={cn("flex items-center gap-2 group rounded-lg px-1.5 py-1 transition-colors cursor-pointer",
+                              isSelected ? "bg-brand-50" : "hover:bg-gray-50"
+                            )} onClick={() => setSelectedTitle(isSelected ? null : title)}>
+                              <span className="text-xs text-gray-400 w-4 flex-shrink-0">{i + 1}.</span>
+                              <p className={cn("text-sm flex-1", isSelected ? "text-brand-700 font-medium" : "text-gray-700")}>{title}</p>
+                              <button
+                                onClick={e => { e.stopPropagation(); copyToClipboard(title, `title-${i}`) }}
+                                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-gray-100 flex-shrink-0"
+                              >
+                                {copiedTitle === `title-${i}`
+                                  ? <Check size={12} className="text-green-500" />
+                                  : <Copy size={12} className="text-gray-400" />
+                                }
+                              </button>
+                            </div>
+                          )
+                        })}
 
                       </div>
                     </>

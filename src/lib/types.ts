@@ -7,6 +7,9 @@ export type UserRole = 'owner' | 'admin' | 'editor' | 'viewer'
 export type PropertyType = 'apartment' | 'officetel' | 'villa' | 'commercial' | 'land' | 'house'
 export type ProjectStatus = 'draft' | 'active' | 'completed' | 'archived'
 export type ContentType = 'blog' | 'card_news' | 'video_script' | 'location_analysis' | 'doc_summary'
+export type BlogTone = 'professional' | 'friendly' | 'emotional' | 'intuitive'
+export type BlogFormat = 'default' | 'storytelling' | 'summary' | 'qna'
+export type BlogFocus = 'location' | 'investment' | 'interior' | 'price'
 export type TaskType = 'naver_upload' | 'youtube_upload' | 'building_register' | 'seumteo_api' | 'video_render' | 'pdf_merge'
 export type TaskStatus = 'pending' | 'running' | 'success' | 'failed' | 'retrying' | 'cancelled'
 export type AssetType = 'image' | 'video' | 'document' | 'card_news'
@@ -70,21 +73,21 @@ export interface KakaoDensity {
 }
 
 export interface LandUseItem {
-  zone_name:  string | null
-  zone_code:  string | null
-  reg_date:   string | null
-  law_name:   string | null
+  zone_name: string | null
+  zone_code: string | null
+  reg_date: string | null
+  law_name: string | null
   group_name: string | null
 }
 
 export interface RealPriceItem {
-  deal_ym:  string
-  amount:   number | null
-  area:     number | null
-  floor:    string | null
-  name:     string | null
-  dong:     string | null
-  type:     string
+  deal_ym: string
+  amount: number | null
+  area: number | null
+  floor: string | null
+  name: string | null
+  dong: string | null
+  type: string
 }
 
 export interface CommercialZone {
@@ -116,6 +119,8 @@ export interface CommercialData {
   collected_at: string
 }
 
+export type TransactionType = 'sale' | 'lease' | 'rent'
+
 export interface Project {
   id: string
   org_id: string
@@ -130,15 +135,26 @@ export interface Project {
   ji?: string
   legal_dong?: string
   property_type?: PropertyType
-  transaction_type?: 'sale' | 'jeonse' | 'monthly_rent'
+  property_category?: string      // 중개대상물 종류
+  main_use?: string               // 주용도
+  transaction_type?: TransactionType  // 거래형태
   price?: number
   monthly_rent?: number
   deposit?: number
   key_money?: number
-  area?: number
+  area?: number                   // 전용면적
+  land_area?: number              // 대지면적
+  total_area?: number             // 연면적
   floor?: number
   total_floors?: number
+  rooms_count?: number            // 방 수
+  bathrooms_count?: number        // 화장실 수
   direction?: string
+  approval_date?: string          // 사용승인일
+  parking_legal?: number          // 주차 대장
+  parking_actual?: number         // 주차 실주차
+  move_in_date?: string           // 입주가능일
+  management_fee_detail?: string  // 관리비 상세
   features?: string[]
   status: ProjectStatus
   cover_image_url?: string
@@ -345,6 +361,9 @@ export interface AgentConnection {
 export interface GenerateBlogRequest {
   project_id: string
   style?: 'informative' | 'investment' | 'lifestyle'
+  tone?: BlogTone
+  format?: BlogFormat
+  focus?: BlogFocus
 }
 
 export interface GenerateBlogResponse {

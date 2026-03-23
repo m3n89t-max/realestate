@@ -16,7 +16,7 @@ Deno.serve(async (req) => {
 
     // 요청 파싱
     const body = await req.json()
-    const { project_id, style = 'informative', tone = 'professional', titles_only = false, content_id } = body
+    const { project_id, style = 'informative', tone, format, focus, titles_only = false, content_id } = body
 
     // ── titles_only 모드: 기존 콘텐츠에 제목 5개만 재생성 ──────────────────
     if (titles_only && content_id) {
@@ -120,18 +120,51 @@ Deno.serve(async (req) => {
 
     const nextVersion = (existing?.version ?? 0) + 1
 
+    // 조직 정보 조회 (매물 정보표 에이전시 행)
+    const { data: org } = await supabaseClient
+      .from('organizations').select('name, phone, address, business_number').eq('id', orgId).single()
+
+    // 매물 정보표 HTML (블로그 "## 매물 개요" 섹션에 삽입)
+    const fmt = (won?: number) => {
+      if (!won) return '-'
+      const e = Math.floor(won / 100000000), m = Math.floor((won % 100000000) / 10000)
+      return e > 0 && m > 0 ? `${e}억 ${m}만원` : e > 0 ? `${e}억원` : `${m}만원`
+    }
+    const fmtArea = (sqm?: number) => sqm ? `${sqm}㎡(${(sqm * 0.3025).toFixed(0)}평)` : '-'
+    const txMap: Record<string, string> = { sale: '매매', lease: '전세', rent: '임대' }
+    const txType = txMap[project.transaction_type ?? 'sale'] ?? '매매'
+    const priceLabel = project.transaction_type === 'rent' ? '보증금/임대료' : project.transaction_type === 'lease' ? '전세보증금' : '매매가'
+    const priceVal = project.transaction_type === 'rent'
+      ? `${fmt(project.deposit)} / ${fmt(project.monthly_rent)}`
+      : project.transaction_type === 'lease' ? fmt(project.deposit) : fmt(project.price)
+    const agRow = org ? `<tr><td colspan="6" style="border:1px solid #bbb;padding:8px 12px;background:#f5f5f5;font-size:12px;color:#444;line-height:1.8;">${org.name ? `■ 상호: ${org.name}&nbsp;&nbsp;` : ''}${org.business_number ? `■ 중개등록번호: ${org.business_number}&nbsp;&nbsp;` : ''}${org.address ? `■ 주소: ${org.address}&nbsp;&nbsp;` : ''}${org.phone ? `■ 전화번호: ${org.phone}` : ''}</td></tr>` : ''
+    const s = 'border:1px solid #bbb;padding:6px 10px;', h = s + 'background:#dbeafe;font-weight:bold;'
+    const propertyTableHtml = `<table style="width:100%;border-collapse:collapse;font-size:13px;margin:16px 0;"><tbody><tr><td style="${h}">소재지</td><td style="${s}" colspan="3">${maskPersonalInfo(project.address)}</td><td style="${h}">중개대상물 종류</td><td style="${s}">${project.property_category || '-'}</td></tr><tr><td style="${h}">주용도</td><td style="${s}">${project.main_use || '-'}</td><td style="${h}">해당층/총층</td><td style="${s}">${project.floor || project.total_floors ? `${project.floor ?? '-'}층/${project.total_floors ?? '-'}층` : '-'}</td><td style="${h}">거래형태</td><td style="${s}">${txType}</td></tr><tr><td style="${h}">대지면적</td><td style="${s}">${fmtArea(project.land_area)}</td><td style="${h}">사용승인일</td><td style="${s}">${project.approval_date || '-'}</td><td style="${h}">연면적</td><td style="${s}">${fmtArea(project.total_area)}</td></tr><tr><td style="${h}">전용면적</td><td style="${s}">${fmtArea(project.area)}</td><td style="${h}">방/화장실</td><td style="${s}">${project.rooms_count !== undefined ? `${project.rooms_count}/${project.bathrooms_count ?? '-'}` : '-'}</td><td style="${h}">주차</td><td style="${s}">${project.parking_legal || project.parking_actual ? `대장:${project.parking_legal ?? '-'}대/실:${project.parking_actual ?? '-'}대` : '-'}</td></tr><tr><td style="${h}">${priceLabel}</td><td style="${s}color:#dc2626;font-weight:bold;">${priceVal}</td><td style="${h}">입주가능일</td><td style="${s}">${project.move_in_date || '협의'}</td><td style="${h}">방향</td><td style="${s}">${project.direction || '-'}</td></tr><tr><td style="${h}">권리금</td><td style="${s}">${project.key_money ? fmt(project.key_money) : '무권리'}</td><td style="${h}">관리비</td><td style="${s}" colspan="3">${project.management_fee_detail || '-'}</td></tr>${agRow}</tbody></table>`
+
     // 프롬프트 컨텍스트 구성 (개인정보 마스킹)
     const ctx: BlogPromptContext = {
       address: maskPersonalInfo(project.address),
       property_type: project.property_type ?? '아파트',
+      property_category: project.property_category,
+      main_use: project.main_use,
+      transaction_type: project.transaction_type,
       price: project.price,
       monthly_rent: project.monthly_rent,
       deposit: project.deposit,
       key_money: project.key_money,
       area: project.area,
+      land_area: project.land_area,
+      total_area: project.total_area,
       floor: project.floor,
       total_floors: project.total_floors,
+      rooms_count: project.rooms_count,
+      bathrooms_count: project.bathrooms_count,
       direction: project.direction,
+      approval_date: project.approval_date,
+      parking_legal: project.parking_legal,
+      parking_actual: project.parking_actual,
+      move_in_date: project.move_in_date,
+      management_fee_detail: project.management_fee_detail,
       features: project.features,
       building_condition: project.building_condition,
       floor_composition: project.floor_composition,
@@ -141,12 +174,14 @@ Deno.serve(async (req) => {
       nearby_facilities: location?.nearby_facilities,
       style,
       tone,
-      transaction_type: project.transaction_type,
+      format,
+      focus,
       photo_urls: (assets ?? []).map((a: any) => ({
         url: a.file_url,
         alt: a.alt_text || a.category || '매물사진',
         category: a.category,
       })),
+      property_table_html: propertyTableHtml,
     }
 
     // OpenAI API 호출

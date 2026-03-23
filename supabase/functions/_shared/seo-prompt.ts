@@ -3,14 +3,26 @@
 export interface BlogPromptContext {
   address: string
   property_type: string
+  property_category?: string | null
+  main_use?: string | null
+  transaction_type?: string | null
   price?: number
   monthly_rent?: number
   deposit?: number
   key_money?: number
   area?: number
+  land_area?: number | null
+  total_area?: number | null
   floor?: number
   total_floors?: number
+  rooms_count?: number | null
+  bathrooms_count?: number | null
   direction?: string
+  approval_date?: string | null
+  parking_legal?: number | null
+  parking_actual?: number | null
+  move_in_date?: string | null
+  management_fee_detail?: string | null
   features?: string[]
   building_condition?: string | null
   floor_composition?: string | null
@@ -19,9 +31,11 @@ export interface BlogPromptContext {
   location_advantages?: string[]
   nearby_facilities?: Record<string, unknown>
   style: 'informative' | 'investment' | 'lifestyle'
-  transaction_type?: 'sale' | 'jeonse' | 'monthly_rent'
   tone?: 'professional' | 'friendly' | 'passionate' | 'storytelling' | 'analytical'
+  format?: 'default' | 'storytelling' | 'summary' | 'qna'
+  focus?: 'location' | 'investment' | 'interior' | 'price'
   photo_urls?: { url: string; alt: string; category?: string }[]
+  property_table_html?: string  // 매물 정보표 HTML (블로그에 삽입)
 }
 
 export function buildBlogSystemPrompt(): string {
@@ -109,7 +123,26 @@ export function buildBlogUserPrompt(ctx: BlogPromptContext): string {
     passionate: '열정적인 말투: 적극적으로 매물을 추천하는 에너지 넘치는 문체. 감탄사와 강조 표현 적극 활용. "정말", "꼭", "놓치면 안 돼요" 등의 표현 사용.',
     storytelling: '스토리텔링 말투: 이야기를 들려주듯 감성적이고 생동감 있는 문체. 가상의 일상 장면("아침에 눈을 뜨면...", "퇴근 후 돌아오는 길...")을 그려내며 독자의 감정을 자극.',
     analytical: '분석적인 말투: 데이터와 수치 중심의 냉철하고 객관적인 문체. "~에 따르면", "~대비 ~% 수준", "시세 분석 결과" 등 근거 중심 표현 사용. 감정보다 팩트로 설득.',
-  }[ctx.tone ?? 'professional']
+  } as Record<string, string>
+
+  const formatGuide = {
+    default: '기본적인 블로그 포스팅 구조로 자연스럽게 작성하세요.',
+    storytelling: '마치 한 편의 이야기를 들려주듯 자연스러운 스토리텔링 기법을 적용하여 작성하세요.',
+    summary: '핵심 내용 위주로 개요와 요약을 강조하여, 바쁜 독자가 빠르게 핵심을 파악할 수 있도록 구성하세요.',
+    qna: '독자가 궁금해할 만한 내용을 가상의 질문과 답변 형식으로 재미있게 풀어내면서 설명하세요.'
+  } as Record<string, string>
+
+  const focusGuide = {
+    location: '주변 입지, 교통, 학군, 상권 등 인프라의 장점을 가장 크게 부각하세요.',
+    investment: '향후 가치 상승 여력, 수익률, 개발 호재 등 투자 가치를 중점적으로 강조하세요.',
+    interior: '건물 내부 구조, 인테리어, 채광, 실사용 공간의 효율성을 가장 중요하게 다루세요.',
+    price: '매매가/전월세 가격의 합리성, 가성비, 특별한 혜택이나 조건 등 가격 경쟁력을 강조하세요.'
+  } as Record<string, string>
+
+  const customStyleInstructions: string[] = []
+  if (ctx.tone && toneGuide[ctx.tone]) customStyleInstructions.push(`- 어조(Tone): ${toneGuide[ctx.tone]}`)
+  if (ctx.format && formatGuide[ctx.format]) customStyleInstructions.push(`- 글 구조(Format): ${formatGuide[ctx.format]}`)
+  if (ctx.focus && focusGuide[ctx.focus]) customStyleInstructions.push(`- 강조 포인트(Focus): ${focusGuide[ctx.focus]}`)
 
   const fmtWon = (v: number) => {
     const billions = Math.floor(v / 100000000)
@@ -133,6 +166,17 @@ export function buildBlogUserPrompt(ctx: BlogPromptContext): string {
   }
   if (ctx.key_money) priceLines.push(`- 권리금: ${Math.floor(ctx.key_money / 10000)}만원`)
 
+  const extraInfo: string[] = []
+  if (ctx.property_category) extraInfo.push(`- 중개대상물 종류: ${ctx.property_category}`)
+  if (ctx.main_use) extraInfo.push(`- 주용도: ${ctx.main_use}`)
+  if (ctx.land_area) extraInfo.push(`- 대지면적: ${ctx.land_area}㎡`)
+  if (ctx.total_area) extraInfo.push(`- 연면적: ${ctx.total_area}㎡`)
+  if (ctx.rooms_count !== null && ctx.rooms_count !== undefined) extraInfo.push(`- 방/화장실: ${ctx.rooms_count}/${ctx.bathrooms_count ?? '-'}`)
+  if (ctx.approval_date) extraInfo.push(`- 사용승인일: ${ctx.approval_date}`)
+  if (ctx.parking_legal || ctx.parking_actual) extraInfo.push(`- 주차: 대장상 ${ctx.parking_legal ?? '-'}대 / 실주차 ${ctx.parking_actual ?? '-'}대`)
+  if (ctx.move_in_date) extraInfo.push(`- 입주가능일: ${ctx.move_in_date}`)
+  if (ctx.management_fee_detail) extraInfo.push(`- 관리비: ${ctx.management_fee_detail}`)
+
   return `다음 매물 정보로 SEO 최적화 부동산 블로그 글을 작성하세요.
 
 [매물 기본 정보]
@@ -144,6 +188,8 @@ ${priceLines.join('\n')}
 - 방향: ${ctx.direction ?? '정보 없음'}
 - 특징: ${ctx.features?.join(', ') ?? '없음'}
 - 건물 상태: ${ctx.building_condition || '정보 없음'}
+${extraInfo.length > 0 ? extraInfo.join('\n') : ''}
+${ctx.property_table_html ? `\n[매물 정보표 HTML - "## 매물 개요" 섹션 첫 줄에 아래 HTML 표를 그대로 삽입하세요]\n${ctx.property_table_html}` : ''}
 
 [매물 사진 - 본문에 반드시 삽입]
 ${ctx.photo_urls && ctx.photo_urls.length > 0
@@ -165,6 +211,7 @@ ${ctx.location_advantages?.map((a, i) => `${i + 1}. ${a}`).join('\n') || '입지
 
 [글 스타일]
 ${styleGuide}
+${customStyleInstructions.length > 0 ? `\n[추가 선택 옵션 적용 지침]\n다음 옵션을 최대한 반영하여 글을 전개하세요:\n${customStyleInstructions.join('\n')}` : ''}
 
 [말투]
 ${toneGuide}
