@@ -325,12 +325,13 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
 
             <div>
               <label className="text-xs text-gray-500 mb-1.5 block font-medium">3. 포스팅 어조(Tone)</label>
-              <div className="grid grid-cols-4 gap-1.5">
+              <div className="grid grid-cols-5 gap-1.5">
                 {([
                   ['professional', '전문가형'],
                   ['friendly', '친근한'],
-                  ['emotional', '감성적'],
-                  ['intuitive', '직관적'],
+                  ['passionate', '열정적'],
+                  ['storytelling', '스토리텔링'],
+                  ['analytical', '분석적'],
                 ] as const).map(([val, label]) => (
                   <button
                     key={val}
