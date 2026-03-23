@@ -59,6 +59,27 @@ function formatCommercial(commercial_data: any): string {
   return lines.join('\n')
 }
 
+function formatKakaoDensity(kakao_density: any): string {
+  if (!kakao_density) return '(업종 밀집도 데이터 없음)'
+  const { categories = {}, radius_m = 500 } = kakao_density
+  const LABEL: Record<string, string> = {
+    CE7: '카페', FD6: '음식점', HP8: '병원', AC5: '학원',
+    CS2: '편의점', AG2: '부동산', PM9: '약국',
+  }
+  const lines: string[] = [`카카오맵 기준 반경 ${radius_m}m 업종 밀집도:`]
+  const sorted = Object.entries(categories as Record<string, any>)
+    .map(([code, data]) => ({ code, label: LABEL[code] ?? code, total: data.total_count ?? 0, items: data.items ?? [] }))
+    .sort((a, b) => b.total - a.total)
+  for (const { label, total, items } of sorted) {
+    if (total === 0) continue
+    const nearest = items.slice(0, 3).map((i: any) => `${i.name}(${i.distance_m}m)`).join(', ')
+    lines.push(`  ${label}: 총 ${total}개 | 가까운 순: ${nearest || '-'}`)
+  }
+  const totalAll = sorted.reduce((s, c) => s + c.total, 0)
+  lines.push(`  합계: ${totalAll}개 (상권 밀집도 지표)`)
+  return lines.join('\n')
+}
+
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
   if (corsResponse) return corsResponse
@@ -171,11 +192,12 @@ Deno.serve(async (req) => {
     }
 
     // ── 실제 수집 데이터 포맷팅 ──────────────────────────────
-    const isCommercial  = project.property_type === 'commercial'
-    const poiText       = formatPOI(poi_data)
-    const realPriceText = isCommercial
+    const isCommercial    = project.property_type === 'commercial'
+    const poiText         = formatPOI(poi_data)
+    const realPriceText   = isCommercial
       ? formatCommercial(project.commercial_data)
       : formatRealPrice(project.real_price_data)
+    const kakaoDensityText = formatKakaoDensity(project.kakao_density)
 
     const systemPrompt = `당신은 대한민국 부동산 입지 분석 전문가입니다.
 실제 수집된 데이터를 기반으로 입지 분석을 수행하세요. 수집된 데이터가 있으면 반드시 활용하고, 없는 항목은 주소와 지역 특성으로 추론하세요.
@@ -225,8 +247,14 @@ ${poiText}
 [${isCommercial ? '상권 분석 데이터' : '최근 실거래가'}]
 ${realPriceText}
 
-위 실제 데이터를 적극 활용하여 분석하세요. 장점은 "도보/차량 N분" 등 구체적 수치 표현을 사용하세요.
-중개사 메모에 특이사항이 있으면 분석에 반드시 반영하세요.`
+[카카오맵 업종 밀집도 - 실측 데이터, 반드시 분석에 반영]
+${kakaoDensityText}
+
+위 실제 데이터를 적극 활용하여 분석하세요.
+- POI 데이터에서 "도보/차량 N분" 등 구체적 수치 표현 사용
+- 카카오맵 업종 밀집도 숫자(음식점 N개, 카페 N개 등)를 입지 장점/분석에 직접 인용
+- 가장 가까운 업소 이름과 거리를 구체적으로 언급
+- 중개사 메모에 특이사항이 있으면 분석에 반드시 반영`
 
     const responseText = await callOpenAI(
       [
