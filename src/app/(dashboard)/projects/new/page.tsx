@@ -189,7 +189,7 @@ export default function NewProjectPage() {
   }
 
   const canNext = () => {
-    if (currentStep === 0) return form.address.length > 0 && form.property_type !== ''
+    if (currentStep === 0) return form.address.length > 0
     return true
   }
 
@@ -444,7 +444,7 @@ export default function NewProjectPage() {
 
                   {/* Row 3: 매물유형 / 방·화장실 */}
                   <tr>
-                    <TLabel>매물 유형 *</TLabel>
+                    <TLabel>매물 유형</TLabel>
                     <TCell colSpan={3}>
                       <div className="flex flex-wrap gap-1.5 py-0.5">
                         {PROPERTY_TYPES.map(t => chipBtn(t.label, form.property_type === t.value, () => set('property_type', t.value)))}
