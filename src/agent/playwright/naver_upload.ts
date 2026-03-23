@@ -14,7 +14,7 @@ const SESSION_DIR = path.join(
     process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'),
     'RealEstateAIOS'
 );
-const NAVER_SESSION_PATH = path.join(SESSION_DIR, 'naver-session.json');
+
 
 // ============================================================
 // 네이버 블로그 자동 업로드
@@ -40,21 +40,21 @@ export async function uploadNaverBlog(
     // 2. 이미지 조회 (webhook 경유)
     const assets = await getAssets(config, projectId);
 
-    // 3. 브라우저 실행 (저장된 세션 복원)
-    const storageState = existsSync(NAVER_SESSION_PATH) ? NAVER_SESSION_PATH : undefined;
-    const browser = await chromium.launch({
+    // 3. 브라우저 실행 — 에이전트 전용 Edge 프로필 (캡챠 우회)
+    // 전용 프로필 디렉토리: 사용자 Edge와 충돌 없이 로그인 세션 영속 보존
+    const agentProfileDir = path.join(SESSION_DIR, 'EdgeProfile');
+
+    const context = await chromium.launchPersistentContext(agentProfileDir, {
         channel: 'msedge',
         headless: false,
         args: ['--start-maximized'],
+        locale: 'ko-KR',
     });
 
+    const browser = { close: async () => { try { await context.close(); } catch { } } };
+
     try {
-        const context = await browser.newContext({
-            viewport: { width: 1280, height: 900 },
-            locale: 'ko-KR',
-            storageState,
-        });
-        const page = await context.newPage();
+        const page = context.pages()[0] || await context.newPage();
 
         // 4. 로그인 확인
         await progress(config, task.id, '네이버 로그인 확인 중...', 5);
@@ -99,9 +99,7 @@ export async function uploadNaverBlog(
                 await page.waitForURL('**/naver.com/**', { timeout: 120_000 }).catch(() => { });
             }
 
-            // 세션 저장
-            await context.storageState({ path: NAVER_SESSION_PATH });
-            await progress(config, task.id, '로그인 완료. 세션 저장됨.', 25);
+            await progress(config, task.id, '로그인 완료.', 25);
         } else {
             await progress(config, task.id, '기존 세션으로 로그인 유지.', 25);
         }
@@ -406,9 +404,6 @@ export async function uploadNaverBlog(
         }
 
         await updateContent(config, contentId, { is_published: true, published_url: publishedUrl });
-
-        // 세션 갱신 저장
-        await context.storageState({ path: NAVER_SESSION_PATH });
 
         await progress(config, task.id, '✅ 네이버 블로그 발행 완료!', 100);
         return { published_url: publishedUrl, content_id: contentId };
