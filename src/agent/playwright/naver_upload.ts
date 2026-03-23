@@ -142,6 +142,7 @@ export async function uploadNaverBlog(
 
         // 마크다운 줄 → 네이버용 텍스트로 변환 (이미지 제외)
         const stripLine = (line: string) => line
+            .replace(/<[^>]+>/g, '')
             .replace(/^#{1,6}\s+/, '')
             .replace(/\*\*([^*]+)\*\*/g, '$1')
             .replace(/\*([^*]+)\*/g, '$1')
@@ -235,6 +236,7 @@ export async function uploadNaverBlog(
             const plainBody = (content.content || '')
                 .replace(/!\[.*?\]\(.*?\)/g, '')
                 .replace(/\*▲.*?\*/g, '')
+                .replace(/<[^>]+>/g, '')
                 .replace(/^#{1,6}\s+/gm, '')
                 .replace(/\*\*([^*]+)\*\*/g, '$1')
                 .replace(/\*([^*]+)\*/g, '$1')
