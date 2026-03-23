@@ -1,323 +1,118 @@
 # CLAUDE.md
-RealEstate AI OS
 
-이 파일은 Claude Code가 프로젝트 작업 시 항상 참고하는 **지속 규칙(Persistent Rules)** 이다.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
----
+## Project Overview
 
-# Project Overview
+RealEstate AI OS - 공인중개사용 부동산 업무 자동화 SaaS 플랫폼. 주소/사진/특장점 입력만으로 입지 분석, 건축물대장 수집, SEO 블로그/카드뉴스/쇼츠 콘텐츠를 자동 생성한다.
 
-프로젝트 이름:
+## Development Commands
 
-RealEstate AI OS
+```bash
+npm run dev          # Next.js 개발 서버 (포트 3001; 3000이 사용 중이므로)
+npm run build        # 프로덕션 빌드
+npm run lint         # ESLint
+npm run type-check   # TypeScript 타입 검사 (빌드 없이)
 
-목표:
+# Local Automation Agent
+npm run agent:start  # tsx로 에이전트 워커 실행
+npm run agent:dev    # Electron 에이전트 개발 모드
+npm run agent:build  # Windows 배포용 빌드
 
-공인중개사가 다음만 입력하면
+# E2E 테스트
+npm run test:e2e
+npm run test:e2e:ui
 
-- 지번 또는 주소
-- 매물 사진
-- 간단 소개
-- 특장점
+# Supabase Edge Functions 배포
+npx supabase functions deploy <function-name>
+```
 
-시스템이 자동으로 다음을 수행한다.
+## Architecture
 
-1. 입지 및 상권 분석
-2. 건축물대장 다운로드
-3. 지적도 다운로드
-4. 서류 요약 분석
-5. 네이버 블로그 SEO 글 생성
-6. 인스타 카드뉴스 제작
-7. 카카오 카드뉴스 제작
-8. 유튜브 쇼츠 스크립트 생성
-9. 쇼츠 영상 렌더링
-10. 콘텐츠 업로드 자동화
+### Frontend (Next.js App Router)
 
-이 시스템은 **부동산 업무 자동화 OS**이다.
+- `src/app/(auth)/` - 인증 불필요 라우트 (login, onboarding). layout.tsx에 `force-dynamic` 적용.
+- `src/app/(dashboard)/` - 인증 필요 라우트. layout.tsx가 Supabase 세션 + 조직 정보 + 에이전트 상태 로드.
+- `src/app/(dashboard)/projects/[id]/page.tsx` - 탭 기반 매물 상세 (overview/analysis/blog/card_news/shorts/docs/tasks/package). URL searchParam `tab`으로 탭 제어.
 
----
+**중요 패턴:**
+- Supabase를 직접 사용하는 Server Component 페이지는 반드시 `export const dynamic = 'force-dynamic'` 선언 필요.
+- 클라이언트 컴포넌트: `src/lib/supabase/client.ts`의 `createClient()` 사용.
+- 서버 컴포넌트: `src/lib/supabase/server.ts`의 `createClient()` (SSR 쿠키 기반) 또는 `createAdminClient()` (service role) 사용.
 
-# Tech Stack
+### Backend (Supabase Edge Functions)
 
-Frontend
+`supabase/functions/` 폴더는 **Deno 런타임**이며 `tsconfig.json` exclude 목록에 포함. Node.js import 불가, `https://esm.sh/` URL import 사용.
 
-- Next.js (App Router)
-- TypeScript
-- TailwindCSS
+**공통 헬퍼** (`supabase/functions/_shared/`):
+- `auth.ts` - `getAuthenticatedUser()`, `getOrgId()`, `checkQuota()` 필수 패턴
+- `cors.ts` - CORS 헤더 + preflight 처리
+- `openai.ts` - GPT-4o 호출 래퍼
+- `masking.ts` - 개인정보(상세 번지) 마스킹
+- `seo-prompt.ts` - 블로그 프롬프트 빌더
+- `shorts-prompt.ts` - 쇼츠 스크립트 프롬프트 빌더
 
-Backend
+**Edge Function 표준 패턴:**
+```typescript
+Deno.serve(async (req) => {
+  const corsResponse = handleCors(req)
+  if (corsResponse) return corsResponse
+  try {
+    const { user, supabaseClient } = await getAuthenticatedUser(req)
+    const orgId = await getOrgId(supabaseClient, user.id)
+    await checkQuota(supabaseClient, orgId, 'generation')
+    // ... 비즈니스 로직
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), { status: 400, headers: corsHeaders })
+  }
+})
+```
 
-- Supabase
-- PostgreSQL
-- Supabase Auth
-- Supabase Storage
-- Supabase Realtime
-- Supabase Edge Functions
+### Database
 
-Local Automation Agent
+멀티테넌트 구조 - 모든 데이터는 `org_id` 기반으로 RLS 정책으로 격리.
 
-- Windows
-- Electron 또는 Tauri
-- Playwright
-- FFmpeg
+핵심 테이블: `organizations`, `memberships`, `projects`, `assets`, `generated_contents`, `documents`, `tasks`, `agent_connections`, `location_analyses`, `usage_logs`
 
-Deployment
+마이그레이션 파일: `supabase/migrations/` (001~019 순서)
 
-- Vercel
+### Task Queue
 
----
+자동화 작업은 `tasks` 테이블로 관리. Local Agent가 Supabase Realtime을 구독하여 `pending` 작업을 처리.
 
-# Core Architecture Rules
+`TaskType`: `naver_upload` | `youtube_upload` | `building_register` | `seumteo_api` | `video_render` | `pdf_merge`
 
-Claude는 항상 다음 아키텍처 규칙을 유지해야 한다.
+### Local Agent
 
-1. 모든 API는 **Supabase Edge Functions** 기반
-2. 모든 데이터는 **Supabase Postgres**
-3. 인증은 **Supabase Auth**
-4. 파일은 **Supabase Storage**
-5. 실시간 상태는 **Supabase Realtime**
-6. 로컬 자동화는 **Local Agent**가 담당
-7. 모든 자동화 작업은 **Task Queue** 기반
+`src/agent/worker.ts` - `agent_key` 인증 (JWT 아님), Playwright 기반 RPA. 서버에 크레덴셜 저장 금지.
 
----
+## Key Types (`src/lib/types.ts`)
 
-# Task Queue Architecture
+- `Project` - 매물 (address, property_type, transaction_type, price/deposit/monthly_rent, area, etc.)
+- `GeneratedContent` - AI 생성 콘텐츠 (blog, card_news, video_script, location_analysis)
+- `Task` - 자동화 작업 큐 항목
+- `BlogTone` - `professional` | `friendly` | `emotional` | `intuitive`
+- `TransactionType` - `sale` | `lease` | `rent`
 
-자동화 작업은 모두 **tasks 테이블**을 통해 관리된다.
+**주의:** `src/lib/types.ts`와 `supabase/functions/generate-blog/index.ts`에 미해결 git merge conflict marker가 있음. 작업 전 확인 필요.
 
-tasks.type ENUM
+## Environment Variables
 
-normalize_parcel
-location_analyze
-download_building_register
-download_cadastral_map
-summarize_documents
-generate_blog
-generate_cards_instagram
-generate_cards_kakao
-generate_shorts_script
-render_shorts_video
-upload_naver_blog
-upload_youtube
-
-tasks.status
-
-queued
-running
-success
-failed
-
-작업 흐름:
-
-1. Frontend 요청
-2. Backend Edge Function 실행
-3. tasks 생성
-4. Worker 또는 Local Agent 처리
-5. 상태 업데이트
-
----
-
-# Database Schema
-
-주요 테이블
-
-organizations
-users
-memberships
-projects
-assets
-documents
-generated_contents
-tasks
-usage_logs
-
-시스템은 **멀티테넌트 구조**이다.
-
-모든 데이터는 **organization_id 기반으로 격리**된다.
-
----
-
-# Security Rules
-
-모든 API는 다음을 반드시 확인해야 한다.
-
-1. auth 인증
-2. organization 권한 체크
-3. project 접근 권한 확인
-
-Supabase RLS 정책을 반드시 적용한다.
-
----
-
-# API Rules
-
-API는 REST 스타일을 따른다.
-
-예시:
-
-POST /projects
-POST /projects/{id}/generate
-POST /projects/{id}/documents/summarize
-GET /projects/{id}
-GET /tasks?project_id=
-
-모든 응답은 다음 구조를 따른다.
-
-{
-  success: true,
-  data: {}
-}
-
----
-
-# Frontend Rules
-
-Next.js App Router 사용
-
-필수 화면:
-
-/dashboard
-/projects
-/projects/new
-/projects/[id]
-
-projects/[id] 화면은 다음 탭을 가진다.
-
-Overview
-Docs
-Blog
-Cards
-Shorts
-Tasks
-
-필수 기능
-
-- 매물 등록 wizard
-- 사진 업로드
-- 자동화 실행 버튼
-- tasks 실시간 상태 표시
-- 블로그 편집기
-- 카드뉴스 미리보기
-- 서류 상태 표시
-
----
-
-# SEO Blog Generation Rules
-
-블로그 글은 다음 구조를 따른다.
-
-H1
-지역명 + 매물유형 + 핵심강점
-
-H2
-매물 개요
-
-H2
-입지 장점 7가지
-
-H2
-주변 인프라 분석
-
-H2
-시장 전망
-
-H2
-실거주 / 투자 포인트
-
-H2
-FAQ
-
-H2
-문의 안내
-
-요구사항
-
-- 1500자 이상
-- 키워드 자연 분포
-- ALT 태그 포함
-- 해시태그 30개
-
----
-
-# Content Engine Rules
-
-콘텐츠 엔진은 다음을 생성한다.
-
-1. SEO 블로그 글
-2. 인스타 카드뉴스
-3. 카카오 카드뉴스
-4. 유튜브 쇼츠 스크립트
-
-카드뉴스
-
-- 기본 6장 템플릿
-
-쇼츠
-
-- 30~60초 스크립트
-
----
-
-# Local Automation Agent Rules
-
-Local Agent는 다음 작업을 수행한다.
-
-download_building_register
-download_cadastral_map
-
-동작 방식
-
-1. Supabase tasks subscribe
-2. 작업 실행
-3. 결과 업로드
-4. 상태 업데이트
-
-Phase 2 이후
-
-- 네이버 블로그 자동 업로드
-- 유튜브 자동 업로드
-
----
-
-# Development Phases
-
-Phase 1
-
-- 매물 등록
-- 입지 분석
-- 블로그 생성
-- 카드뉴스 생성
-
-Phase 2
-
-- 건축물대장 다운로드
-- 지적도 다운로드
-- 서류 요약
-
-Phase 3
-
-- 쇼츠 렌더링
-- 자동 업로드
-
----
-
-# Compact Instructions
-
-이 프로젝트는
-
-부동산 자동화 SaaS 플랫폼이다.
-
-핵심 기능
-
-- 매물 분석
-- 서류 자동 수집
-- 콘텐츠 자동 생성
-- 마케팅 자동화
-
-Claude는 항상
-
-- Supabase 기반
-- Next.js 기반
-- Task Queue 기반
-
-구조를 유지해야 한다.
+```
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY
+NEXT_PUBLIC_KAKAO_MAP_API_KEY   # 지도 + 지오코딩
+OPENAI_API_KEY                  # gpt-4o
+```
+
+## Content Generation
+
+- **블로그**: `generate-blog` Edge Function → GPT-4o → `generated_contents` 저장. 1500자+, H2 7개+, FAQ, 해시태그 30개, 개인정보 마스킹 필수.
+- **카드뉴스**: `generate-card-news` → 6~8장 슬라이드 JSON. `generate-card-image`로 이미지 렌더링.
+- **입지분석**: `analyze-location` → `location_analyses` 테이블 저장. 카카오 밀도 데이터(`kakao_density`), 실거래가(`real_price_data`), 상권(`commercial_data`) 포함.
+- **쇼츠 스크립트**: `generate-shorts-script` → 15/30/60초 씬 구성.
+
+## SEO Blog Structure
+
+H1: 지역명+매물유형+핵심강점 / H2 순서: 매물 개요(매물 정보표 HTML 포함) > 입지 장점 7가지 > 주변 인프라 > 시장 전망 > 실거주/투자 포인트 > FAQ > 문의 안내

@@ -373,32 +373,52 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
                 ))}
               </div>
             </div>
-          </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1.5 block font-medium">5. 사진 배치</label>
+              <div className="grid grid-cols-2 gap-1.5">
+                {([
+                  ['inline', '글 중간 (인라인)', '각 섹션 내 삽입'],
+                  ['bulk', '글 마지막 (일괄)', '본문 뒤 한번에'],
+                ] as const).map(([val, label, desc]) => (
+                  <button
+                    key={val}
+                    onClick={() => setPhotoPosition(val)}
+                    className={cn(
+                      'py-2 px-2 text-left rounded-lg border transition-colors',
+                      photoPosition === val
+                        ? 'bg-brand-50 border-brand-500 text-brand-700'
+                        : 'border-gray-200 text-gray-600 hover:border-brand-300'
+                    )}
+                  >
+                    <div className="text-xs font-medium">{label}</div>
+                    <div className="text-[10px] text-gray-400 mt-0.5">{desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
 
-          <div className="mb-3">
-            <label className="label text-xs">말투</label>
-            <div className="grid grid-cols-1 gap-1.5">
-              {([
-                ['professional', '🎩 전문가형', '격식 있고 신뢰감 있는 합쇼체'],
-                ['friendly', '😊 친근한형', '편안하고 자연스러운 해요체'],
-                ['passionate', '🔥 열정형', '적극 추천하는 에너지 넘치는 문체'],
-                ['storytelling', '📖 스토리텔링형', '일상 장면을 그리는 감성적 문체'],
-                ['analytical', '📊 분석형', '데이터·수치 중심의 냉철한 문체'],
-              ] as const).map(([val, label, desc]) => (
-                <button
-                  key={val}
-                  onClick={() => setTone(val)}
-                  className={cn(
-                    'py-2 px-2.5 text-left rounded-lg border transition-colors',
-                    tone === val
-                      ? 'bg-brand-50 border-brand-400 text-brand-700'
-                      : 'border-gray-200 text-gray-600 hover:border-brand-200'
-                  )}
-                >
-                  <div className="text-xs font-medium">{label}</div>
-                  <div className="text-[10px] text-gray-400 mt-0.5">{desc}</div>
-                </button>
-              ))}
+            <div>
+              <label className="text-xs text-gray-500 mb-1.5 block font-medium">6. 사진 형식</label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {([
+                  ['individual', '개별'],
+                  ['collage', '콜라주'],
+                  ['slideshow', '슬라이드'],
+                ] as const).map(([val, label]) => (
+                  <button
+                    key={val}
+                    onClick={() => setPhotoLayout(val)}
+                    className={cn(
+                      'py-1.5 text-xs rounded-lg border font-medium transition-colors',
+                      photoLayout === val
+                        ? 'bg-brand-600 text-white border-brand-600'
+                        : 'border-gray-200 text-gray-600 hover:border-brand-300'
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -429,59 +449,9 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
         {selectedId && (
           <div className="card p-4">
             <h3 className="text-sm font-semibold text-gray-700 mb-2">자동 업로드</h3>
-            <p className="text-xs text-gray-400 mb-2">
+            <p className="text-xs text-gray-400 mb-3">
               로컬 에이전트가 실행 중이어야 합니다
             </p>
-
-            {/* 사진 배치 위치 */}
-            <div className="mb-2">
-              <label className="text-xs text-gray-500 mb-1.5 block">사진 배치</label>
-              <div className="grid grid-cols-2 gap-1.5">
-                {([
-                  ['inline', '글 중간 (인라인)', '각 섹션 내 삽입'],
-                  ['bulk', '글 마지막 (일괄)', '본문 뒤 한번에'],
-                ] as const).map(([val, label, desc]) => (
-                  <button
-                    key={val}
-                    onClick={() => setPhotoPosition(val)}
-                    className={cn(
-                      'py-2 px-2 text-left rounded-lg border transition-colors',
-                      photoPosition === val
-                        ? 'bg-green-50 border-green-500 text-green-700'
-                        : 'border-gray-200 text-gray-600 hover:border-green-300'
-                    )}
-                  >
-                    <div className="text-xs font-medium">{label}</div>
-                    <div className="text-[10px] text-gray-400 mt-0.5">{desc}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* 사진 형식 */}
-            <div className="mb-3">
-              <label className="text-xs text-gray-500 mb-1.5 block">사진 형식</label>
-              <div className="grid grid-cols-3 gap-1.5">
-                {([
-                  ['individual', '개별'],
-                  ['collage', '콜라주'],
-                  ['slideshow', '슬라이드'],
-                ] as const).map(([val, label]) => (
-                  <button
-                    key={val}
-                    onClick={() => setPhotoLayout(val)}
-                    className={cn(
-                      'py-1.5 text-xs rounded-lg border font-medium transition-colors',
-                      photoLayout === val
-                        ? 'bg-green-600 text-white border-green-600'
-                        : 'border-gray-200 text-gray-600 hover:border-green-300'
-                    )}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
 
             {/* 공인중개사 연락처 */}
             <div className="mb-3 border-t border-gray-100 pt-3">
