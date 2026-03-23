@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
+import { toPng } from 'html-to-image'
 import {
   Wand2, Download, Image as ImageIcon, Sparkles, Loader2,
   Building2, MapPin, TrendingUp, Home, Phone,
@@ -91,12 +92,12 @@ function assignPhoto(order: number, assets: any[]): string | undefined {
 
 function CoverCard({ card, theme, photo, filterCss }: { card: CardSlide; theme: Theme; photo?: string; filterCss?: string }) {
   return (
-    <div className="relative aspect-square rounded-2xl overflow-hidden shadow-xl">
+    <div className="relative aspect-square rounded-[32px] overflow-hidden shadow-2xl">
       {photo
         ? <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={filterCss ? { filter: filterCss } : undefined} />
         : <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${theme.dark}, ${theme.accent})` }} />
       }
-      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/10 backdrop-blur-[2px]" />
       {/* Top accent bar */}
       <div className="absolute top-0 left-0 right-0 h-1.5" style={{ background: theme.accent }} />
       {/* Slide badge */}
@@ -114,8 +115,8 @@ function CoverCard({ card, theme, photo, filterCss }: { card: CardSlide; theme: 
             ))}
           </div>
         )}
-        <h2 className="font-black text-[24px] leading-tight drop-shadow-lg whitespace-pre-line mb-2">{card.title}</h2>
-        {card.subtitle && <p className="text-[12px] opacity-70 mb-3">{card.subtitle}</p>}
+        <h2 className="font-display font-bold text-[28px] tracking-tight leading-tight drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] whitespace-pre-line mb-2">{card.title}</h2>
+        {card.subtitle && <p className="text-[13px] opacity-80 mb-3 font-medium">{card.subtitle}</p>}
         {card.price_badge && (
           <div className="inline-block text-[13px] font-black px-4 py-2 rounded-full shadow-lg" style={{ background: theme.accent }}>
             {card.price_badge}
@@ -128,17 +129,17 @@ function CoverCard({ card, theme, photo, filterCss }: { card: CardSlide; theme: 
 
 function LocationCard({ card, theme, photo, filterCss }: { card: CardSlide; theme: Theme; photo?: string; filterCss?: string }) {
   return (
-    <div className="relative aspect-square rounded-2xl overflow-hidden shadow-xl">
+    <div className="relative aspect-square rounded-[32px] overflow-hidden shadow-2xl">
       {photo
         ? <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={filterCss ? { filter: filterCss } : undefined} />
         : <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${theme.dark}, ${theme.accent})` }} />
       }
-      <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/20 to-black/70" />
-      <div className="absolute top-0 left-0 right-0 p-4" style={{ background: `${theme.accent}e8` }}>
+      <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/30 to-black/80 backdrop-blur-[2px]" />
+      <div className="absolute top-0 left-0 right-0 p-5" style={{ background: `${theme.accent}dd`, backdropFilter: 'blur(8px)' }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-white">
-            <MapPin size={14} />
-            <span className="font-bold text-[13px]">{card.title}</span>
+            <MapPin size={16} />
+            <span className="font-display font-medium text-[15px]">{card.title}</span>
           </div>
           <span className="text-white/70 text-[10px] font-medium">2 / 6</span>
         </div>
@@ -165,12 +166,12 @@ function LocationCard({ card, theme, photo, filterCss }: { card: CardSlide; them
 
 function CompositionCard({ card, theme, photo }: { card: CardSlide; theme: Theme; photo?: string }) {
   return (
-    <div className="relative aspect-square rounded-2xl overflow-hidden shadow-xl" style={{ background: theme.light }}>
-      <div className="absolute top-0 left-0 right-0 p-3.5" style={{ background: theme.accent }}>
+    <div className="relative aspect-square rounded-[32px] overflow-hidden shadow-2xl" style={{ background: theme.light }}>
+      <div className="absolute top-0 left-0 right-0 p-4" style={{ background: theme.accent }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-white">
-            <Building2 size={13} />
-            <span className="font-bold text-[13px]">{card.title}</span>
+            <Building2 size={15} />
+            <span className="font-display font-medium text-[15px]">{card.title}</span>
           </div>
           <span className="text-white/70 text-[10px] font-medium">3 / 6</span>
         </div>
@@ -207,17 +208,17 @@ function CompositionCard({ card, theme, photo }: { card: CardSlide; theme: Theme
 
 function InvestmentCard({ card, theme, photo, filterCss }: { card: CardSlide; theme: Theme; photo?: string; filterCss?: string }) {
   return (
-    <div className="relative aspect-square rounded-2xl overflow-hidden shadow-xl">
+    <div className="relative aspect-square rounded-[32px] overflow-hidden shadow-2xl">
       {photo
         ? <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={filterCss ? { filter: filterCss } : undefined} />
         : <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${theme.dark}, ${theme.mid})` }} />
       }
-      <div className="absolute inset-0 bg-gradient-to-t from-black/92 via-black/30 to-black/60" />
-      <div className="absolute top-0 left-0 right-0 p-3.5" style={{ background: `${theme.dark}cc` }}>
+      <div className="absolute inset-0 bg-gradient-to-t from-black/92 via-black/30 to-black/60 backdrop-blur-[2px]" />
+      <div className="absolute top-0 left-0 right-0 p-4" style={{ background: `${theme.dark}dd`, backdropFilter: 'blur(8px)' }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-white">
-            <TrendingUp size={13} style={{ color: theme.accent }} />
-            <span className="font-bold text-[13px]">{card.title}</span>
+            <TrendingUp size={15} style={{ color: theme.accent }} />
+            <span className="font-display font-medium text-[15px]">{card.title}</span>
           </div>
           <span className="text-white/50 text-[10px]">4 / 6</span>
         </div>
@@ -246,20 +247,20 @@ function InvestmentCard({ card, theme, photo, filterCss }: { card: CardSlide; th
 
 function InteriorCard({ card, theme, photo, filterCss }: { card: CardSlide; theme: Theme; photo?: string; filterCss?: string }) {
   return (
-    <div className="relative aspect-square rounded-2xl overflow-hidden shadow-xl">
+    <div className="relative aspect-square rounded-[32px] overflow-hidden shadow-2xl">
       {photo
         ? <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={filterCss ? { filter: filterCss } : undefined} />
         : <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${theme.dark}, ${theme.accent})` }} />
       }
-      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/20 to-transparent" />
       <div className="absolute top-4 left-4 flex items-center gap-2">
         <div className="w-8 h-8 rounded-full flex items-center justify-center shadow-lg" style={{ background: `${theme.accent}dd` }}>
           <Home size={15} className="text-white" />
         </div>
         <span className="text-white/70 text-[10px]">5 / 6</span>
       </div>
-      <div className="absolute inset-x-0 bottom-0 p-5 text-white">
-        <h3 className="font-black text-[14px] mb-2.5">{card.title}</h3>
+      <div className="absolute inset-x-0 bottom-0 p-6 text-white">
+        <h3 className="font-display font-bold text-[20px] mb-3 drop-shadow-md">{card.title}</h3>
         {card.checkpoints && card.checkpoints.length > 0 && (
           <div className="space-y-2">
             {card.checkpoints.slice(0, 4).map((pt, i) => (
@@ -280,19 +281,19 @@ function InteriorCard({ card, theme, photo, filterCss }: { card: CardSlide; them
 
 function CtaCard({ card, theme, photo, filterCss }: { card: CardSlide; theme: Theme; photo?: string; filterCss?: string }) {
   return (
-    <div className="relative aspect-square rounded-2xl overflow-hidden shadow-xl">
+    <div className="relative aspect-square rounded-[32px] overflow-hidden shadow-2xl">
       {photo
         ? <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={filterCss ? { filter: filterCss } : undefined} />
         : <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${theme.dark}, ${theme.accent})` }} />
       }
-      <div className="absolute inset-0 bg-gradient-to-b from-black/75 via-black/50 to-black/90" />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/95 backdrop-blur-sm" />
       <div className="absolute top-0 left-0 right-0 h-1.5" style={{ background: theme.accent }} />
       <div className="absolute top-3 right-3 text-white/50 text-[10px]">6 / 6</div>
-      <div className="absolute inset-0 flex flex-col items-center justify-center p-5 text-center text-white">
-        <div className="mb-2">
-          <Phone size={20} style={{ color: theme.accent }} className="mx-auto" />
+      <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-white">
+        <div className="mb-3">
+          <Phone size={24} style={{ color: theme.accent }} className="mx-auto" />
         </div>
-        <h2 className="font-black text-[20px] leading-tight whitespace-pre-line mb-3 drop-shadow">{card.title}</h2>
+        <h2 className="font-display font-bold text-[26px] tracking-tight leading-tight whitespace-pre-line mb-4 drop-shadow-xl">{card.title}</h2>
         {card.price_badge && (
           <div className="inline-block text-[13px] font-black px-5 py-2 rounded-full mb-3 shadow-lg" style={{ background: theme.accent }}>
             {card.price_badge}
@@ -455,7 +456,7 @@ function CardPreview({
         <button
           onClick={onGenerateAI}
           disabled={aiLoading}
-          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-full shadow-lg bg-white/92 text-gray-700 hover:bg-white disabled:opacity-60"
+          className="exclude-export absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-full shadow-lg bg-white/92 text-gray-700 hover:bg-white disabled:opacity-60"
         >
           {aiLoading ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} className="text-purple-500" />}
           AI 배경
@@ -484,6 +485,9 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
   const [activeSlide, setActiveSlide] = useState(0)
   const [copied, setCopied] = useState(false)
   const [editedCards, setEditedCards] = useState<Record<number, Partial<CardSlide>>>({})
+  const [customInstructions, setCustomInstructions] = useState('')
+  const [showInstructions, setShowInstructions] = useState(true)
+  const cardRef = useRef<HTMLDivElement>(null)
 
   const selected = contents.find(c => c.id === selectedId)
   const rawContent = selected?.content ? JSON.parse(selected.content) : null
@@ -591,6 +595,24 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
   const prevSlide = () => setActiveSlide(s => Math.max(0, s - 1))
   const nextSlide = () => setActiveSlide(s => Math.min((slides.length || 1) - 1, s + 1))
 
+  const handleDownloadCurrent = async () => {
+    if (!cardRef.current) return
+    try {
+      const dataUrl = await toPng(cardRef.current, {
+        cacheBust: true,
+        pixelRatio: 3,
+        filter: (node) => !node.classList?.contains('exclude-export')
+      })
+      const link = document.createElement('a')
+      link.download = `card-${platform}-${activeSlide + 1}.png`
+      link.href = dataUrl
+      link.click()
+      toast.success('이미지가 저장되었습니다')
+    } catch (err) {
+      toast.error('다운로드 중 오류가 발생했습니다')
+    }
+  }
+
   return (
     <div className="space-y-5">
       {/* ── 상단 컨트롤 바 ── */}
@@ -649,6 +671,11 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
           )}
 
           <div className="flex-1" />
+
+          {/* 현재 카드 다운로드 */}
+          <button onClick={handleDownloadCurrent} className="btn-secondary text-xs gap-1.5 border-brand-200 hover:border-brand-500 hover:text-brand-600 transition-colors">
+            <Download size={13} /> 다운로드
+          </button>
 
           {/* 해시태그 복사 */}
           {slides.some(s => s.hashtags && s.hashtags.length > 0) && (
@@ -792,17 +819,17 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
               </button>
 
               {/* Active card - centered, max width */}
-              <div className="max-w-[420px] mx-auto">
+              <div className="max-w-[420px] mx-auto w-full" ref={cardRef}>
                 {slides[activeSlide] && (
                   <CardPreview
                     card={mergeCard(slides[activeSlide])}
                     theme={theme}
                     photo={assignPhoto(slides[activeSlide].order, assets)}
                     aiPhoto={aiPhotos[slides[activeSlide].order]}
+                    platform={platform}
                     onGenerateAI={platform === 'instagram' ? () => handleGenerateAI(slides[activeSlide]) : undefined}
                     aiLoading={aiLoading[slides[activeSlide].order]}
                     filterCss={filterCss}
-                    platform={platform}
                   />
                 )}
               </div>

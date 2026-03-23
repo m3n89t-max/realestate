@@ -331,21 +331,21 @@ export default function NewProjectPage() {
     if (form.transaction_type === 'rent') return (
       <tr>
         <TLabel>보 증 금<br /><span className="font-normal text-gray-400">(만원)</span></TLabel>
-        <TCell><TInput value={form.deposit} onChange={v => set('deposit', v)} placeholder="7000" type="number" /></TCell>
+        <TCell><TInput value={form.deposit} onChange={v => set('deposit', v)} placeholder="7000" /></TCell>
         <TLabel>월 임 대 료<br /><span className="font-normal text-gray-400">(만원)</span></TLabel>
-        <TCell><TInput value={form.monthly_rent} onChange={v => set('monthly_rent', v)} placeholder="500" type="number" className="text-red-600 font-bold" /></TCell>
+        <TCell><TInput value={form.monthly_rent} onChange={v => set('monthly_rent', v)} placeholder="500" className="text-red-600 font-bold" /></TCell>
       </tr>
     )
     if (form.transaction_type === 'lease') return (
       <tr>
         <TLabel>전세보증금<br /><span className="font-normal text-gray-400">(만원)</span></TLabel>
-        <TCell colSpan={3}><TInput value={form.deposit} onChange={v => set('deposit', v)} placeholder="30000" type="number" className="text-red-600 font-bold" /></TCell>
+        <TCell colSpan={3}><TInput value={form.deposit} onChange={v => set('deposit', v)} placeholder="30000" className="text-red-600 font-bold" /></TCell>
       </tr>
     )
     return (
       <tr>
         <TLabel>매 매 가<br /><span className="font-normal text-gray-400">(만원)</span></TLabel>
-        <TCell colSpan={3}><TInput value={form.price} onChange={v => set('price', v)} placeholder="100000" type="number" className="text-red-600 font-bold" /></TCell>
+        <TCell colSpan={3}><TInput value={form.price} onChange={v => set('price', v)} placeholder="100000" className="text-red-600 font-bold" /></TCell>
       </tr>
     )
   }
@@ -442,24 +442,6 @@ export default function NewProjectPage() {
                     </TCell>
                   </tr>
 
-                  {/* Row 3: 매물유형 / 방·화장실 */}
-                  <tr>
-                    <TLabel>매물 유형</TLabel>
-                    <TCell colSpan={3}>
-                      <div className="flex flex-wrap gap-1.5 py-0.5">
-                        {PROPERTY_TYPES.map(t => chipBtn(t.label, form.property_type === t.value, () => set('property_type', t.value)))}
-                      </div>
-                    </TCell>
-                    <TLabel>방 / 화장실</TLabel>
-                    <TCell>
-                      <div className="flex items-center gap-1">
-                        <TInput value={form.rooms_count} onChange={v => set('rooms_count', v)} placeholder="0" type="number" className="w-10" />
-                        <span className="text-gray-400"> / </span>
-                        <TInput value={form.bathrooms_count} onChange={v => set('bathrooms_count', v)} placeholder="1" type="number" className="w-10" />
-                      </div>
-                    </TCell>
-                  </tr>
-
                   {/* Row 4: 대지면적 / 사용승인일 / 연면적 */}
                   <tr>
                     <TLabel>대지면적(㎡)</TLabel>
@@ -476,7 +458,7 @@ export default function NewProjectPage() {
                     </TCell>
                   </tr>
 
-                  {/* Row 5: 전용면적 / 입주가능일 / 주차대수 */}
+                  {/* Row 5: 전용면적 / 입주가능일 / 방·화장실 */}
                   <tr>
                     <TLabel>전용면적(㎡)</TLabel>
                     <TCell>
@@ -486,9 +468,21 @@ export default function NewProjectPage() {
                     <TCell>
                       <TInput value={form.move_in_date} onChange={v => set('move_in_date', v)} placeholder="즉시입주가능" />
                     </TCell>
-                    <TLabel>주 차 대 수</TLabel>
+                    <TLabel>방 / 화장실</TLabel>
                     <TCell>
-                      <div className="space-y-0.5">
+                      <div className="flex items-center gap-1">
+                        <TInput value={form.rooms_count} onChange={v => set('rooms_count', v)} placeholder="0" type="number" className="w-10" />
+                        <span className="text-gray-400"> / </span>
+                        <TInput value={form.bathrooms_count} onChange={v => set('bathrooms_count', v)} placeholder="1" type="number" className="w-10" />
+                      </div>
+                    </TCell>
+                  </tr>
+
+                  {/* Row 5b: 주차대수 */}
+                  <tr>
+                    <TLabel>주 차 대 수</TLabel>
+                    <TCell colSpan={5}>
+                      <div className="flex gap-4">
                         <div className="flex items-center gap-1 text-xs">
                           <span className="text-gray-500">대장상</span>
                           <TInput value={form.parking_legal} onChange={v => set('parking_legal', v)} placeholder="12" type="number" className="w-12" />
@@ -510,7 +504,7 @@ export default function NewProjectPage() {
                   <tr>
                     <TLabel>권 리 금<br /><span className="font-normal text-gray-400">(만원)</span></TLabel>
                     <TCell>
-                      <TInput value={form.key_money} onChange={v => set('key_money', v)} placeholder="무권리=0" type="number" />
+                      <TInput value={form.key_money} onChange={v => set('key_money', v)} placeholder="무권리=0" />
                     </TCell>
                     <TLabel>관 리 비</TLabel>
                     <TCell colSpan={3}>
