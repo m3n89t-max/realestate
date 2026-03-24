@@ -577,13 +577,14 @@ function KakaoDensityPanel({ kakao_density, projectId, lat, lng }: {
 
 // ── 지도 섹션 ─────────────────────────────────────────────────
 function MapSection({
-  lat, lng, poi_data, kakao_density, locationAnalysis, real_price_data, projectId,
+  lat, lng, poi_data, kakao_density, locationAnalysis, population_data, real_price_data, projectId,
 }: {
   lat: number | null
   lng: number | null
   poi_data: Record<string, POIItem[]> | null
   kakao_density?: any
   locationAnalysis?: any
+  population_data?: any
   real_price_data: RealPriceItem[] | null
   projectId: string
 }) {
@@ -627,10 +628,38 @@ function MapSection({
   const avgPrice = amounts.length ? Math.round(amounts.reduce((s, a) => s + a, 0) / amounts.length) : null
   const maxPrice = amounts.length ? Math.max(...amounts) : null
 
+  const [popLoading, setPopLoading] = useState(false)
+
+  const analyzePopulation = async () => {
+    if (!lat || !lng) { toast.error('좌표가 없습니다'); return }
+    setPopLoading(true)
+    try {
+      const res = await fetch('/api/population', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_id: projectId }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? '인구 통계 수집 실패')
+      toast.success('배후 인구 분석이 완료되었습니다')
+      window.location.reload()
+    } catch (e: any) {
+      toast.error(e.message ?? '배후 인구 분석 실패')
+    } finally {
+      setPopLoading(false)
+    }
+  }
+
   return (
     <div className="space-y-3">
+      <div className="flex justify-between items-center px-1">
+        <p className="text-xs text-gray-500">지도의 마커와 팝업으로 상세 위치 정보를 확인하세요.</p>
+        <button onClick={analyzePopulation} disabled={popLoading || !lat} className="btn-secondary text-[11px] py-1 px-2.5 h-7">
+          {popLoading ? <><Loader2 size={11} className="animate-spin" /> 수집 중...</> : <><Users size={11} /> 배후 인구 분석</>}
+        </button>
+      </div>
       <div className="rounded-xl overflow-hidden border border-gray-100 relative">
-        <KakaoMap lat={lat} lng={lng} level={4} style={{ width: '100%', height: 380 }} poiData={poi_data} kakaoDensity={kakao_density} locationAnalysis={locationAnalysis} />
+        <KakaoMap lat={lat} lng={lng} level={4} style={{ width: '100%', height: 380 }} poiData={poi_data} kakaoDensity={kakao_density} locationAnalysis={locationAnalysis} populationData={population_data} />
         <a
           href={`https://map.kakao.com/link/map/${lat},${lng}`}
           target="_blank"
@@ -1000,6 +1029,7 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
     { label: '좌표 변환', done: !!(project.lat && project.lng) },
     { label: 'POI 수집', done: hasPOI },
     { label: isCommercial ? '상권 데이터' : '부동산 데이터', done: hasData },
+    { label: '배후 인구', done: !!project.population_data },
     { label: '입지 분석', done: hasAnalysis },
   ]
 
@@ -1031,6 +1061,7 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
           poi_data={project.poi_data}
           kakao_density={project.kakao_density}
           locationAnalysis={locationAnalysis}
+          population_data={project.population_data}
           real_price_data={isCommercial ? null : project.real_price_data}
           projectId={projectId}
         />

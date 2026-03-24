@@ -67,6 +67,27 @@ export class SGISClient {
 
         return data.result;
     }
+
+    /**
+     * Fetches household statistics (API_0305).
+     * @param household_type '01' for 1-gen, 'A0' for 1-person household
+     */
+    public async getHouseholdStat(year: string, adm_cd: string, household_type: string = 'A0', low_search: string = '0') {
+        const token = await this.getAccessToken();
+        const url = `https://sgisapi.kostat.go.kr/OpenAPI3/stats/household.json?year=${year}&adm_cd=${adm_cd}&low_search=${low_search}&household_type=${household_type}&accessToken=${token}`;
+
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`SGIS Household Request Failed with status ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (data.errCd !== 0) {
+            throw new Error(`SGIS Household API Error: ${data.errMsg} (Code: ${data.errCd})`);
+        }
+
+        return data.result;
+    }
 }
 
 // Optional export for an initialized client if keys are in process.env

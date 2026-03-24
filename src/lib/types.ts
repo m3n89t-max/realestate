@@ -169,6 +169,7 @@ export interface Project {
   floor_composition?: string | null
   rental_status?: string | null
   kakao_density?: KakaoDensity | null
+  population_data?: PopulationData | null
   created_at: string
   updated_at: string
 }
@@ -224,6 +225,16 @@ export interface GeneratedContent {
   template_id?: string
   created_at: string
   updated_at: string
+}
+
+export interface PopulationData {
+  density: number
+  total_population: number
+  total_households: number
+  single_households: number
+  avg_members: number
+  avg_age: number
+  collected_at: string
 }
 
 export interface LocationAnalysis {

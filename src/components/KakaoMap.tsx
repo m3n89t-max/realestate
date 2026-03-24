@@ -16,6 +16,7 @@ interface KakaoMapProps {
   poiData?: Record<string, POIItem[]> | null
   kakaoDensity?: KakaoDensity | null
   locationAnalysis?: any
+  populationData?: any
 }
 
 // 카테고리별 마커 이미지 색상 매핑 (임의의 색상/이모지 사용)
@@ -33,7 +34,7 @@ const POI_EMOJI: Record<string, string> = {
 }
 
 export default function KakaoMap({
-  lat, lng, level = 4, className, style, poiData, kakaoDensity, locationAnalysis
+  lat, lng, level = 4, className, style, poiData, kakaoDensity, locationAnalysis, populationData
 }: KakaoMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const appKey = process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY
@@ -115,5 +116,41 @@ export default function KakaoMap({
     )
   }
 
-  return <div ref={containerRef} className={className} style={style} />
+  return (
+    <div className={`relative ${className || ''}`} style={style}>
+      <div ref={containerRef} className="w-full h-full" />
+      {populationData && (
+        <div className="absolute top-4 right-4 z-10 bg-white/95 backdrop-blur-sm p-3.5 rounded-xl shadow-md border border-brand-100 min-w-[180px]">
+          <h4 className="text-xs font-bold text-gray-800 mb-2.5 border-b pb-1.5 flex items-center gap-1">
+            <span>👥</span> 배후 인구 분석
+          </h4>
+          <div className="space-y-2">
+            <div className="flex justify-between items-center text-[11px]">
+              <span className="text-gray-500">인구 밀도</span>
+              <span className="font-semibold text-brand-600">{populationData.density?.toLocaleString()}명/㎢</span>
+            </div>
+            <div className="flex justify-between items-center text-[11px]">
+              <span className="text-gray-500">총 인구</span>
+              <span className="font-semibold text-gray-700">{populationData.total_population?.toLocaleString()}명</span>
+            </div>
+            <div className="flex justify-between items-center text-[11px]">
+              <span className="text-gray-500">총 가구 수</span>
+              <span className="font-semibold text-gray-700">{populationData.total_households?.toLocaleString()}가구</span>
+            </div>
+            <div className="flex justify-between items-center text-[11px]">
+              <span className="text-gray-500">1인가구 비율</span>
+              <span className="font-semibold text-orange-600">
+                {populationData.total_households > 0
+                  ? ((populationData.single_households / populationData.total_households) * 100).toFixed(1)
+                  : 0}%
+              </span>
+            </div>
+          </div>
+          {populationData.collected_at && (
+            <p className="mt-3 text-[9px] text-gray-400 text-right">SGIS 통계청 기준</p>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
