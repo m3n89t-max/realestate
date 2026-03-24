@@ -853,6 +853,8 @@ function CommercialSection({ commercial_data, projectId }: {
     store_count_by_category = {},
     stores = [],
     radius_m = 500,
+    floating_population = null,
+    sales_data = null,
   } = commercial_data
 
   const totalStores: number = stores.length
@@ -880,6 +882,9 @@ function CommercialSection({ commercial_data, projectId }: {
       .sort((a, b) => b.count - a.count)
   }
 
+  const hourLabels = ['00-06시', '06-11시', '11-14시', '14-17시', '17-21시', '21-24시']
+  const maxHour = floating_population ? Math.max(...floating_population.by_hour, 1) : 1
+
   return (
     <div className="space-y-4">
       {/* 요약 수치 */}
@@ -893,6 +898,77 @@ function CommercialSection({ commercial_data, projectId }: {
           <p className="text-xl font-bold text-orange-600">{zones.length}개</p>
         </div>
       </div>
+
+      {/* 유동인구 */}
+      {floating_population && (
+        <div className="p-3 bg-purple-50 rounded-lg">
+          <p className="text-xs font-semibold text-purple-700 mb-2">🚶 유동인구 (반경 500m)</p>
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            <div className="text-center">
+              <p className="text-[10px] text-gray-500">주중</p>
+              <p className="text-lg font-bold text-purple-700">{floating_population.weekday.toLocaleString()}명</p>
+            </div>
+            <div className="text-center">
+              <p className="text-[10px] text-gray-500">주말</p>
+              <p className="text-lg font-bold text-purple-500">{floating_population.weekend.toLocaleString()}명</p>
+            </div>
+          </div>
+          <p className="text-[10px] text-gray-500 mb-1">시간대별 유동인구</p>
+          <div className="flex items-end gap-0.5 h-10">
+            {floating_population.by_hour.map((v: number, i: number) => (
+              <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
+                <div
+                  className="w-full rounded-sm bg-purple-400"
+                  style={{ height: `${Math.round((v / maxHour) * 32)}px`, minHeight: 2 }}
+                  title={`${hourLabels[i]}: ${v.toLocaleString()}명`}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-between mt-0.5">
+            {hourLabels.map((l, i) => (
+              <span key={i} className="text-[8px] text-gray-400 flex-1 text-center leading-tight">{l.split('-')[0]}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 카드 매출 */}
+      {sales_data && (
+        <div className="p-3 bg-green-50 rounded-lg">
+          <p className="text-xs font-semibold text-green-700 mb-2">💳 카드 매출 현황</p>
+          {sales_data.area_name && (
+            <p className="text-[10px] text-gray-400 mb-1">{sales_data.area_name} 상권 기준</p>
+          )}
+          <div className="grid grid-cols-3 gap-1.5 text-center">
+            <div className="p-1.5 bg-white rounded">
+              <p className="text-[9px] text-gray-500">월 추정매출</p>
+              <p className="text-xs font-bold text-green-700">
+                {sales_data.monthly_sales > 0
+                  ? `${(sales_data.monthly_sales / 10000).toFixed(0)}만원`
+                  : '-'}
+              </p>
+            </div>
+            <div className="p-1.5 bg-white rounded">
+              <p className="text-[9px] text-gray-500">주중 매출</p>
+              <p className="text-xs font-bold text-gray-700">
+                {sales_data.weekly_sales > 0
+                  ? `${(sales_data.weekly_sales / 10000).toFixed(0)}만원`
+                  : '-'}
+              </p>
+            </div>
+            <div className="p-1.5 bg-white rounded">
+              <p className="text-[9px] text-gray-500">주말 매출</p>
+              <p className="text-xs font-bold text-gray-700">
+                {sales_data.weekend_sales > 0
+                  ? `${(sales_data.weekend_sales / 10000).toFixed(0)}만원`
+                  : '-'}
+              </p>
+            </div>
+          </div>
+          <p className="text-[9px] text-gray-400 mt-1.5 text-right">소상공인진흥공단 기준</p>
+        </div>
+      )}
 
       {/* 업종별 분포 (클릭 시 중분류/소분류 드릴다운) */}
       {categories.length > 0 && (

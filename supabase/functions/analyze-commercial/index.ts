@@ -96,16 +96,67 @@ async function fetchNearbyStores(serviceKey: string, lat: number, lng: number): 
     pageNo: '1', numOfRows: '100', radius: '500',
     cx: String(lng), cy: String(lat), type: 'json',
   })
-  console.log('[analyze-commercial] stores URL:', url.replace(serviceKey, serviceKey.slice(0, 8) + '...'))
   const res = await fetch(url)
   const text = await res.text()
-  console.log('[analyze-commercial] stores raw response (first 500):', text.slice(0, 500))
+  try { return extractItems(JSON.parse(text)) } catch { return [] }
+}
+
+async function fetchFloatingPopulation(serviceKey: string, lat: number, lng: number): Promise<any | null> {
   try {
+    const url = buildApiUrl('storeFlpopCo', serviceKey, {
+      pageNo: '1', numOfRows: '1', radius: '500',
+      cx: String(lng), cy: String(lat), type: 'json',
+    })
+    const res = await fetch(url)
+    const text = await res.text()
     const data = JSON.parse(text)
-    return extractItems(data)
-  } catch {
-    console.error('[analyze-commercial] stores JSON parse error, raw:', text.slice(0, 200))
-    return []
+    const items = extractItems(data)
+    if (!items.length) return null
+    const it = items[0]
+    return {
+      weekday: Number(it.wkdayFlpopCo ?? it.mdWkDwFlpopCo ?? 0),
+      weekend: Number(it.wkndFlpopCo ?? 0),
+      by_hour: [
+        Number(it.timeZone01 ?? 0),  // 00-06시
+        Number(it.timeZone02 ?? 0),  // 06-11시
+        Number(it.timeZone03 ?? 0),  // 11-14시
+        Number(it.timeZone04 ?? 0),  // 14-17시
+        Number(it.timeZone05 ?? 0),  // 17-21시
+        Number(it.timeZone06 ?? 0),  // 21-24시
+      ],
+      male_ratio: it.maleFlpopCo && it.totFlpopCo
+        ? Math.round((Number(it.maleFlpopCo) / Number(it.totFlpopCo)) * 100)
+        : null,
+    }
+  } catch (e) {
+    console.error('[analyze-commercial] floating population fetch failed:', e)
+    return null
+  }
+}
+
+async function fetchSalesData(serviceKey: string, lat: number, lng: number): Promise<any | null> {
+  try {
+    const url = buildApiUrl('trdarSalersList', serviceKey, {
+      pageNo: '1', numOfRows: '5', radius: '500',
+      cx: String(lng), cy: String(lat), type: 'json',
+    })
+    const res = await fetch(url)
+    const text = await res.text()
+    const data = JSON.parse(text)
+    const items = extractItems(data)
+    if (!items.length) return null
+    // 첫 번째 상권의 매출 요약
+    const it = items[0]
+    return {
+      monthly_sales: Number(it.thmonSalesAmt ?? it.slsAmt ?? 0),
+      weekly_sales: Number(it.wkdaySlsAmt ?? 0),
+      weekend_sales: Number(it.wkndSlsAmt ?? 0),
+      top_category: it.indsLclsNm ?? null,
+      area_name: it.trdarNm ?? null,
+    }
+  } catch (e) {
+    console.error('[analyze-commercial] sales data fetch failed:', e)
+    return null
   }
 }
 
@@ -170,12 +221,15 @@ Deno.serve(async (req) => {
 
     console.log('[analyze-commercial] lat:', lat, 'lng:', lng, 'key prefix:', serviceKey.slice(0, 8))
 
-    const [zones, stores] = await Promise.all([
+    const [zones, stores, floating_population, sales_data] = await Promise.all([
       fetchCommercialZones(serviceKey, lat, lng),
       fetchNearbyStores(serviceKey, lat, lng),
+      fetchFloatingPopulation(serviceKey, lat, lng),
+      fetchSalesData(serviceKey, lat, lng),
     ])
 
-    console.log('[analyze-commercial] zones:', zones.length, 'stores:', stores.length)
+    console.log('[analyze-commercial] zones:', zones.length, 'stores:', stores.length,
+      'flpop:', !!floating_population, 'sales:', !!sales_data)
 
     // 카테고리(대분류)별 상가 수 집계
     const storeCounts: Record<string, number> = {}
@@ -188,6 +242,8 @@ Deno.serve(async (req) => {
       zones,
       stores,
       store_count_by_category: storeCounts,
+      floating_population,
+      sales_data,
       radius_m: 500,
       collected_at: new Date().toISOString(),
     }
