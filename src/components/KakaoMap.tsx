@@ -19,19 +19,6 @@ interface KakaoMapProps {
   populationData?: any
 }
 
-const POI_EMOJI: Record<string, string> = {
-  subway: '🚇',
-  mart: '🛒',
-  hospital: '🏥',
-  school: '🏫',
-  convenience: '🏪',
-  pharmacy: '💊',
-  culture: '🏛️',
-  bank: '🏦',
-  cafe: '☕',
-  restaurant: '🍽️',
-}
-
 // 유동인구 추정 가중치 (TEAM5 spec 기반)
 const POI_HEATMAP_WEIGHT: Record<string, number> = {
   subway: 10,
@@ -84,28 +71,7 @@ export default function KakaoMap({
           circle.setMap(map)
         }
 
-        // 3. POI 마커
-        if (poiData) {
-          Object.entries(poiData).forEach(([catKey, items]) => {
-            const emoji = POI_EMOJI[catKey] || '📍'
-            items.forEach((item) => {
-              if (item.lat && item.lng) {
-                const itemPos = new window.kakao.maps.LatLng(item.lat, item.lng)
-                const content = document.createElement('div')
-                content.className = 'bg-white border text-xs px-1.5 py-0.5 rounded shadow-sm text-gray-700 whitespace-nowrap cursor-pointer hover:bg-gray-50'
-                content.innerHTML = `<span class="mr-1">${emoji}</span>${item.name}`
-                const overlay = new window.kakao.maps.CustomOverlay({
-                  position: itemPos,
-                  content: content,
-                  yAnchor: 1
-                })
-                overlay.setMap(map)
-              }
-            })
-          })
-        }
-
-        // 4. 유동인구 히트맵 (heatmap.js + POI 가중치)
+        // 3. 유동인구 히트맵 (heatmap.js + POI 가중치)
         if (poiData && heatmapDivRef.current) {
           const hDiv = heatmapDivRef.current
 
