@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { POIItem, KakaoDensity } from '@/lib/types'
 
 declare global {
-  interface Window { kakao: any; h337: any }
+  interface Window { kakao: any }
 }
 
 interface KakaoMapProps {
@@ -19,7 +19,6 @@ interface KakaoMapProps {
   populationData?: any
 }
 
-// 유동인구 추정 가중치 (TEAM5 spec 기반)
 const POI_HEATMAP_WEIGHT: Record<string, number> = {
   subway: 10,
   mart: 7,
@@ -33,11 +32,35 @@ const POI_HEATMAP_WEIGHT: Record<string, number> = {
   culture: 2,
 }
 
+// 네이티브 Canvas 히트맵 렌더러 (heatmap.js 불필요)
+function drawHeatmap(
+  canvas: HTMLCanvasElement,
+  points: { x: number; y: number; value: number }[]
+) {
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+  points.forEach(({ x, y, value }) => {
+    const radius = 50 + value * 4
+    const alpha = 0.12 + (value / 10) * 0.35
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, radius)
+    grad.addColorStop(0,   `rgba(239,68,68,${alpha})`)    // 빨강 (중심)
+    grad.addColorStop(0.4, `rgba(234,179,8,${alpha * 0.7})`) // 노랑
+    grad.addColorStop(0.75,`rgba(59,130,246,${alpha * 0.4})`) // 파랑
+    grad.addColorStop(1,   'rgba(59,130,246,0)')
+    ctx.beginPath()
+    ctx.arc(x, y, radius, 0, Math.PI * 2)
+    ctx.fillStyle = grad
+    ctx.fill()
+  })
+}
+
 export default function KakaoMap({
   lat, lng, level = 4, className, style, poiData, kakaoDensity, locationAnalysis, populationData
 }: KakaoMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const heatmapDivRef = useRef<HTMLDivElement>(null)
+  const canvasRef    = useRef<HTMLCanvasElement>(null)
   const [showHeatmap, setShowHeatmap] = useState(false)
   const appKey = process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY
 
@@ -58,87 +81,64 @@ export default function KakaoMap({
         infowindow.open(map, marker)
 
         // 2. 업종 밀집도 원
-        if (kakaoDensity && kakaoDensity.radius_m) {
-          const circle = new window.kakao.maps.Circle({
-            center: center,
+        if (kakaoDensity?.radius_m) {
+          new window.kakao.maps.Circle({
+            map,
+            center,
             radius: kakaoDensity.radius_m,
             strokeWeight: 1,
             strokeColor: '#3b82f6',
             strokeOpacity: 0.5,
             fillColor: '#60a5fa',
-            fillOpacity: 0.1
-          })
-          circle.setMap(map)
+            fillOpacity: 0.1,
+          }).setMap(map)
         }
 
-        // 3. 유동인구 히트맵 (heatmap.js + POI 가중치)
-        if (poiData && heatmapDivRef.current) {
-          const hDiv = heatmapDivRef.current
+        // 3. 유동인구 히트맵 (네이티브 Canvas)
+        const canvas = canvasRef.current
+        if (!canvas || !poiData) return
 
-          const buildHeatmap = () => {
-            hDiv.innerHTML = '' // 이전 canvas 제거
+        // bounds → pixel 변환
+        const toPixel = (iLat: number, iLng: number) => {
+          const b  = map.getBounds()
+          const sw = b.getSouthWest()
+          const ne = b.getNorthEast()
+          const w  = canvas.width
+          const h  = canvas.height
+          return {
+            x: Math.round(((iLng - sw.getLng()) / (ne.getLng() - sw.getLng())) * w),
+            y: Math.round(((ne.getLat() - iLat)  / (ne.getLat() - sw.getLat()))  * h),
+          }
+        }
 
-            const instance = window.h337.create({
-              container: hDiv,
-              radius: 55,
-              maxOpacity: 0.65,
-              minOpacity: 0,
-              blur: 0.88,
-              gradient: {
-                0.2: '#3b82f6',
-                0.5: '#06b6d4',
-                0.75: '#eab308',
-                1.0: '#ef4444',
-              },
+        const render = () => {
+          // canvas 픽셀 크기를 실제 DOM 크기에 맞춤
+          canvas.width  = container.offsetWidth
+          canvas.height = container.offsetHeight
+
+          const points: { x: number; y: number; value: number }[] = []
+
+          // 매물 위치 (항상 포함)
+          points.push({ ...toPixel(lat, lng), value: 8 })
+
+          Object.entries(poiData!).forEach(([cat, items]) => {
+            const w = POI_HEATMAP_WEIGHT[cat] || 2
+            items.forEach(item => {
+              if (item.lat && item.lng) {
+                const pt = toPixel(item.lat, item.lng)
+                if (pt.x > -80 && pt.x < canvas.width + 80 && pt.y > -80 && pt.y < canvas.height + 80) {
+                  points.push({ ...pt, value: w })
+                }
+              }
             })
+          })
 
-            // bounds 기반 좌표 변환 (pointFromCoords 대신 — 더 안정적)
-            const latlngToPixel = (itemLat: number, itemLng: number, w: number, h: number) => {
-              const bounds = map.getBounds()
-              const sw = bounds.getSouthWest()
-              const ne = bounds.getNorthEast()
-              const x = ((itemLng - sw.getLng()) / (ne.getLng() - sw.getLng())) * w
-              const y = ((ne.getLat() - itemLat) / (ne.getLat() - sw.getLat())) * h
-              return { x: Math.round(x), y: Math.round(y) }
-            }
-
-            const render = () => {
-              const w = hDiv.offsetWidth
-              const h = hDiv.offsetHeight
-              const points: { x: number; y: number; value: number }[] = []
-
-              // 매물 위치 자체도 데이터 포인트로 추가 (항상 유효)
-              points.push({ ...latlngToPixel(lat, lng, w, h), value: 8 })
-
-              Object.entries(poiData!).forEach(([catKey, items]) => {
-                const weight = POI_HEATMAP_WEIGHT[catKey] || 2
-                items.forEach(item => {
-                  if (item.lat && item.lng) {
-                    const pt = latlngToPixel(item.lat, item.lng, w, h)
-                    if (pt.x > -80 && pt.x < w + 80 && pt.y > -80 && pt.y < h + 80) {
-                      points.push({ ...pt, value: weight })
-                    }
-                  }
-                })
-              })
-
-              instance.setData({ max: 10, data: points })
-            }
-
-            render()
-            window.kakao.maps.event.addListener(map, 'zoom_changed', render)
-            window.kakao.maps.event.addListener(map, 'dragend', render)
-          }
-
-          if (window.h337) {
-            buildHeatmap()
-          } else {
-            const s = document.createElement('script')
-            s.src = 'https://cdn.jsdelivr.net/npm/heatmap.js@2.0.5/build/heatmap.min.js'
-            s.onload = buildHeatmap
-            document.head.appendChild(s)
-          }
+          drawHeatmap(canvas, points)
         }
+
+        render()
+        window.kakao.maps.event.addListener(map, 'zoom_changed', render)
+        window.kakao.maps.event.addListener(map, 'dragend', render)
       })
     }
 
@@ -170,11 +170,12 @@ export default function KakaoMap({
     <div className={`relative ${className || ''}`} style={style}>
       <div ref={containerRef} className="w-full h-full" />
 
-      {/* 히트맵 캔버스 오버레이 (항상 DOM에 있어야 heatmap.js 초기화 가능) */}
-      <div
-        ref={heatmapDivRef}
+      {/* 히트맵 캔버스 오버레이 */}
+      <canvas
+        ref={canvasRef}
         style={{
-          position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+          position: 'absolute', top: 0, left: 0,
+          width: '100%', height: '100%',
           pointerEvents: 'none',
           opacity: showHeatmap ? 1 : 0,
           transition: 'opacity 0.4s ease',
