@@ -118,9 +118,6 @@ export default function KakaoMap({
 
           const points: { x: number; y: number; value: number }[] = []
 
-          // 매물 위치 (항상 포함)
-          points.push({ ...toPixel(lat, lng), value: 8 })
-
           Object.entries(poiData!).forEach(([cat, items]) => {
             const w = POI_HEATMAP_WEIGHT[cat] || 2
             items.forEach(item => {
@@ -193,16 +190,33 @@ export default function KakaoMap({
               : 'bg-white/90 backdrop-blur-sm text-gray-600 border-gray-200 hover:bg-gray-50'
           }`}
         >
-          🔥 유동인구 히트맵
+          🔥 시설 밀집도 히트맵
         </button>
+      )}
+
+      {/* 히트맵 색상 범례 */}
+      {hasPoi && showHeatmap && (
+        <div className="absolute bottom-10 left-28 z-20 bg-white/90 backdrop-blur-sm px-2.5 py-1.5 rounded-xl shadow-md border border-gray-200 text-[10px] text-gray-600">
+          <div className="flex items-center gap-1.5 mb-1 font-medium text-gray-500">시설 밀집도</div>
+          <div className="flex items-center gap-1">
+            <div className="flex gap-0.5">
+              <span className="w-3 h-3 rounded-sm" style={{background:'rgba(239,68,68,0.8)'}} />
+              <span className="w-3 h-3 rounded-sm" style={{background:'rgba(234,179,8,0.6)'}} />
+              <span className="w-3 h-3 rounded-sm" style={{background:'rgba(59,130,246,0.4)'}} />
+            </div>
+            <span className="text-gray-400">높음 → 낮음</span>
+          </div>
+          <p className="mt-1 text-[9px] text-gray-400">지하철·마트·편의점 등 시설 기반</p>
+        </div>
       )}
 
       {/* 배후 인구 분석 팝업 */}
       {populationData && (
         <div className="absolute top-4 right-4 z-10 bg-white/95 backdrop-blur-sm p-3.5 rounded-xl shadow-md border border-brand-100 min-w-[180px]">
-          <h4 className="text-xs font-bold text-gray-800 mb-2.5 border-b pb-1.5 flex items-center gap-1">
+          <h4 className="text-xs font-bold text-gray-800 mb-1 flex items-center gap-1">
             <span>👥</span> 배후 인구 분석
           </h4>
+          <p className="text-[9px] text-blue-500 mb-2 pb-1.5 border-b border-gray-100">시군구 행정구역 기준</p>
           <div className="space-y-2">
             <div className="flex justify-between items-center text-[11px]">
               <span className="text-gray-500">인구 밀도</span>
