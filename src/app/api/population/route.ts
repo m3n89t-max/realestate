@@ -21,22 +21,16 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: '프로젝트 좌표가 없습니다. 위치를 먼저 지정해주세요.' }, { status: 400 })
         }
 
-        const kakaoApiKey = process.env.KAKAO_REST_API_KEY
-        if (!kakaoApiKey) throw new Error('Kakao API key missing')
-
-        // 1. Get region code from Kakao
-        const regionUrl = `https://dapi.kakao.com/v2/local/geo/coord2regioncode.json?x=${project.lng}&y=${project.lat}`
-        const regionRes = await fetch(regionUrl, { headers: { Authorization: `KakaoAK ${kakaoApiKey}` } })
-        const regionData = await regionRes.json()
-
-        // Use Administrative code (region_type='H') 10 digits
-        const hRegion = regionData.documents?.find((d: any) => d.region_type === 'H') || regionData.documents?.[0]
-        if (!hRegion) throw new Error('행정동 정보를 찾을 수 없습니다.')
-
-        const sgisAdmCd = hRegion.code.substring(0, 8) // SGIS uses 8 digits for 읍면동
-        const sigunguCd = hRegion.code.substring(0, 5) // Fallback to 5 digits (sigungu)
-
         const sgis = new SGISClient()
+
+        // 1. Get region code directly from SGIS Reverse Geocoding
+        let sigunguCd: string;
+        try {
+            sigunguCd = await sgis.getSgisAdmCdFromWGS84(project.lat, project.lng);
+        } catch (e: any) {
+            console.error('SGIS RGeocode Error:', e.message);
+            throw new Error('SGIS 행정동 코드를 변환할 수 없습니다.');
+        }
 
         // 2. Fetch basic population/household stat (API_0301)
         let popData: any = null;

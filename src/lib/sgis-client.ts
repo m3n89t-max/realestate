@@ -88,6 +88,44 @@ export class SGISClient {
 
         return data.result;
     }
+
+    /**
+     * Converts WGS84 (lat/lng) to UTM-K (EPSG:5179) and then retrieves SGIS adm_cd
+     * Returns the 5-digit sigungu code (sido_cd + sgg_cd) or 8-digit emdong code.
+     */
+    public async getSgisAdmCdFromWGS84(lat: number, lng: number): Promise<string> {
+        const token = await this.getAccessToken();
+
+        // 1. Transform WGS84 to UTM-K (EPSG:5179)
+        const transUrl = `https://sgisapi.kostat.go.kr/OpenAPI3/transformation/transcoord.json?src=4326&dst=5179&posX=${lng}&posY=${lat}&accessToken=${token}`;
+        const transRes = await fetch(transUrl);
+        const transData = await transRes.json();
+
+        if (transData.errCd !== 0 || !transData.result) {
+            throw new Error(`SGIS Transcoord API Error: ${transData.errMsg} (Code: ${transData.errCd})`);
+        }
+
+        const { posX, posY } = transData.result;
+
+        // 2. Reverse Geocode UTM-K to get SGIS adm_cd (addr_type=20 for administrative boundaries)
+        const rgeoUrl = `https://sgisapi.kostat.go.kr/OpenAPI3/addr/rgeocode.json?x_coor=${posX}&y_coor=${posY}&addr_type=20&accessToken=${token}`;
+        const rgeoRes = await fetch(rgeoUrl);
+        const rgeoData = await rgeoRes.json();
+
+        if (rgeoData.errCd !== 0 || !rgeoData.result || rgeoData.result.length === 0) {
+            throw new Error(`SGIS RGeocode API Error: ${rgeoData.errMsg} (Code: ${rgeoData.errCd})`);
+        }
+
+        const regionInfo = rgeoData.result[0];
+        const sido = regionInfo.sido_cd;
+        const sgg = regionInfo.sgg_cd;
+
+        if (!sido || !sgg) {
+            throw new Error("SGIS RGeocode did not return sido_cd or sgg_cd");
+        }
+
+        return `${sido}${sgg}`; // 5-digit SGIS Sigungu Code
+    }
 }
 
 // Optional export for an initialized client if keys are in process.env
