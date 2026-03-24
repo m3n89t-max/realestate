@@ -91,9 +91,9 @@ export class SGISClient {
 
     /**
      * Converts WGS84 (lat/lng) to UTM-K (EPSG:5179) and then retrieves SGIS adm_cd
-     * Returns the 5-digit sigungu code (sido_cd + sgg_cd) or 8-digit emdong code.
+     * Returns an object containing the sido_cd and sgg_cd
      */
-    public async getSgisAdmCdFromWGS84(lat: number, lng: number): Promise<string> {
+    public async getSgisAdmCodesFromWGS84(lat: number, lng: number): Promise<{ sido: string, sgg: string }> {
         const token = await this.getAccessToken();
 
         // 1. Transform WGS84 to UTM-K (EPSG:5179)
@@ -120,11 +120,11 @@ export class SGISClient {
         const sido = regionInfo.sido_cd;
         const sgg = regionInfo.sgg_cd;
 
-        if (!sido || !sgg) {
-            throw new Error("SGIS RGeocode did not return sido_cd or sgg_cd");
+        if (!sido) {
+            throw new Error("SGIS RGeocode did not return sido_cd");
         }
 
-        return `${sido}${sgg}`; // 5-digit SGIS Sigungu Code
+        return { sido, sgg: sgg || '' };
     }
 }
 

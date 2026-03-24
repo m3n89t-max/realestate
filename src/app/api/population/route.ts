@@ -24,9 +24,12 @@ export async function POST(req: NextRequest) {
         const sgis = new SGISClient()
 
         // 1. Get region code directly from SGIS Reverse Geocoding
-        let sigunguCd: string;
+        let sidoCd: string;
+        let sggCd: string;
         try {
-            sigunguCd = await sgis.getSgisAdmCdFromWGS84(project.lat, project.lng);
+            const codes = await sgis.getSgisAdmCodesFromWGS84(project.lat, project.lng);
+            sidoCd = codes.sido;
+            sggCd = codes.sgg;
         } catch (e: any) {
             console.error('SGIS RGeocode Error:', e.message);
             throw new Error('SGIS 행정동 코드를 변환할 수 없습니다.');
@@ -35,18 +38,40 @@ export async function POST(req: NextRequest) {
         // 2. Fetch basic population/household stat (API_0301)
         let popData: any = null;
         let targetYear = '2023';
+        let usedAdmCd = `${sidoCd}${sggCd}`; // default to Sigungu
 
         const yearsToTry = ['2023', '2022', '2021', '2020'];
-        for (const y of yearsToTry) {
-            try {
-                const stats = await sgis.getPopulationStat(y, sigunguCd);
-                if (stats && stats[0]) {
-                    popData = stats[0];
-                    targetYear = y;
-                    break;
+
+        // Try Sigungu level first
+        if (sggCd) {
+            for (const y of yearsToTry) {
+                try {
+                    const stats = await sgis.getPopulationStat(y, `${sidoCd}${sggCd}`);
+                    if (stats && stats[0]) {
+                        popData = stats[0];
+                        targetYear = y;
+                        break;
+                    }
+                } catch (e: any) {
+                    // Silently ignore Sigungu fetch errors to allow fallback
                 }
-            } catch (e: any) {
-                console.log(`SGIS Pop Error for ${y}:`, e.message);
+            }
+        }
+
+        // 3. Adaptive Fallback: If Sigungu doesn't exist or fails, try Sido level
+        if (!popData) {
+            usedAdmCd = sidoCd;
+            for (const y of yearsToTry) {
+                try {
+                    const stats = await sgis.getPopulationStat(y, sidoCd);
+                    if (stats && stats[0]) {
+                        popData = stats[0];
+                        targetYear = y;
+                        break;
+                    }
+                } catch (e: any) {
+                    // Ignore Sido fetch errors until the end
+                }
             }
         }
 
@@ -58,7 +83,7 @@ export async function POST(req: NextRequest) {
 
         // Attempt to get household distribution for 1인 가구 (API_0305) if needed
         try {
-            const hhStats = await sgis.getHouseholdStat(targetYear, sigunguCd, 'A0', '0');
+            const hhStats = await sgis.getHouseholdStat(targetYear, usedAdmCd, 'A0', '0');
             if (hhStats && hhStats[0]) {
                 single_households = parseInt(hhStats[0].household_cnt || '0', 10);
             }
