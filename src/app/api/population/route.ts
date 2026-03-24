@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { SGISClient } from '@/../packages/commercial-engine/population-engine/src/sgis-client'
+import { SGISClient } from '@/lib/sgis-client'
 
 export async function POST(req: NextRequest) {
     try {
@@ -39,22 +39,32 @@ export async function POST(req: NextRequest) {
         const sgis = new SGISClient()
 
         // 2. Fetch basic population/household stat (API_0301)
-        let popData: any = null
-        try {
-            const stats = await sgis.getPopulationStat('2022', sigunguCd) // Using sigungu as reliable baseline for broad hinterland or 8-digit. SGIS sometimes misses 8 digits
-            popData = stats?.[0]
-        } catch (e) {
-            console.error(e);
-            // fallback
+        let popData: any = null;
+        let targetYear = '2023';
+
+        const yearsToTry = ['2023', '2022', '2021', '2020'];
+        for (const y of yearsToTry) {
+            try {
+                const stats = await sgis.getPopulationStat(y, sigunguCd);
+                if (stats && stats[0]) {
+                    popData = stats[0];
+                    targetYear = y;
+                    break;
+                }
+            } catch (e: any) {
+                console.log(`SGIS Pop Error for ${y}:`, e.message);
+            }
         }
 
-        if (!popData) throw new Error('SGIS 인구 통계를 불러올 수 없습니다.');
+        if (!popData) {
+            return NextResponse.json({ error: '해당 지역의 인구 통계 데이터가 SGIS에 존재하지 않습니다. (제공되지 않는 지역이거나 코드가 불일치할 수 있습니다.)' }, { status: 404 });
+        }
 
         let single_households = 0;
 
         // Attempt to get household distribution for 1인 가구 (API_0305) if needed
         try {
-            const hhStats = await sgis.getHouseholdStat('2022', sigunguCd, 'A0', '0');
+            const hhStats = await sgis.getHouseholdStat(targetYear, sigunguCd, 'A0', '0');
             if (hhStats && hhStats[0]) {
                 single_households = parseInt(hhStats[0].household_cnt || '0', 10);
             }
