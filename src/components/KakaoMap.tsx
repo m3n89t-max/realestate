@@ -61,11 +61,15 @@ export default function KakaoMap({
 }: KakaoMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef    = useRef<HTMLCanvasElement>(null)
-  const mapRef       = useRef<any>(null)
-  const popCircleRef = useRef<any>(null)
-  const popLabelRef  = useRef<any>(null)
+  const mapRef          = useRef<any>(null)
+  const popCircleRef    = useRef<any>(null)
+  const popLabelRef     = useRef<any>(null)
+  const kakaoDensityRef = useRef(kakaoDensity)
   const [showHeatmap, setShowHeatmap] = useState(false)
   const appKey = process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY
+
+  // kakaoDensity ref 동기화
+  useEffect(() => { kakaoDensityRef.current = kakaoDensity }, [kakaoDensity])
 
   // ── Effect 1: 지도 초기화 + 히트맵 (poiData / kakaoDensity 변경 시)
   useEffect(() => {
@@ -165,9 +169,9 @@ export default function KakaoMap({
     if (!populationData?.total_population || !populationData?.density || populationData.density <= 0) return
 
     const center = new window.kakao.maps.LatLng(lat, lng)
-    const areaSqm = (populationData.total_population / populationData.density) * 1_000_000
-    const radiusM = Math.round(Math.sqrt(areaSqm / Math.PI))
-    const clampedRadius = Math.max(300, Math.min(radiusM, 8000))
+    // 반경: kakaoDensity 분석반경의 1.5배, 없으면 700m 고정 (행정구역 면적 기반 계산은 너무 광범위)
+    const baseRadius = kakaoDensityRef.current?.radius_m ?? 700
+    const clampedRadius = Math.round(Math.min(baseRadius * 1.5, 2000))
 
     const density = populationData.density
     const color = density > 5000 ? '#ef4444' : density > 1000 ? '#f97316' : '#22c55e'
@@ -237,14 +241,14 @@ export default function KakaoMap({
               : 'bg-white/90 backdrop-blur-sm text-gray-600 border-gray-200 hover:bg-gray-50'
           }`}
         >
-          🔥 시설 밀집도 히트맵
+          🔥 유동인구 히트맵
         </button>
       )}
 
       {/* 히트맵 색상 범례 */}
       {hasPoi && showHeatmap && (
         <div className="absolute bottom-10 left-28 z-20 bg-white/90 backdrop-blur-sm px-2.5 py-1.5 rounded-xl shadow-md border border-gray-200 text-[10px] text-gray-600">
-          <div className="flex items-center gap-1.5 mb-1 font-medium text-gray-500">시설 밀집도</div>
+          <div className="flex items-center gap-1.5 mb-1 font-medium text-gray-500">유동인구 밀집도</div>
           <div className="flex items-center gap-1">
             <div className="flex gap-0.5">
               <span className="w-3 h-3 rounded-sm" style={{background:'rgba(239,68,68,0.8)'}} />
@@ -253,7 +257,7 @@ export default function KakaoMap({
             </div>
             <span className="text-gray-400">높음 → 낮음</span>
           </div>
-          <p className="mt-1 text-[9px] text-gray-400">지하철·마트·편의점 등 시설 기반</p>
+          <p className="mt-1 text-[9px] text-gray-400">지하철·마트·편의점 등 집객시설 기반 추정</p>
         </div>
       )}
 
