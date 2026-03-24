@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { POIItem, KakaoDensity } from '@/lib/types'
 
 declare global {
-  interface Window { kakao: any }
+  interface Window { kakao: any; h337: any }
 }
 
 interface KakaoMapProps {
@@ -19,7 +19,6 @@ interface KakaoMapProps {
   populationData?: any
 }
 
-// 카테고리별 마커 이미지 색상 매핑 (임의의 색상/이모지 사용)
 const POI_EMOJI: Record<string, string> = {
   subway: '🚇',
   mart: '🛒',
@@ -33,10 +32,26 @@ const POI_EMOJI: Record<string, string> = {
   restaurant: '🍽️',
 }
 
+// 유동인구 추정 가중치 (TEAM5 spec 기반)
+const POI_HEATMAP_WEIGHT: Record<string, number> = {
+  subway: 10,
+  mart: 7,
+  convenience: 5,
+  cafe: 4,
+  restaurant: 4,
+  hospital: 3,
+  pharmacy: 3,
+  school: 3,
+  bank: 2,
+  culture: 2,
+}
+
 export default function KakaoMap({
   lat, lng, level = 4, className, style, poiData, kakaoDensity, locationAnalysis, populationData
 }: KakaoMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const heatmapDivRef = useRef<HTMLDivElement>(null)
+  const [showHeatmap, setShowHeatmap] = useState(false)
   const appKey = process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY
 
   useEffect(() => {
@@ -55,41 +70,98 @@ export default function KakaoMap({
         })
         infowindow.open(map, marker)
 
-        // 2. 업종 밀집도 (원 그리기)
+        // 2. 업종 밀집도 원
         if (kakaoDensity && kakaoDensity.radius_m) {
           const circle = new window.kakao.maps.Circle({
             center: center,
             radius: kakaoDensity.radius_m,
             strokeWeight: 1,
-            strokeColor: '#3b82f6', // blue-500
+            strokeColor: '#3b82f6',
             strokeOpacity: 0.5,
-            fillColor: '#60a5fa', // blue-400
+            fillColor: '#60a5fa',
             fillOpacity: 0.1
-          });
-          circle.setMap(map);
+          })
+          circle.setMap(map)
         }
 
-        // 3. POI 데이터 마커
+        // 3. POI 마커
         if (poiData) {
           Object.entries(poiData).forEach(([catKey, items]) => {
             const emoji = POI_EMOJI[catKey] || '📍'
             items.forEach((item) => {
               if (item.lat && item.lng) {
                 const itemPos = new window.kakao.maps.LatLng(item.lat, item.lng)
-                // 커스텀 오버레이로 텍스트/이모지 마커 표시
-                const content = document.createElement('div');
-                content.className = 'bg-white border text-xs px-1.5 py-0.5 rounded shadow-sm text-gray-700 whitespace-nowrap cursor-pointer hover:bg-gray-50';
-                content.innerHTML = `<span class="mr-1">${emoji}</span>${item.name}`;
-
+                const content = document.createElement('div')
+                content.className = 'bg-white border text-xs px-1.5 py-0.5 rounded shadow-sm text-gray-700 whitespace-nowrap cursor-pointer hover:bg-gray-50'
+                content.innerHTML = `<span class="mr-1">${emoji}</span>${item.name}`
                 const overlay = new window.kakao.maps.CustomOverlay({
                   position: itemPos,
                   content: content,
                   yAnchor: 1
-                });
-                overlay.setMap(map);
+                })
+                overlay.setMap(map)
               }
             })
           })
+        }
+
+        // 4. 유동인구 히트맵 (heatmap.js + POI 가중치)
+        if (poiData && heatmapDivRef.current) {
+          const hDiv = heatmapDivRef.current
+
+          const buildHeatmap = () => {
+            hDiv.innerHTML = '' // 이전 canvas 제거
+
+            const instance = window.h337.create({
+              container: hDiv,
+              radius: 55,
+              maxOpacity: 0.65,
+              minOpacity: 0,
+              blur: 0.88,
+              gradient: {
+                0.2: '#3b82f6',
+                0.5: '#06b6d4',
+                0.75: '#eab308',
+                1.0: '#ef4444',
+              },
+            })
+
+            const render = () => {
+              const projection = map.getProjection()
+              const w = hDiv.offsetWidth
+              const h = hDiv.offsetHeight
+              const points: { x: number; y: number; value: number }[] = []
+
+              Object.entries(poiData!).forEach(([catKey, items]) => {
+                const weight = POI_HEATMAP_WEIGHT[catKey] || 2
+                items.forEach(item => {
+                  if (item.lat && item.lng) {
+                    const pt = projection.pointFromCoords(
+                      new window.kakao.maps.LatLng(item.lat, item.lng)
+                    )
+                    if (pt.x > -80 && pt.x < w + 80 && pt.y > -80 && pt.y < h + 80) {
+                      points.push({ x: Math.round(pt.x), y: Math.round(pt.y), value: weight })
+                    }
+                  }
+                })
+              })
+
+              instance.setData({ max: 10, data: points })
+            }
+
+            render()
+            window.kakao.maps.event.addListener(map, 'zoom_changed', render)
+            window.kakao.maps.event.addListener(map, 'dragend', render)
+          }
+
+          if (window.h337) {
+            buildHeatmap()
+          } else {
+            const s = document.createElement('script')
+            s.src = 'https://cdn.jsdelivr.net/npm/heatmap.js@2.0.5/build/heatmap.min.js'
+            s.onload = buildHeatmap
+            document.head.appendChild(s)
+          }
         }
       })
     }
@@ -116,9 +188,39 @@ export default function KakaoMap({
     )
   }
 
+  const hasPoi = poiData && Object.keys(poiData).length > 0
+
   return (
     <div className={`relative ${className || ''}`} style={style}>
       <div ref={containerRef} className="w-full h-full" />
+
+      {/* 히트맵 캔버스 오버레이 (항상 DOM에 있어야 heatmap.js 초기화 가능) */}
+      <div
+        ref={heatmapDivRef}
+        style={{
+          position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+          pointerEvents: 'none',
+          opacity: showHeatmap ? 1 : 0,
+          transition: 'opacity 0.4s ease',
+          zIndex: 5,
+        }}
+      />
+
+      {/* 히트맵 토글 버튼 */}
+      {hasPoi && (
+        <button
+          onClick={() => setShowHeatmap(v => !v)}
+          className={`absolute bottom-10 left-2 z-20 text-[11px] px-2.5 py-1.5 rounded-full shadow-md border font-medium transition-all ${
+            showHeatmap
+              ? 'bg-orange-500 text-white border-orange-400'
+              : 'bg-white/90 backdrop-blur-sm text-gray-600 border-gray-200 hover:bg-gray-50'
+          }`}
+        >
+          🔥 유동인구 히트맵
+        </button>
+      )}
+
+      {/* 배후 인구 분석 팝업 */}
       {populationData && (
         <div className="absolute top-4 right-4 z-10 bg-white/95 backdrop-blur-sm p-3.5 rounded-xl shadow-md border border-brand-100 min-w-[180px]">
           <h4 className="text-xs font-bold text-gray-800 mb-2.5 border-b pb-1.5 flex items-center gap-1">
