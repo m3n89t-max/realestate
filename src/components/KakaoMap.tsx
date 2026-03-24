@@ -94,7 +94,43 @@ export default function KakaoMap({
           }).setMap(map)
         }
 
-        // 3. 유동인구 히트맵 (네이티브 Canvas)
+        // 2-b. 배후 인구 원 (인구밀도 기반 반경 + 밀도에 따른 색상)
+        if (populationData?.total_population && populationData?.density && populationData.density > 0) {
+          // 반경 = sqrt(행정구역 면적 / π), 면적 = 총인구 / 밀도
+          const areaSqm = (populationData.total_population / populationData.density) * 1_000_000
+          const radiusM = Math.round(Math.sqrt(areaSqm / Math.PI))
+          const clampedRadius = Math.max(300, Math.min(radiusM, 8000))
+
+          // 인구밀도에 따른 색상: 고밀(>5000) 빨강, 중밀(1000~5000) 주황, 저밀(<1000) 초록
+          const density = populationData.density
+          const color = density > 5000 ? '#ef4444' : density > 1000 ? '#f97316' : '#22c55e'
+
+          new window.kakao.maps.Circle({
+            map,
+            center,
+            radius: clampedRadius,
+            strokeWeight: 2,
+            strokeColor: color,
+            strokeOpacity: 0.7,
+            strokeStyle: 'dashed',
+            fillColor: color,
+            fillOpacity: 0.06,
+          }).setMap(map)
+
+          // 원 상단에 인구 수 라벨
+          const labelPos = new window.kakao.maps.LatLng(
+            lat + (clampedRadius / 111_000) * 0.85,
+            lng
+          )
+          new window.kakao.maps.CustomOverlay({
+            map,
+            position: labelPos,
+            content: `<div style="background:${color};color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:99px;white-space:nowrap;opacity:0.9;">👥 ${(populationData.total_population / 10000).toFixed(1)}만명</div>`,
+            yAnchor: 1,
+          }).setMap(map)
+        }
+
+        // 3. 시설 밀집도 히트맵 (네이티브 Canvas)
         const canvas = canvasRef.current
         if (!canvas || !poiData) return
 
@@ -151,7 +187,7 @@ export default function KakaoMap({
       script.onload = initMap
       document.head.appendChild(script)
     }
-  }, [lat, lng, level, appKey, poiData, kakaoDensity, locationAnalysis])
+  }, [lat, lng, level, appKey, poiData, kakaoDensity, locationAnalysis, populationData])
 
   if (!appKey) {
     return (
