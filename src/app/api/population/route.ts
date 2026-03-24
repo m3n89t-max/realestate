@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
             sggCd = codes.sgg;
         } catch (e: any) {
             console.error('SGIS RGeocode Error:', e.message);
-            throw new Error('SGIS 행정동 코드를 변환할 수 없습니다.');
+            return NextResponse.json({ error: '해당 위치의 행정동/인구 통계 데이터를 SGIS에서 찾을 수 없습니다. (좌표 예외 지역일 수 있습니다)' }, { status: 404 });
         }
 
         // 2. Fetch basic population/household stat (API_0301)
