@@ -136,7 +136,10 @@ export async function POST(req: NextRequest) {
 
         if (updateErr) throw new Error(updateErr.message)
 
-        return NextResponse.json({ success: true, population_data })
+        return NextResponse.json({
+            success: true, population_data,
+            _debug: { sidoCd, sggCd, emdCd, emdLen: emdCd?.length, usedAdmCd, adm_level: population_data.adm_level }
+        })
     } catch (e: any) {
         return NextResponse.json({ error: e.message || '인구 데이터 수집 실패' }, { status: 500 })
     }
