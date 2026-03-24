@@ -3,7 +3,8 @@ export const dynamic = 'force-dynamic'
 import { createClient } from '@/lib/supabase/server'
 import {
   FolderOpen, Wand2, FileText, CheckCircle,
-  TrendingUp, Plus, ArrowRight, Wifi, WifiOff
+  TrendingUp, Plus, ArrowRight, Wifi, WifiOff,
+  ChevronRight
 } from 'lucide-react'
 import Link from 'next/link'
 import StatusBadge from '@/components/ui/StatusBadge'
@@ -23,7 +24,6 @@ export default async function DashboardPage() {
 
   const orgId = membership?.org_id
 
-  // 병렬로 데이터 로드
   const [projectsResult, usageResult, tasksResult, agentResult, completedTasksResult] = await Promise.all([
     supabase.from('projects').select('*').eq('org_id', orgId).neq('status', 'archived')
       .order('created_at', { ascending: false }).limit(8),
@@ -39,16 +39,12 @@ export default async function DashboardPage() {
   const pendingTasks = (tasksResult.data ?? []).length
   const completedTasks = completedTasksResult.count ?? 0
 
-  // 에이전트 상태 계산 (2분 초과 시 오프라인)
   let agentStatus: 'online' | 'offline' | 'busy' = 'offline'
   if (agentResult.data?.last_seen_at) {
     const lastSeen = new Date(agentResult.data.last_seen_at).getTime()
     const now = new Date().getTime()
     const diffMin = (now - lastSeen) / 1000 / 60
-
-    if (diffMin < 2) {
-      agentStatus = agentResult.data.status as any
-    }
+    if (diffMin < 2) agentStatus = agentResult.data.status as any
   }
 
   const org = membership?.organization as { name?: string; plan_type?: string; monthly_project_limit?: number } | null
@@ -57,26 +53,30 @@ export default async function DashboardPage() {
     {
       label: '총 프로젝트',
       value: projects.length,
-      icon: <FolderOpen size={20} className="text-blue-500" />,
-      bg: 'bg-blue-50',
+      icon: <FolderOpen size={18} className="text-brand-600" />,
+      iconBg: 'bg-brand-50',
+      topColor: 'border-t-brand-500',
     },
     {
       label: '이번 달 생성',
       value: usage?.generation_count ?? 0,
-      icon: <Wand2 size={20} className="text-purple-500" />,
-      bg: 'bg-purple-50',
+      icon: <Wand2 size={18} className="text-violet-600" />,
+      iconBg: 'bg-violet-50',
+      topColor: 'border-t-violet-500',
     },
     {
       label: '서류 수집',
       value: usage?.doc_download_count ?? 0,
-      icon: <FileText size={20} className="text-green-500" />,
-      bg: 'bg-green-50',
+      icon: <FileText size={18} className="text-emerald-600" />,
+      iconBg: 'bg-emerald-50',
+      topColor: 'border-t-emerald-500',
     },
     {
       label: '완료된 작업',
       value: completedTasks,
-      icon: <CheckCircle size={20} className="text-brand-500" />,
-      bg: 'bg-brand-50',
+      icon: <CheckCircle size={18} className="text-amber-600" />,
+      iconBg: 'bg-amber-50',
+      topColor: 'border-t-amber-500',
     },
   ]
 
@@ -85,50 +85,56 @@ export default async function DashboardPage() {
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">대시보드</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {org?.name ?? '내 조직'} · <StatusBadge status={org?.plan_type ?? 'free'} size="sm" />
+          <h1 className="text-xl font-bold text-slate-900">대시보드</h1>
+          <p className="text-sm text-slate-400 mt-0.5 flex items-center gap-1.5">
+            {org?.name ?? '내 조직'}
+            <span className="w-1 h-1 rounded-full bg-slate-300 inline-block" />
+            <StatusBadge status={org?.plan_type ?? 'free'} size="sm" />
           </p>
         </div>
         <Link href="/projects/new" className="btn-primary">
-          <Plus size={16} />
+          <Plus size={15} />
           새 매물 등록
         </Link>
       </div>
 
       {/* 에이전트 상태 배너 */}
       {agentStatus === 'offline' && (
-        <div className="card p-4 bg-amber-50 border-amber-200 flex items-center justify-between">
+        <div className="rounded-2xl p-4 bg-amber-50 border border-amber-200 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <WifiOff size={18} className="text-amber-600 flex-shrink-0" />
+            <div className="w-8 h-8 bg-amber-100 rounded-xl flex items-center justify-center shrink-0">
+              <WifiOff size={16} className="text-amber-600" />
+            </div>
             <div>
-              <p className="text-sm font-medium text-amber-800">로컬 에이전트가 연결되지 않았습니다</p>
-              <p className="text-xs text-amber-600">네이버 업로드, 건축물대장 수집 등 자동화 기능을 사용하려면 에이전트를 설치하세요</p>
+              <p className="text-sm font-semibold text-amber-800">로컬 에이전트가 연결되지 않았습니다</p>
+              <p className="text-xs text-amber-600 mt-0.5">자동화 기능(네이버 업로드, 건축물대장 수집 등)을 사용하려면 에이전트를 설치하세요</p>
             </div>
           </div>
-          <Link href="/settings" className="text-sm text-amber-700 font-medium hover:underline flex-shrink-0">
+          <Link href="/settings" className="text-xs text-amber-700 font-semibold hover:underline shrink-0 ml-4">
             설치 안내 →
           </Link>
         </div>
       )}
       {agentStatus === 'online' && (
-        <div className="card p-3 bg-green-50 border-green-200 flex items-center gap-3">
-          <Wifi size={16} className="text-green-600" />
-          <p className="text-sm text-green-700 font-medium">에이전트 연결됨 · 자동화 기능 사용 가능</p>
+        <div className="rounded-2xl p-3.5 bg-emerald-50 border border-emerald-200 flex items-center gap-3">
+          <div className="w-7 h-7 bg-emerald-100 rounded-lg flex items-center justify-center shrink-0">
+            <Wifi size={14} className="text-emerald-600" />
+          </div>
+          <p className="text-sm text-emerald-700 font-medium">에이전트 연결됨 · 자동화 기능 사용 가능</p>
         </div>
       )}
 
       {/* 통계 카드 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat) => (
-          <div key={stat.label} className="card p-4">
-            <div className={`w-10 h-10 rounded-xl ${stat.bg} flex items-center justify-center mb-3`}>
+          <div key={stat.label} className={`card p-5 border-t-2 ${stat.topColor}`}>
+            <div className={`w-9 h-9 rounded-xl ${stat.iconBg} flex items-center justify-center mb-4`}>
               {stat.icon}
             </div>
-            <p className="text-2xl font-bold text-gray-900">
+            <p className="text-2xl font-bold text-slate-900 tabular-nums">
               {typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
             </p>
-            <p className="text-sm text-gray-500 mt-0.5">{stat.label}</p>
+            <p className="text-xs text-slate-500 mt-1 font-medium">{stat.label}</p>
           </div>
         ))}
       </div>
@@ -136,24 +142,24 @@ export default async function DashboardPage() {
       {/* 이번 달 사용량 */}
       {usage && (
         <div className="card p-5">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-5">
             <h2 className="section-title">이번 달 사용량</h2>
-            <Link href="/usage" className="text-sm text-brand-600 hover:underline flex items-center gap-1">
-              상세보기 <ArrowRight size={14} />
+            <Link href="/usage" className="text-xs text-brand-600 hover:text-brand-700 font-semibold flex items-center gap-0.5">
+              상세보기 <ArrowRight size={12} />
             </Link>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 divide-x divide-slate-100">
             {[
               { label: '프로젝트', val: usage.project_count, max: org?.monthly_project_limit ?? 20 },
               { label: 'AI 생성', val: usage.generation_count, max: -1 },
               { label: '영상 렌더', val: usage.video_render_count, max: -1 },
               { label: '서류 수집', val: usage.doc_download_count, max: -1 },
             ].map(item => (
-              <div key={item.label} className="text-center">
-                <p className="text-xl font-bold text-gray-900">{(item.val ?? 0).toLocaleString()}</p>
-                <p className="text-xs text-gray-500">
+              <div key={item.label} className="text-center px-2 first:pl-0 last:pr-0">
+                <p className="text-2xl font-bold text-slate-900 tabular-nums">{(item.val ?? 0).toLocaleString()}</p>
+                <p className="text-xs text-slate-400 mt-1">
                   {item.label}
-                  {item.max > 0 && ` / ${item.max}`}
+                  {item.max > 0 && <span className="text-slate-300"> / {item.max}</span>}
                 </p>
               </div>
             ))}
@@ -162,44 +168,49 @@ export default async function DashboardPage() {
       )}
 
       {/* 최근 프로젝트 */}
-      <div className="card">
-        <div className="flex items-center justify-between p-5 border-b border-gray-100">
+      <div className="card overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
           <h2 className="section-title">최근 프로젝트</h2>
-          <Link href="/projects" className="text-sm text-brand-600 hover:underline flex items-center gap-1">
-            전체보기 <ArrowRight size={14} />
+          <Link href="/projects" className="text-xs text-brand-600 hover:text-brand-700 font-semibold flex items-center gap-0.5">
+            전체보기 <ArrowRight size={12} />
           </Link>
         </div>
 
         {projects.length === 0 ? (
           <div className="p-12 text-center">
-            <FolderOpen size={40} className="mx-auto text-gray-200 mb-3" />
-            <p className="text-gray-500 text-sm">아직 등록된 매물이 없습니다</p>
+            <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
+              <FolderOpen size={22} className="text-slate-300" />
+            </div>
+            <p className="text-slate-400 text-sm">아직 등록된 매물이 없습니다</p>
             <Link href="/projects/new" className="btn-primary mt-4 inline-flex">
-              <Plus size={16} /> 첫 매물 등록하기
+              <Plus size={15} /> 첫 매물 등록하기
             </Link>
           </div>
         ) : (
-          <div className="divide-y divide-gray-50">
+          <div className="divide-y divide-slate-50">
             {projects.map(project => (
               <Link
                 key={project.id}
                 href={`/projects/${project.id}`}
-                className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                className="flex items-center justify-between px-5 py-3.5 hover:bg-slate-50 transition-colors group"
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 bg-brand-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <FolderOpen size={16} className="text-brand-600" />
+                  <div className="w-8 h-8 bg-brand-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <FolderOpen size={14} className="text-brand-500" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-800 truncate">{project.address}</p>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-sm font-medium text-slate-800 truncate">{project.address}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">
                       {getPropertyTypeLabel(project.property_type ?? '')}
                       {project.price && ` · ${formatPrice(project.price)}`}
                       {' · '}{formatRelativeTime(project.created_at)}
                     </p>
                   </div>
                 </div>
-                <StatusBadge status={project.status} size="sm" />
+                <div className="flex items-center gap-2 shrink-0">
+                  <StatusBadge status={project.status} size="sm" />
+                  <ChevronRight size={14} className="text-slate-300 group-hover:text-slate-500 transition-colors" />
+                </div>
               </Link>
             ))}
           </div>
@@ -208,18 +219,18 @@ export default async function DashboardPage() {
 
       {/* 대기 중인 작업 */}
       {pendingTasks > 0 && (
-        <div className="card p-4 bg-blue-50 border-blue-200">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <TrendingUp size={16} className="text-blue-600" />
-              <p className="text-sm font-medium text-blue-800">
-                {pendingTasks}개 작업이 진행 중입니다
-              </p>
+        <div className="rounded-2xl p-4 bg-brand-50 border border-brand-100 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-brand-100 rounded-xl flex items-center justify-center shrink-0">
+              <TrendingUp size={15} className="text-brand-600" />
             </div>
-            <Link href="/tasks" className="text-sm text-blue-600 hover:underline">
-              확인하기
-            </Link>
+            <p className="text-sm font-semibold text-brand-800">
+              {pendingTasks}개 작업이 진행 중입니다
+            </p>
           </div>
+          <Link href="/tasks" className="text-xs text-brand-600 font-semibold hover:underline">
+            확인하기
+          </Link>
         </div>
       )}
     </div>
