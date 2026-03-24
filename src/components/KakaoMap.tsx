@@ -69,6 +69,7 @@ export default function KakaoMap({
   const flpopLabelRef   = useRef<any>(null)
   const kakaoDensityRef = useRef(kakaoDensity)
   const [showHeatmap, setShowHeatmap] = useState(false)
+  const [mapReady, setMapReady] = useState(false)
   const appKey = process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY
 
   // kakaoDensity ref 동기화
@@ -84,6 +85,7 @@ export default function KakaoMap({
         const center = new window.kakao.maps.LatLng(lat, lng)
         const map = new window.kakao.maps.Map(container, { center, level })
         mapRef.current = map
+        setMapReady(true)
 
         // 1. 매물 위치 마커
         const marker = new window.kakao.maps.Marker({ position: center, map })
@@ -163,7 +165,7 @@ export default function KakaoMap({
   // ── Effect 2: 배후 인구 원 (mapRef 준비 후 populationData 변경 시)
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !window.kakao?.maps) return
+    if (!map || !mapReady || !window.kakao?.maps) return
 
     // 기존 원/라벨 제거
     if (popCircleRef.current) { popCircleRef.current.setMap(null); popCircleRef.current = null }
@@ -205,12 +207,12 @@ export default function KakaoMap({
     })
     label.setMap(map)
     popLabelRef.current = label
-  }, [populationData, lat, lng])
+  }, [populationData, lat, lng, mapReady])
 
   // ── Effect 3: 유동인구 원 (commercial_data.floating_population)
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !window.kakao?.maps) return
+    if (!map || !mapReady || !window.kakao?.maps) return
 
     if (flpopCircleRef.current) { flpopCircleRef.current.setMap(null); flpopCircleRef.current = null }
     if (flpopLabelRef.current)  { flpopLabelRef.current.setMap(null);  flpopLabelRef.current  = null }
@@ -250,7 +252,7 @@ export default function KakaoMap({
     })
     label.setMap(map)
     flpopLabelRef.current = label
-  }, [commercialData, lat, lng])
+  }, [commercialData, lat, lng, mapReady])
 
   if (!appKey) {
     return (

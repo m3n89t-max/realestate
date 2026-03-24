@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
             sggCd = codes.sgg;
             emdCd = codes.emd;
             admNm = codes.adm_nm;
+            console.log('[population] SGIS codes:', { sidoCd, sggCd, emdCd: emdCd + `(len=${emdCd.length})`, admNm });
         } catch (e: any) {
             console.error('SGIS RGeocode Error:', e.message);
             return NextResponse.json({ error: '해당 위치의 행정동/인구 통계 데이터를 SGIS에서 찾을 수 없습니다. (좌표 예외 지역일 수 있습니다)' }, { status: 404 });
@@ -57,9 +58,14 @@ export async function POST(req: NextRequest) {
                         usedAdmCd = emdCd;
                         break;
                     }
-                } catch { /* fallthrough */ }
+                } catch (e: any) {
+                    console.log(`[population] emd (${emdCd}) year ${y} failed:`, e.message);
+                }
             }
+        } else {
+            console.log('[population] skipping emd level — emdCd:', emdCd);
         }
+        if (!popData) console.log('[population] emd level not found, trying sigungu');
 
         // Fallback: Sigungu level
         if (!popData && sggCd) {
