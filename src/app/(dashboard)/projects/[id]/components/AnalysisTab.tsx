@@ -5,7 +5,8 @@ import {
   MapPin, TrendingUp, Building2, Target, FileText,
   Loader2, CheckCircle2, AlertCircle, RefreshCw, ChevronDown, ChevronUp,
   Train, ShoppingCart, Hospital, GraduationCap, Coffee, Pill, Landmark,
-  ExternalLink, Store, BarChart3, UtensilsCrossed, BookOpen, Home as HomeIcon
+  ExternalLink, Store, BarChart3, UtensilsCrossed, BookOpen, Home as HomeIcon,
+  ThumbsUp, ThumbsDown, Users, Award, Layers
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
@@ -185,6 +186,126 @@ function AIAnalysisReport({ analysis, projectId, hasCoords, hasPOI, hasData, isC
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {/* TEAM5: 상권 등급 + 유동인구 + 상권유형 */}
+      {(analysis.commercial_grade || analysis.commercial_type || analysis.foot_traffic) && (
+        <div className="grid grid-cols-3 gap-3">
+          {/* 상권 등급 */}
+          {analysis.commercial_grade && (() => {
+            const gradeColor: Record<string, string> = {
+              S: 'bg-purple-100 text-purple-800 border-purple-200',
+              A: 'bg-green-100 text-green-800 border-green-200',
+              B: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+              C: 'bg-gray-100 text-gray-600 border-gray-200',
+            }
+            return (
+              <div className={`card p-4 text-center border-2 ${gradeColor[analysis.commercial_grade] ?? 'bg-gray-50 border-gray-200'}`}>
+                <div className="flex items-center justify-center gap-1 mb-1">
+                  <Award size={13} />
+                  <span className="text-xs font-semibold">상권 등급</span>
+                </div>
+                <p className="text-4xl font-black">{analysis.commercial_grade}</p>
+                <p className="text-xs mt-1 opacity-70">
+                  {analysis.commercial_grade === 'S' ? '최우수 상권' : analysis.commercial_grade === 'A' ? '우수 상권' : analysis.commercial_grade === 'B' ? '보통 상권' : '낮은 상권'}
+                </p>
+              </div>
+            )
+          })()}
+
+          {/* 유동인구 추정 */}
+          {analysis.foot_traffic && (() => {
+            const ft = analysis.foot_traffic as any
+            const color = ft.score >= 75 ? 'text-red-600' : ft.score >= 50 ? 'text-orange-600' : ft.score >= 25 ? 'text-yellow-600' : 'text-gray-400'
+            return (
+              <div className="card p-4 text-center">
+                <div className="flex items-center justify-center gap-1 mb-1">
+                  <Users size={13} className="text-brand-500" />
+                  <span className="text-xs font-semibold text-gray-600">유동인구 지수</span>
+                </div>
+                <p className={`text-3xl font-black ${color}`}>{ft.score}</p>
+                <p className="text-xs text-gray-500 mt-1">{ft.label} · /100</p>
+                <div className="mt-2 space-y-0.5">
+                  {[
+                    { label: 'POI밀도', v: ft.breakdown?.poi_score },
+                    { label: '교통', v: ft.breakdown?.transit_score },
+                    { label: '배후인구', v: ft.breakdown?.population_score },
+                  ].map(({ label, v }) => v != null && (
+                    <div key={label} className="flex items-center gap-1.5 text-xs">
+                      <span className="text-gray-400 w-14 flex-shrink-0">{label}</span>
+                      <div className="flex-1 bg-gray-100 rounded-full h-1">
+                        <div className="h-1 bg-brand-400 rounded-full" style={{ width: `${v}%` }} />
+                      </div>
+                      <span className="text-gray-500 w-5 text-right">{v}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* 상권 유형 */}
+          {analysis.commercial_type && (
+            <div className="card p-4 text-center">
+              <div className="flex items-center justify-center gap-1 mb-1">
+                <Layers size={13} className="text-brand-500" />
+                <span className="text-xs font-semibold text-gray-600">상권 유형</span>
+              </div>
+              <p className="text-lg font-bold text-brand-700 mt-2">{analysis.commercial_type}</p>
+              <p className="text-xs text-gray-400 mt-1">상권</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TEAM5: 추천 / 비추천 업종 */}
+      {analysis.recommended_industries && (
+        <div className="card p-5">
+          <h3 className="section-title mb-4 flex items-center gap-2">
+            <Store size={16} className="text-brand-500" />
+            업종 추천 분석
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* 추천 업종 */}
+            {(analysis.recommended_industries as any).recommended?.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-green-700 mb-2 flex items-center gap-1">
+                  <ThumbsUp size={11} /> 추천 업종 (상권 공백·수요 적합)
+                </p>
+                <div className="space-y-2">
+                  {(analysis.recommended_industries as any).recommended.map((ind: any, i: number) => (
+                    <div key={i} className="flex items-start gap-2 p-2.5 bg-green-50 rounded-lg border border-green-100">
+                      <span className="w-5 h-5 bg-green-200 text-green-800 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">{i + 1}</span>
+                      <div>
+                        <p className="text-xs font-semibold text-green-800">{ind.name}</p>
+                        <p className="text-xs text-green-600 mt-0.5">{ind.reason}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* 비추천 업종 */}
+            {(analysis.recommended_industries as any).not_recommended?.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-red-600 mb-2 flex items-center gap-1">
+                  <ThumbsDown size={11} /> 비추천 업종 (경쟁 과밀·수요 불일치)
+                </p>
+                <div className="space-y-2">
+                  {(analysis.recommended_industries as any).not_recommended.map((ind: any, i: number) => (
+                    <div key={i} className="flex items-start gap-2 p-2.5 bg-red-50 rounded-lg border border-red-100">
+                      <span className="w-5 h-5 bg-red-200 text-red-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">✕</span>
+                      <div>
+                        <p className="text-xs font-semibold text-red-700">{ind.name}</p>
+                        <p className="text-xs text-red-500 mt-0.5">{ind.reason}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
