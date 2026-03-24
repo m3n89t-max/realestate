@@ -45,9 +45,9 @@ function drawHeatmap(
     const radius = 50 + value * 4
     const alpha = 0.12 + (value / 10) * 0.35
     const grad = ctx.createRadialGradient(x, y, 0, x, y, radius)
-    grad.addColorStop(0,   `rgba(239,68,68,${alpha})`)    // 빨강 (중심)
-    grad.addColorStop(0.4, `rgba(234,179,8,${alpha * 0.7})`) // 노랑
-    grad.addColorStop(0.75,`rgba(59,130,246,${alpha * 0.4})`) // 파랑
+    grad.addColorStop(0,   `rgba(239,68,68,${alpha})`)
+    grad.addColorStop(0.4, `rgba(234,179,8,${alpha * 0.7})`)
+    grad.addColorStop(0.75,`rgba(59,130,246,${alpha * 0.4})`)
     grad.addColorStop(1,   'rgba(59,130,246,0)')
     ctx.beginPath()
     ctx.arc(x, y, radius, 0, Math.PI * 2)
@@ -61,9 +61,13 @@ export default function KakaoMap({
 }: KakaoMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef    = useRef<HTMLCanvasElement>(null)
+  const mapRef       = useRef<any>(null)
+  const popCircleRef = useRef<any>(null)
+  const popLabelRef  = useRef<any>(null)
   const [showHeatmap, setShowHeatmap] = useState(false)
   const appKey = process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY
 
+  // ── Effect 1: 지도 초기화 + 히트맵 (poiData / kakaoDensity 변경 시)
   useEffect(() => {
     if (!appKey || !containerRef.current) return
 
@@ -72,6 +76,7 @@ export default function KakaoMap({
         const container = containerRef.current!
         const center = new window.kakao.maps.LatLng(lat, lng)
         const map = new window.kakao.maps.Map(container, { center, level })
+        mapRef.current = map
 
         // 1. 매물 위치 마커
         const marker = new window.kakao.maps.Marker({ position: center, map })
@@ -80,7 +85,7 @@ export default function KakaoMap({
         })
         infowindow.open(map, marker)
 
-        // 2. 업종 밀집도 원
+        // 2. 업종 밀집도 원 (파란 실선)
         if (kakaoDensity?.radius_m) {
           new window.kakao.maps.Circle({
             map,
@@ -94,47 +99,10 @@ export default function KakaoMap({
           }).setMap(map)
         }
 
-        // 2-b. 배후 인구 원 (인구밀도 기반 반경 + 밀도에 따른 색상)
-        if (populationData?.total_population && populationData?.density && populationData.density > 0) {
-          // 반경 = sqrt(행정구역 면적 / π), 면적 = 총인구 / 밀도
-          const areaSqm = (populationData.total_population / populationData.density) * 1_000_000
-          const radiusM = Math.round(Math.sqrt(areaSqm / Math.PI))
-          const clampedRadius = Math.max(300, Math.min(radiusM, 8000))
-
-          // 인구밀도에 따른 색상: 고밀(>5000) 빨강, 중밀(1000~5000) 주황, 저밀(<1000) 초록
-          const density = populationData.density
-          const color = density > 5000 ? '#ef4444' : density > 1000 ? '#f97316' : '#22c55e'
-
-          new window.kakao.maps.Circle({
-            map,
-            center,
-            radius: clampedRadius,
-            strokeWeight: 2,
-            strokeColor: color,
-            strokeOpacity: 0.7,
-            strokeStyle: 'dashed',
-            fillColor: color,
-            fillOpacity: 0.06,
-          }).setMap(map)
-
-          // 원 상단에 인구 수 라벨
-          const labelPos = new window.kakao.maps.LatLng(
-            lat + (clampedRadius / 111_000) * 0.85,
-            lng
-          )
-          new window.kakao.maps.CustomOverlay({
-            map,
-            position: labelPos,
-            content: `<div style="background:${color};color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:99px;white-space:nowrap;opacity:0.9;">👥 ${(populationData.total_population / 10000).toFixed(1)}만명</div>`,
-            yAnchor: 1,
-          }).setMap(map)
-        }
-
         // 3. 시설 밀집도 히트맵 (네이티브 Canvas)
         const canvas = canvasRef.current
         if (!canvas || !poiData) return
 
-        // bounds → pixel 변환
         const toPixel = (iLat: number, iLng: number) => {
           const b  = map.getBounds()
           const sw = b.getSouthWest()
@@ -148,12 +116,9 @@ export default function KakaoMap({
         }
 
         const render = () => {
-          // canvas 픽셀 크기를 실제 DOM 크기에 맞춤
           canvas.width  = container.offsetWidth
           canvas.height = container.offsetHeight
-
           const points: { x: number; y: number; value: number }[] = []
-
           Object.entries(poiData!).forEach(([cat, items]) => {
             const w = POI_HEATMAP_WEIGHT[cat] || 2
             items.forEach(item => {
@@ -165,7 +130,6 @@ export default function KakaoMap({
               }
             })
           })
-
           drawHeatmap(canvas, points)
         }
 
@@ -187,7 +151,54 @@ export default function KakaoMap({
       script.onload = initMap
       document.head.appendChild(script)
     }
-  }, [lat, lng, level, appKey, poiData, kakaoDensity, locationAnalysis, populationData])
+  }, [lat, lng, level, appKey, poiData, kakaoDensity, locationAnalysis])
+
+  // ── Effect 2: 배후 인구 원 (mapRef 준비 후 populationData 변경 시)
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !window.kakao?.maps) return
+
+    // 기존 원/라벨 제거
+    if (popCircleRef.current) { popCircleRef.current.setMap(null); popCircleRef.current = null }
+    if (popLabelRef.current)  { popLabelRef.current.setMap(null);  popLabelRef.current  = null }
+
+    if (!populationData?.total_population || !populationData?.density || populationData.density <= 0) return
+
+    const center = new window.kakao.maps.LatLng(lat, lng)
+    const areaSqm = (populationData.total_population / populationData.density) * 1_000_000
+    const radiusM = Math.round(Math.sqrt(areaSqm / Math.PI))
+    const clampedRadius = Math.max(300, Math.min(radiusM, 8000))
+
+    const density = populationData.density
+    const color = density > 5000 ? '#ef4444' : density > 1000 ? '#f97316' : '#22c55e'
+
+    const circle = new window.kakao.maps.Circle({
+      map,
+      center,
+      radius: clampedRadius,
+      strokeWeight: 2,
+      strokeColor: color,
+      strokeOpacity: 0.7,
+      strokeStyle: 'dashed',
+      fillColor: color,
+      fillOpacity: 0.06,
+    })
+    circle.setMap(map)
+    popCircleRef.current = circle
+
+    const labelPos = new window.kakao.maps.LatLng(
+      lat + (clampedRadius / 111_000) * 0.85,
+      lng
+    )
+    const label = new window.kakao.maps.CustomOverlay({
+      map,
+      position: labelPos,
+      content: `<div style="background:${color};color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:99px;white-space:nowrap;opacity:0.9;">👥 ${(populationData.total_population / 10000).toFixed(1)}만명</div>`,
+      yAnchor: 1,
+    })
+    label.setMap(map)
+    popLabelRef.current = label
+  }, [populationData, lat, lng])
 
   if (!appKey) {
     return (
