@@ -2,16 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 const POI_CATEGORIES: Record<string, string> = {
-  subway:      'SW8',
-  mart:        'MT1',
-  hospital:    'HP8',
-  school:      'SC4',
+  subway: 'SW8',
+  mart: 'MT1',
+  hospital: 'HP8',
+  school: 'SC4',
   convenience: 'CS2',
-  pharmacy:    'PM9',
-  bank:        'BK9',
-  culture:     'CT1',
-  cafe:        'CE7',
-  restaurant:  'FD6',
+  pharmacy: 'PM9',
+  bank: 'BK9',
+  culture: 'CT1',
+  cafe: 'CE7',
+  restaurant: 'FD6',
 }
 
 export async function POST(req: NextRequest) {
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     if (!apiKey) return NextResponse.json({ error: 'KAKAO_REST_API_KEY가 설정되지 않았습니다' }, { status: 500 })
 
     const collected: Record<string, any[]> = {}
-    
+
     await Promise.allSettled(
       Object.entries(POI_CATEGORIES).map(async ([key, code]) => {
         try {
@@ -47,9 +47,11 @@ export async function POST(req: NextRequest) {
           const data = await res.json()
           if (data.documents?.length > 0) {
             collected[key] = data.documents.map((d: any) => ({
-              name:       d.place_name,
+              name: d.place_name,
               distance_m: parseInt(d.distance) || null,
-              address:    d.road_address_name || d.address_name,
+              address: d.road_address_name || d.address_name,
+              lat: parseFloat(d.y),
+              lng: parseFloat(d.x),
             }))
           }
         } catch { /* 개별 실패 무시 */ }

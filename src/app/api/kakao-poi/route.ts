@@ -34,6 +34,8 @@ async function fetchCategory(
     address: d.road_address_name || d.address_name || '',
     distance_m: parseInt(d.distance ?? '0', 10),
     phone: d.phone || undefined,
+    lat: parseFloat(d.y),
+    lng: parseFloat(d.x),
   }))
   return { label, total_count: totalCount, items }
 }

@@ -15,15 +15,15 @@ import KakaoMap from '@/components/KakaoMap'
 
 // ── POI 아이콘 맵 ─────────────────────────────────────────────
 const POI_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
-  subway:      { label: '지하철',   icon: <Train size={14} />,        color: 'text-blue-600 bg-blue-50' },
-  mart:        { label: '대형마트', icon: <ShoppingCart size={14} />, color: 'text-green-600 bg-green-50' },
-  hospital:    { label: '병원',     icon: <Hospital size={14} />,     color: 'text-red-600 bg-red-50' },
-  school:      { label: '학교',     icon: <GraduationCap size={14} />,color: 'text-purple-600 bg-purple-50' },
-  convenience: { label: '편의점',   icon: <Coffee size={14} />,       color: 'text-amber-600 bg-amber-50' },
-  pharmacy:    { label: '약국',     icon: <Pill size={14} />,         color: 'text-pink-600 bg-pink-50' },
-  culture:     { label: '문화시설', icon: <Landmark size={14} />,     color: 'text-indigo-600 bg-indigo-50' },
-  bank:        { label: '은행',     icon: <Building2 size={14} />,    color: 'text-sky-600 bg-sky-50' },
-  cafe:        { label: '카페',     icon: <Coffee size={14} />,       color: 'text-amber-500 bg-amber-50' },
+  subway: { label: '지하철', icon: <Train size={14} />, color: 'text-blue-600 bg-blue-50' },
+  mart: { label: '대형마트', icon: <ShoppingCart size={14} />, color: 'text-green-600 bg-green-50' },
+  hospital: { label: '병원', icon: <Hospital size={14} />, color: 'text-red-600 bg-red-50' },
+  school: { label: '학교', icon: <GraduationCap size={14} />, color: 'text-purple-600 bg-purple-50' },
+  convenience: { label: '편의점', icon: <Coffee size={14} />, color: 'text-amber-600 bg-amber-50' },
+  pharmacy: { label: '약국', icon: <Pill size={14} />, color: 'text-pink-600 bg-pink-50' },
+  culture: { label: '문화시설', icon: <Landmark size={14} />, color: 'text-indigo-600 bg-indigo-50' },
+  bank: { label: '은행', icon: <Building2 size={14} />, color: 'text-sky-600 bg-sky-50' },
+  cafe: { label: '카페', icon: <Coffee size={14} />, color: 'text-amber-500 bg-amber-50' },
 }
 const SHOW_POI = ['subway', 'mart', 'hospital', 'school', 'convenience', 'pharmacy', 'culture']
 
@@ -55,9 +55,8 @@ function WorkflowStatus({ steps }: { steps: WorkflowStep[] }) {
     <div className="flex items-center gap-1 overflow-x-auto pb-1">
       {steps.map((step, i) => (
         <div key={i} className="flex items-center gap-1 flex-shrink-0">
-          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${
-            step.done ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'
-          }`}>
+          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${step.done ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'
+            }`}>
             {step.done
               ? <CheckCircle2 size={12} />
               : <div className="w-3 h-3 rounded-full border-2 border-current opacity-40" />
@@ -88,7 +87,7 @@ function AIAnalysisReport({ analysis, projectId, hasCoords, hasPOI, hasData, isC
 
   const prereqs = [
     { label: '좌표 변환', done: hasCoords },
-    { label: 'POI 수집',  done: hasPOI },
+    { label: 'POI 수집', done: hasPOI },
     { label: isCommercial ? '상권 데이터' : '부동산 데이터', done: hasData },
     { label: '업종 밀집도', done: hasKakaoDensity },
   ]
@@ -438,21 +437,21 @@ function POISection({ poi_data, projectId, lat, lng }: {
 
 // ── 카카오 업종 밀집도 분석 ──────────────────────────────────
 const KAKAO_CAT_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string; bg: string }> = {
-  CE7: { label: '카페',        icon: <Coffee size={14} />,          color: 'text-amber-700',  bg: 'bg-amber-50 border-amber-200' },
-  FD6: { label: '음식점',      icon: <UtensilsCrossed size={14} />, color: 'text-orange-700', bg: 'bg-orange-50 border-orange-200' },
-  HP8: { label: '병원',        icon: <Hospital size={14} />,        color: 'text-red-700',    bg: 'bg-red-50 border-red-200' },
-  AC5: { label: '학원',        icon: <BookOpen size={14} />,        color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200' },
-  CS2: { label: '편의점',      icon: <ShoppingCart size={14} />,    color: 'text-green-700',  bg: 'bg-green-50 border-green-200' },
-  AG2: { label: '부동산',      icon: <HomeIcon size={14} />,        color: 'text-blue-700',   bg: 'bg-blue-50 border-blue-200' },
-  PM9: { label: '약국',        icon: <Pill size={14} />,            color: 'text-pink-700',   bg: 'bg-pink-50 border-pink-200' },
+  CE7: { label: '카페', icon: <Coffee size={14} />, color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200' },
+  FD6: { label: '음식점', icon: <UtensilsCrossed size={14} />, color: 'text-orange-700', bg: 'bg-orange-50 border-orange-200' },
+  HP8: { label: '병원', icon: <Hospital size={14} />, color: 'text-red-700', bg: 'bg-red-50 border-red-200' },
+  AC5: { label: '학원', icon: <BookOpen size={14} />, color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200' },
+  CS2: { label: '편의점', icon: <ShoppingCart size={14} />, color: 'text-green-700', bg: 'bg-green-50 border-green-200' },
+  AG2: { label: '부동산', icon: <HomeIcon size={14} />, color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200' },
+  PM9: { label: '약국', icon: <Pill size={14} />, color: 'text-pink-700', bg: 'bg-pink-50 border-pink-200' },
 }
 
 function densityScore(counts: { total_count: number }[]): { score: number; label: string; color: string } {
   const total = counts.reduce((s, c) => s + c.total_count, 0)
   if (total >= 200) return { score: total, label: '매우 높음', color: 'text-red-600' }
-  if (total >= 100) return { score: total, label: '높음',     color: 'text-orange-600' }
-  if (total >= 50)  return { score: total, label: '보통',     color: 'text-yellow-600' }
-  return             { score: total, label: '낮음',     color: 'text-gray-500' }
+  if (total >= 100) return { score: total, label: '높음', color: 'text-orange-600' }
+  if (total >= 50) return { score: total, label: '보통', color: 'text-yellow-600' }
+  return { score: total, label: '낮음', color: 'text-gray-500' }
 }
 
 function KakaoDensityPanel({ kakao_density, projectId, lat, lng }: {
@@ -578,11 +577,13 @@ function KakaoDensityPanel({ kakao_density, projectId, lat, lng }: {
 
 // ── 지도 섹션 ─────────────────────────────────────────────────
 function MapSection({
-  lat, lng, poi_data, real_price_data, projectId,
+  lat, lng, poi_data, kakao_density, locationAnalysis, real_price_data, projectId,
 }: {
   lat: number | null
   lng: number | null
   poi_data: Record<string, POIItem[]> | null
+  kakao_density?: any
+  locationAnalysis?: any
   real_price_data: RealPriceItem[] | null
   projectId: string
 }) {
@@ -629,7 +630,7 @@ function MapSection({
   return (
     <div className="space-y-3">
       <div className="rounded-xl overflow-hidden border border-gray-100 relative">
-        <KakaoMap lat={lat} lng={lng} level={4} style={{ width: '100%', height: 380 }} />
+        <KakaoMap lat={lat} lng={lng} level={4} style={{ width: '100%', height: 380 }} poiData={poi_data} kakaoDensity={kakao_density} locationAnalysis={locationAnalysis} />
         <a
           href={`https://map.kakao.com/link/map/${lat},${lng}`}
           target="_blank"
@@ -989,15 +990,15 @@ interface AnalysisTabProps {
 export default function AnalysisTab({ projectId, project, locationAnalysis }: AnalysisTabProps) {
   const isCommercial = project.property_type === 'commercial'
 
-  const hasPOI        = project.poi_data != null && Object.keys(project.poi_data).length > 0
-  const hasRealPrice  = project.real_price_data != null
+  const hasPOI = project.poi_data != null && Object.keys(project.poi_data).length > 0
+  const hasRealPrice = project.real_price_data != null
   const hasCommercial = project.commercial_data != null
-  const hasData       = isCommercial ? hasCommercial : hasRealPrice
-  const hasAnalysis   = !!locationAnalysis
+  const hasData = isCommercial ? hasCommercial : hasRealPrice
+  const hasAnalysis = !!locationAnalysis
 
   const workflowSteps = [
     { label: '좌표 변환', done: !!(project.lat && project.lng) },
-    { label: 'POI 수집',  done: hasPOI },
+    { label: 'POI 수집', done: hasPOI },
     { label: isCommercial ? '상권 데이터' : '부동산 데이터', done: hasData },
     { label: '입지 분석', done: hasAnalysis },
   ]
@@ -1028,6 +1029,8 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
           lat={project.lat}
           lng={project.lng}
           poi_data={project.poi_data}
+          kakao_density={project.kakao_density}
+          locationAnalysis={locationAnalysis}
           real_price_data={isCommercial ? null : project.real_price_data}
           projectId={projectId}
         />

@@ -58,12 +58,14 @@ export interface POIItem {
   distance_m: number
   category?: string
   phone?: string | null
+  lat?: number
+  lng?: number
 }
 
 export interface KakaoDensityCategory {
   label: string
   total_count: number
-  items: { name: string; address: string; distance_m: number; phone?: string }[]
+  items: { name: string; address: string; distance_m: number; phone?: string; lat?: number; lng?: number }[]
 }
 
 export interface KakaoDensity {
