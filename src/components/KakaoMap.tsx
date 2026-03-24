@@ -17,6 +17,7 @@ interface KakaoMapProps {
   kakaoDensity?: KakaoDensity | null
   locationAnalysis?: any
   populationData?: any
+  commercialData?: any
 }
 
 const POI_HEATMAP_WEIGHT: Record<string, number> = {
@@ -57,13 +58,15 @@ function drawHeatmap(
 }
 
 export default function KakaoMap({
-  lat, lng, level = 4, className, style, poiData, kakaoDensity, locationAnalysis, populationData
+  lat, lng, level = 4, className, style, poiData, kakaoDensity, locationAnalysis, populationData, commercialData
 }: KakaoMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef    = useRef<HTMLCanvasElement>(null)
   const mapRef          = useRef<any>(null)
   const popCircleRef    = useRef<any>(null)
   const popLabelRef     = useRef<any>(null)
+  const flpopCircleRef  = useRef<any>(null)
+  const flpopLabelRef   = useRef<any>(null)
   const kakaoDensityRef = useRef(kakaoDensity)
   const [showHeatmap, setShowHeatmap] = useState(false)
   const appKey = process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY
@@ -203,6 +206,51 @@ export default function KakaoMap({
     label.setMap(map)
     popLabelRef.current = label
   }, [populationData, lat, lng])
+
+  // ── Effect 3: 유동인구 원 (commercial_data.floating_population)
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !window.kakao?.maps) return
+
+    if (flpopCircleRef.current) { flpopCircleRef.current.setMap(null); flpopCircleRef.current = null }
+    if (flpopLabelRef.current)  { flpopLabelRef.current.setMap(null);  flpopLabelRef.current  = null }
+
+    const fp = commercialData?.floating_population
+    if (!fp?.weekday) return
+
+    const center = new window.kakao.maps.LatLng(lat, lng)
+    const radius = kakaoDensityRef.current?.radius_m ?? 500  // 상권 분석 반경 그대로 사용
+
+    // 유동인구 수에 따른 색상: 고(>10000) 보라, 중(2000-10000) 파랑, 저(<2000) 하늘
+    const color = fp.weekday > 10000 ? '#7c3aed' : fp.weekday > 2000 ? '#2563eb' : '#0891b2'
+
+    const circle = new window.kakao.maps.Circle({
+      map, center, radius,
+      strokeWeight: 2,
+      strokeColor: color,
+      strokeOpacity: 0.8,
+      strokeStyle: 'shortdot',
+      fillColor: color,
+      fillOpacity: 0.08,
+    })
+    circle.setMap(map)
+    flpopCircleRef.current = circle
+
+    // 피크 시간대 계산
+    const hourLabels = ['0-6시', '6-11시', '11-14시', '14-17시', '17-21시', '21-24시']
+    const peakIdx = fp.by_hour ? fp.by_hour.indexOf(Math.max(...fp.by_hour)) : -1
+    const peakLabel = peakIdx >= 0 ? hourLabels[peakIdx] : ''
+
+    const labelPos = new window.kakao.maps.LatLng(lat - (radius / 111_000) * 0.85, lng)
+    const label = new window.kakao.maps.CustomOverlay({
+      map,
+      position: labelPos,
+      content: `<div style="background:${color};color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;white-space:nowrap;opacity:0.92;display:flex;align-items:center;gap:4px;">🚶 주중 ${fp.weekday.toLocaleString()}명${peakLabel ? ` · 피크 ${peakLabel}` : ''}</div>`,
+      yAnchor: 0,
+    })
+    label.setMap(map)
+    flpopLabelRef.current = label
+  }, [commercialData, lat, lng])
 
   if (!appKey) {
     return (

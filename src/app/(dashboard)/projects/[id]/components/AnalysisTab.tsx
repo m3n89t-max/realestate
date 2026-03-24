@@ -577,7 +577,7 @@ function KakaoDensityPanel({ kakao_density, projectId, lat, lng }: {
 
 // ── 지도 섹션 ─────────────────────────────────────────────────
 function MapSection({
-  lat, lng, poi_data, kakao_density, locationAnalysis, population_data, real_price_data, projectId,
+  lat, lng, poi_data, kakao_density, locationAnalysis, population_data, real_price_data, projectId, commercial_data,
 }: {
   lat: number | null
   lng: number | null
@@ -587,6 +587,7 @@ function MapSection({
   population_data?: any
   real_price_data: RealPriceItem[] | null
   projectId: string
+  commercial_data?: any
 }) {
   const [loading, setLoading] = useState(false)
   const supabase = createClient()
@@ -659,7 +660,7 @@ function MapSection({
         </button>
       </div>
       <div className="rounded-xl overflow-hidden border border-gray-100 relative">
-        <KakaoMap lat={lat} lng={lng} level={4} style={{ width: '100%', height: 380 }} poiData={poi_data} kakaoDensity={kakao_density} locationAnalysis={locationAnalysis} populationData={population_data} />
+        <KakaoMap lat={lat} lng={lng} level={4} style={{ width: '100%', height: 380 }} poiData={poi_data} kakaoDensity={kakao_density} locationAnalysis={locationAnalysis} populationData={population_data} commercialData={commercial_data} />
         <a
           href={`https://map.kakao.com/link/map/${lat},${lng}`}
           target="_blank"
@@ -1072,6 +1073,42 @@ function CommercialSection({ commercial_data, projectId }: {
         </div>
       )}
 
+      {/* 상권 분석 요약 설명란 */}
+      {(floating_population || sales_data) && (() => {
+        const fp = floating_population
+        const sd = sales_data
+        const hourLabels = ['새벽(0-6시)', '오전(6-11시)', '점심(11-14시)', '오후(14-17시)', '저녁(17-21시)', '야간(21-24시)']
+        const peakIdx = fp?.by_hour ? fp.by_hour.indexOf(Math.max(...fp.by_hour)) : -1
+        const peakTime = peakIdx >= 0 ? hourLabels[peakIdx] : null
+        const wkRatio = fp && fp.weekday > 0 ? Math.round((fp.weekend / fp.weekday) * 100) : null
+        const fpLevel = fp ? (fp.weekday > 10000 ? '매우 높음' : fp.weekday > 4000 ? '높음' : fp.weekday > 1500 ? '보통' : '낮음') : null
+
+        return (
+          <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 space-y-2">
+            <p className="text-xs font-semibold text-gray-700 flex items-center gap-1">
+              <span>📋</span> 상권 분석 요약
+            </p>
+            <div className="space-y-1.5 text-[11px] text-gray-600 leading-relaxed">
+              {fp && (
+                <>
+                  <p>• 반경 500m 유동인구는 주중 <span className="font-semibold text-purple-700">{fp.weekday.toLocaleString()}명/일</span>으로 <span className="font-semibold">{fpLevel}</span> 수준의 상권입니다.</p>
+                  {peakTime && <p>• 피크 시간대는 <span className="font-semibold text-blue-700">{peakTime}</span>이며, 이 시간대 방문 고객이 집중됩니다.</p>}
+                  {wkRatio !== null && (
+                    <p>• 주말 유동인구는 주중 대비 <span className="font-semibold">{wkRatio}%</span> 수준으로{wkRatio > 90 ? ' 주말에도 꾸준한 유동인구가 확인됩니다.' : wkRatio > 60 ? ' 주중·주말 모두 활성화된 상권입니다.' : ' 주중 위주의 직장인 상권 특성을 보입니다.'}</p>
+                  )}
+                </>
+              )}
+              {sd && sd.monthly_sales > 0 && (
+                <p>• 이 상권의 월 추정 카드 매출은 <span className="font-semibold text-green-700">{(sd.monthly_sales / 10000).toFixed(0)}만원</span>이며{sd.top_category ? ` ${sd.top_category} 업종이 주요 매출을 이끌고 있습니다.` : '.'}</p>
+              )}
+              {sd && sd.weekly_sales > 0 && sd.weekend_sales > 0 && (
+                <p>• 주중 매출 {(sd.weekly_sales / 10000).toFixed(0)}만원, 주말 매출 {(sd.weekend_sales / 10000).toFixed(0)}만원으로{sd.weekend_sales > sd.weekly_sales ? ' 주말 매출 비중이 높습니다.' : ' 주중 매출 비중이 높습니다.'}</p>
+              )}
+            </div>
+          </div>
+        )
+      })()}
+
       <button
         onClick={fetchData}
         disabled={loading}
@@ -1140,6 +1177,7 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
           population_data={project.population_data}
           real_price_data={isCommercial ? null : project.real_price_data}
           projectId={projectId}
+          commercial_data={project.commercial_data}
         />
       </div>
 
