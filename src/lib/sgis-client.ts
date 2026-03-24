@@ -93,7 +93,7 @@ export class SGISClient {
      * Converts WGS84 (lat/lng) to UTM-K (EPSG:5179) and then retrieves SGIS adm_cd
      * Returns an object containing the sido_cd and sgg_cd
      */
-    public async getSgisAdmCodesFromWGS84(lat: number, lng: number): Promise<{ sido: string, sgg: string }> {
+    public async getSgisAdmCodesFromWGS84(lat: number, lng: number): Promise<{ sido: string, sgg: string, emd: string, adm_nm: string }> {
         const token = await this.getAccessToken();
 
         // 1. Transform WGS84 to UTM-K (EPSG:5179)
@@ -119,12 +119,15 @@ export class SGISClient {
         const regionInfo = rgeoData.result[0];
         const sido = regionInfo.sido_cd;
         const sgg = regionInfo.sgg_cd;
+        // 읍면동 코드: adm_cd 전체(8자리) 또는 emd_cd 필드
+        const emd = regionInfo.adm_cd || regionInfo.emd_cd || '';
+        const adm_nm = regionInfo.adm_nm || '';
 
         if (!sido) {
             throw new Error("SGIS RGeocode did not return sido_cd");
         }
 
-        return { sido, sgg: sgg || '' };
+        return { sido, sgg: sgg || '', emd, adm_nm };
     }
 }
 

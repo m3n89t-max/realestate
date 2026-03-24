@@ -26,39 +26,57 @@ export async function POST(req: NextRequest) {
         // 1. Get region code directly from SGIS Reverse Geocoding
         let sidoCd: string;
         let sggCd: string;
+        let emdCd: string;
+        let admNm: string;
         try {
             const codes = await sgis.getSgisAdmCodesFromWGS84(project.lat, project.lng);
             sidoCd = codes.sido;
             sggCd = codes.sgg;
+            emdCd = codes.emd;
+            admNm = codes.adm_nm;
         } catch (e: any) {
             console.error('SGIS RGeocode Error:', e.message);
             return NextResponse.json({ error: '해당 위치의 행정동/인구 통계 데이터를 SGIS에서 찾을 수 없습니다. (좌표 예외 지역일 수 있습니다)' }, { status: 404 });
         }
 
-        // 2. Fetch basic population/household stat (API_0301)
+        // 2. Fetch basic population/household stat — 읍면동 → 시군구 → 시도 순으로 폴백
         let popData: any = null;
         let targetYear = '2023';
-        let usedAdmCd = `${sidoCd}${sggCd}`; // default to Sigungu
+        let usedAdmCd = emdCd || `${sidoCd}${sggCd}`;
 
         const yearsToTry = ['2023', '2022', '2021', '2020'];
 
-        // Try Sigungu level first
-        if (sggCd) {
+        // Try 읍면동 level first (most granular)
+        if (emdCd && emdCd.length >= 8) {
             for (const y of yearsToTry) {
                 try {
-                    const stats = await sgis.getPopulationStat(y, `${sidoCd}${sggCd}`);
+                    const stats = await sgis.getPopulationStat(y, emdCd);
+                    if (stats && stats[0]) {
+                        popData = stats[0];
+                        targetYear = y;
+                        usedAdmCd = emdCd;
+                        break;
+                    }
+                } catch { /* fallthrough */ }
+            }
+        }
+
+        // Fallback: Sigungu level
+        if (!popData && sggCd) {
+            usedAdmCd = `${sidoCd}${sggCd}`;
+            for (const y of yearsToTry) {
+                try {
+                    const stats = await sgis.getPopulationStat(y, usedAdmCd);
                     if (stats && stats[0]) {
                         popData = stats[0];
                         targetYear = y;
                         break;
                     }
-                } catch (e: any) {
-                    // Silently ignore Sigungu fetch errors to allow fallback
-                }
+                } catch { /* fallthrough */ }
             }
         }
 
-        // 3. Adaptive Fallback: If Sigungu doesn't exist or fails, try Sido level
+        // 3. Final Fallback: Sido level
         if (!popData) {
             usedAdmCd = sidoCd;
             for (const y of yearsToTry) {
@@ -69,9 +87,7 @@ export async function POST(req: NextRequest) {
                         targetYear = y;
                         break;
                     }
-                } catch (e: any) {
-                    // Ignore Sido fetch errors until the end
-                }
+                } catch { /* ignore */ }
             }
         }
 
@@ -93,6 +109,7 @@ export async function POST(req: NextRequest) {
 
         // Calculate metrics
         // "aged_child_idx", "avg_age", "ppltn_dnsty", "tot_family", "tot_house", "tot_ppltn", "oldage_suprt_per", "juv_suprt_per", "avg_fmember_cnt"
+        const adm_level = usedAdmCd.length >= 8 ? '읍면동' : usedAdmCd.length >= 5 ? '시군구' : '시도';
         const population_data = {
             density: parseFloat(popData.ppltn_dnsty || '0'),
             total_population: parseInt(popData.tot_ppltn || '0', 10),
@@ -100,6 +117,8 @@ export async function POST(req: NextRequest) {
             single_households,
             avg_members: parseFloat(popData.avg_fmember_cnt || '0'),
             avg_age: parseFloat(popData.avg_age || '0'),
+            adm_nm: popData.adm_nm || admNm,
+            adm_level,
             collected_at: new Date().toISOString()
         }
 

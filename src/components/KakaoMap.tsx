@@ -216,7 +216,11 @@ export default function KakaoMap({
           <h4 className="text-xs font-bold text-gray-800 mb-1 flex items-center gap-1">
             <span>👥</span> 배후 인구 분석
           </h4>
-          <p className="text-[9px] text-blue-500 mb-2 pb-1.5 border-b border-gray-100">시군구 행정구역 기준</p>
+          <p className="text-[9px] text-blue-500 mb-2 pb-1.5 border-b border-gray-100">
+            {populationData.adm_nm
+              ? `${populationData.adm_nm} (${populationData.adm_level || '시군구'} 기준)`
+              : '시군구 행정구역 기준'}
+          </p>
           <div className="space-y-2">
             <div className="flex justify-between items-center text-[11px]">
               <span className="text-gray-500">인구 밀도</span>
