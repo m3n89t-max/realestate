@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { SGISClient } from '@/lib/sgis-client'
 
 export async function POST(req: NextRequest) {
     try {
         const supabase = await createClient()
+        const adminSupabase = await createAdminClient()
         const { data: { user } } = await supabase.auth.getUser()
         // if (!user) return NextResponse.json({ error: '인증되지 않은 요청입니다' }, { status: 401 })
 
         const { project_id } = await req.json()
         if (!project_id) return NextResponse.json({ error: 'project_id가 필요합니다' }, { status: 400 })
 
-        const { data: project } = await supabase
+        const { data: project } = await adminSupabase
             .from('projects')
             .select('lat, lng')
             .eq('id', project_id)
@@ -128,8 +129,8 @@ export async function POST(req: NextRequest) {
             collected_at: new Date().toISOString()
         }
 
-        // Save to database
-        const { error: updateErr } = await supabase
+        // Save to database (admin client to bypass RLS)
+        const { error: updateErr } = await adminSupabase
             .from('projects')
             .update({ population_data })
             .eq('id', project_id)
