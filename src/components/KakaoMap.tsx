@@ -92,21 +92,31 @@ export default function KakaoMap({
               },
             })
 
+            // bounds 기반 좌표 변환 (pointFromCoords 대신 — 더 안정적)
+            const latlngToPixel = (itemLat: number, itemLng: number, w: number, h: number) => {
+              const bounds = map.getBounds()
+              const sw = bounds.getSouthWest()
+              const ne = bounds.getNorthEast()
+              const x = ((itemLng - sw.getLng()) / (ne.getLng() - sw.getLng())) * w
+              const y = ((ne.getLat() - itemLat) / (ne.getLat() - sw.getLat())) * h
+              return { x: Math.round(x), y: Math.round(y) }
+            }
+
             const render = () => {
-              const projection = map.getProjection()
               const w = hDiv.offsetWidth
               const h = hDiv.offsetHeight
               const points: { x: number; y: number; value: number }[] = []
+
+              // 매물 위치 자체도 데이터 포인트로 추가 (항상 유효)
+              points.push({ ...latlngToPixel(lat, lng, w, h), value: 8 })
 
               Object.entries(poiData!).forEach(([catKey, items]) => {
                 const weight = POI_HEATMAP_WEIGHT[catKey] || 2
                 items.forEach(item => {
                   if (item.lat && item.lng) {
-                    const pt = projection.pointFromCoords(
-                      new window.kakao.maps.LatLng(item.lat, item.lng)
-                    )
+                    const pt = latlngToPixel(item.lat, item.lng, w, h)
                     if (pt.x > -80 && pt.x < w + 80 && pt.y > -80 && pt.y < h + 80) {
-                      points.push({ x: Math.round(pt.x), y: Math.round(pt.y), value: weight })
+                      points.push({ ...pt, value: weight })
                     }
                   }
                 })
