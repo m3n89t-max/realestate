@@ -1,15 +1,17 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import {
   Building2, Bell, Menu, X, ChevronDown, LogOut,
   LayoutDashboard, FolderOpen, Settings, BarChart3,
   MapPin, Newspaper, LayoutGrid, Video, FileArchive,
-  Zap
+  Zap, Users
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
+import toast from 'react-hot-toast'
 
 interface NavItem {
   href: string
@@ -55,11 +57,33 @@ interface AppShellProps {
   children: React.ReactNode
   agentStatus?: 'online' | 'offline' | 'busy'
   orgName?: string
+  userRole?: string
 }
 
-export default function AppShell({ children, agentStatus = 'offline', orgName = '' }: AppShellProps) {
+export default function AppShell({
+  children,
+  agentStatus = 'offline',
+  orgName = '',
+  userRole = 'viewer'
+}: AppShellProps) {
   const pathname = usePathname()
+  const router = useRouter()
+  const supabase = createClient()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) throw error
+      toast.success('로그아웃되었습니다')
+      router.push('/login')
+      router.refresh()
+    } catch (err: any) {
+      toast.error('로그아웃 중 오류가 발생했습니다')
+    }
+  }
+
+  const isAdmin = userRole === 'owner' || userRole === 'admin'
 
   useEffect(() => {
     if (isMobileMenuOpen) {
@@ -197,6 +221,29 @@ export default function AppShell({ children, agentStatus = 'offline', orgName = 
                 </Link>
               )
             })}
+
+            {isAdmin && (
+              <>
+                <p className="px-3 mt-6 mb-3 text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
+                  Admin
+                </p>
+                <Link
+                  href="/admin/members"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group",
+                    pathname.startsWith('/admin/members')
+                      ? "bg-brand-50 text-brand-700"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                  )}
+                >
+                  <span className={cn("shrink-0 transition-colors", pathname.startsWith('/admin/members') ? "text-brand-600" : "text-slate-400 group-hover:text-slate-600")}>
+                    <Users size={20} />
+                  </span>
+                  회원관리
+                </Link>
+              </>
+            )}
           </div>
         </div>
 
@@ -261,7 +308,10 @@ export default function AppShell({ children, agentStatus = 'offline', orgName = 
             )
           })}
 
-          <button className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-all duration-200 w-full text-left group">
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-all duration-200 w-full text-left group"
+          >
             <span className="shrink-0 text-slate-400 group-hover:text-slate-600 transition-colors">
               <LogOut size={20} />
             </span>

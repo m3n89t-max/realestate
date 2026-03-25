@@ -49,6 +49,7 @@ export default async function DashboardLayout({
     <AppShell
       orgName={membership?.organization?.name ?? ''}
       agentStatus={effectiveStatus}
+      userRole={membership?.role ?? 'viewer'}
     >
       {children}
     </AppShell>

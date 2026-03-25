@@ -92,14 +92,15 @@ export function StepperNav({
   nextLabel = '다음',
   submitLabel = '완료',
   canNext = true,
-}: StepperNavProps) {
+  isNextLoading = false,
+}: StepperNavProps & { isNextLoading?: boolean }) {
   const isLast = currentStep === totalSteps - 1
 
   return (
     <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-200">
       <button
         onClick={onPrev}
-        disabled={currentStep === 0}
+        disabled={currentStep === 0 || isNextLoading}
         className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
       >
         이전
@@ -121,10 +122,15 @@ export function StepperNav({
       ) : (
         <button
           onClick={onNext}
-          disabled={!canNext}
+          disabled={!canNext || isNextLoading}
           className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {nextLabel}
+          {isNextLoading ? (
+            <>
+              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              처리중...
+            </>
+          ) : nextLabel}
         </button>
       )}
     </div>

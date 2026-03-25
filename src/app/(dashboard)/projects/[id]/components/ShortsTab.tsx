@@ -387,6 +387,28 @@ export default function ShortsTab({ projectId, assets = [] }: ShortsTabProps) {
   const [customInstructions, setCustomInstructions] = useState('')
   const [showInstructions, setShowInstructions] = useState(false)
 
+  // 📝 에디터용 로컬 상태
+  const [editedScenes, setEditedScenes] = useState<Record<number, Partial<Scene>>>({})
+  const [editedScript, setEditedScript] = useState<Partial<ShortsScript>>({})
+
+  // 사용자 편집 내용이 병합된 최종 스크립트
+  const activeScript: ShortsScript | null = script ? {
+    ...script,
+    ...editedScript,
+    scenes: (script.scenes ?? []).map(s => ({ ...s, ...(editedScenes[s.scene_number] ?? {}) }))
+  } : null
+
+  const updateScene = (sceneNum: number, updates: Partial<Scene>) => {
+    setEditedScenes(prev => ({ ...prev, [sceneNum]: { ...(prev[sceneNum] ?? {}), ...updates } }))
+  }
+  const updateScript = (updates: Partial<ShortsScript>) => {
+    setEditedScript(prev => ({ ...prev, ...updates }))
+  }
+  const resetScript = () => {
+    setEditedScenes({})
+    setEditedScript({})
+  }
+
   const handleGenerate = async () => {
     setGenerating(true)
     try {
@@ -408,6 +430,7 @@ export default function ShortsTab({ projectId, assets = [] }: ShortsTabProps) {
       if (!res.ok) throw new Error(json.error ?? '생성에 실패했습니다')
       const data = json.data ?? json
       setScript({ hook: data.hook, total_duration_sec: data.total_duration_sec ?? 60, scenes: data.scenes ?? [], hashtags: data.hashtags ?? [] })
+      resetScript()
       setActiveScene(0)
       toast.success('쇼츠 스크립트가 생성되었습니다!')
     } catch (err: unknown) {
@@ -425,15 +448,15 @@ export default function ShortsTab({ projectId, assets = [] }: ShortsTabProps) {
   }
 
   const downloadTxt = () => {
-    if (!script) return
+    if (!activeScript) return
     const lines = [
-      `[후킹] ${script.hook}`,
+      `[후킹] ${activeScript.hook}`,
       '',
-      ...(script.scenes ?? []).map(s =>
+      ...(activeScript.scenes ?? []).map(s =>
         `[장면 ${s.scene_number} - ${s.duration_sec}초]\n화면: ${s.visual_description}\n나레이션: ${s.narration}${s.cta ? `\nCTA: ${s.cta}` : ''}`
       ),
       '',
-      `[해시태그] ${(script.hashtags ?? []).join(' ')}`,
+      `[해시태그] ${(activeScript.hashtags ?? []).join(' ')}`,
     ]
     const blob = new Blob([lines.join('\n\n')], { type: 'text/plain;charset=utf-8' })
     const url = URL.createObjectURL(blob)
@@ -446,8 +469,8 @@ export default function ShortsTab({ projectId, assets = [] }: ShortsTabProps) {
   }
 
   const downloadJson = () => {
-    if (!script) return
-    const blob = new Blob([JSON.stringify(script, null, 2)], { type: 'application/json;charset=utf-8' })
+    if (!activeScript) return
+    const blob = new Blob([JSON.stringify(activeScript, null, 2)], { type: 'application/json;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -458,8 +481,8 @@ export default function ShortsTab({ projectId, assets = [] }: ShortsTabProps) {
   }
 
   const renderVideo = async () => {
-    if (!script || rendering) return
-    const scenes = script.scenes ?? []
+    if (!activeScript || rendering) return
+    const scenes = activeScript.scenes ?? []
     if (scenes.length === 0) { toast.error('스크립트가 없습니다'); return }
 
     setRendering(true)
@@ -467,7 +490,7 @@ export default function ShortsTab({ projectId, assets = [] }: ShortsTabProps) {
     setRenderScene(1)
 
     const hasMedia = assets.length > 0
-    toast(`영상 렌더링을 시작합니다. 약 ${script.total_duration_sec ?? 60}초가 소요됩니다.`, { icon: '🎬', duration: 4000 })
+    toast(`영상 렌더링을 시작합니다. 약 ${activeScript.total_duration_sec ?? 60}초가 소요됩니다.`, { icon: '🎬', duration: 4000 })
 
     try {
       const W = 720, H = 1280
@@ -589,7 +612,7 @@ export default function ShortsTab({ projectId, assets = [] }: ShortsTabProps) {
 
         for (let f = 0; f < frames; f++) {
           const globalProgress = (elapsed + (f / 30)) / totalDuration
-          drawSceneToCanvas(canvas, scene, script.hook, scenes.length, globalProgress, bg)
+          drawSceneToCanvas(canvas, scene, activeScript.hook, scenes.length, globalProgress, bg)
           setRenderProgress(Math.round(globalProgress * 100))
           await new Promise(r => setTimeout(r, frameDuration))
         }
@@ -741,17 +764,29 @@ export default function ShortsTab({ projectId, assets = [] }: ShortsTabProps) {
         </div>
       )}
 
-      {script && (
+      {activeScript && (
         <>
           {/* 후킹 멘트 */}
           <div className="card p-4 border-l-4 border-brand-500">
-            <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-semibold text-brand-600 uppercase tracking-wide">후킹 멘트 (첫 1초)</span>
-              <button onClick={() => copyText(script.hook, 'hook')} className="p-1 rounded hover:bg-gray-100">
-                {copied === 'hook' ? <Check size={13} className="text-green-500" /> : <Copy size={13} className="text-gray-400" />}
-              </button>
+              <div className="flex gap-1.5 items-center">
+                {editedScript.hook !== undefined && (
+                  <button onClick={() => updateScript({ hook: undefined })} className="text-[11px] text-red-500 hover:text-red-600 font-medium">
+                    초기화
+                  </button>
+                )}
+                <button onClick={() => copyText(activeScript.hook, 'hook')} className="p-1 rounded hover:bg-gray-100">
+                  {copied === 'hook' ? <Check size={13} className="text-green-500" /> : <Copy size={13} className="text-gray-400" />}
+                </button>
+              </div>
             </div>
-            <p className="text-lg font-bold text-gray-900">&quot;{script.hook}&quot;</p>
+            <textarea
+              className="w-full text-lg font-bold text-gray-900 bg-transparent border-0 outline-none resize-none px-0 py-0 focus:ring-0"
+              value={activeScript.hook}
+              onChange={e => updateScript({ hook: e.target.value })}
+              rows={2}
+            />
           </div>
 
           {/* 메인 영역: 장면 카드 + 폰 미리보기 */}
@@ -759,13 +794,15 @@ export default function ShortsTab({ projectId, assets = [] }: ShortsTabProps) {
 
             {/* 장면 카드 그리드 */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {(script.scenes ?? []).map(scene => (
-                <button
+              {(activeScript.scenes ?? []).map(scene => {
+                const isActive = activeScene === scene.scene_number - 1
+                return (
+                <div
                   key={scene.scene_number}
                   onClick={() => setActiveScene(scene.scene_number - 1)}
                   className={cn(
-                    'card p-4 space-y-3 text-left transition-all',
-                    activeScene === scene.scene_number - 1
+                    'card p-4 space-y-3 text-left transition-all cursor-pointer',
+                    isActive
                       ? 'ring-2 ring-brand-400 shadow-md'
                       : 'hover:shadow-md'
                   )}
@@ -779,23 +816,62 @@ export default function ShortsTab({ projectId, assets = [] }: ShortsTabProps) {
                     )}>
                       장면 {scene.scene_number}
                     </span>
-                    <span className="text-xs text-gray-400">{scene.duration_sec}초</span>
-                  </div>
-
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">화면 구성</p>
-                    <p className="text-sm text-gray-700 line-clamp-2">{scene.visual_description}</p>
-                  </div>
-
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">나레이션</p>
-                    <p className="text-sm text-gray-800 font-medium line-clamp-2">{scene.narration}</p>
-                  </div>
-
-                  {scene.cta && (
-                    <div className="pt-2 border-t border-gray-100">
-                      <p className="text-xs font-bold text-orange-600 truncate">📞 {scene.cta}</p>
+                    <div className="flex items-center gap-2">
+                      {editedScenes[scene.scene_number] && (
+                        <button onClick={(e) => { e.stopPropagation(); setEditedScenes(prev => { const n = { ...prev }; delete n[scene.scene_number]; return n }) }} className="text-[10px] text-red-400 hover:text-red-500 font-medium">초기화</button>
+                      )}
+                      <span className="text-xs text-gray-400">{scene.duration_sec}초</span>
                     </div>
+                  </div>
+
+                  {isActive ? (
+                    <div className="space-y-3 cursor-default" onClick={e => e.stopPropagation()}>
+                      <div>
+                        <p className="text-[10px] font-medium text-gray-400 mb-0.5">화면 구성 (예상)</p>
+                        <textarea
+                          value={scene.visual_description}
+                          onChange={e => updateScene(scene.scene_number, { visual_description: e.target.value })}
+                          className="w-full text-xs text-gray-700 bg-white border border-gray-200 rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-brand-400 resize-none shadow-sm"
+                          rows={2}
+                        />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-medium text-gray-400 mb-0.5">나레이션 (쇼츠 자막/음성)</p>
+                        <textarea
+                          value={scene.narration}
+                          onChange={e => updateScene(scene.scene_number, { narration: e.target.value })}
+                          className="w-full text-sm font-medium text-gray-800 bg-white border border-gray-200 rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-brand-400 resize-none shadow-sm"
+                          rows={3}
+                        />
+                      </div>
+                      {scene.cta !== null && (
+                        <div>
+                          <p className="text-[10px] font-medium text-gray-400 mb-0.5">CTA 버튼</p>
+                          <input
+                            type="text"
+                            value={scene.cta ?? ''}
+                            onChange={e => updateScene(scene.scene_number, { cta: e.target.value })}
+                            className="w-full text-xs font-bold text-orange-600 bg-white border border-orange-200 rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-orange-400 shadow-sm"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <p className="text-[10px] font-medium text-gray-400 mb-1">화면 구성</p>
+                        <p className="text-xs text-gray-700 line-clamp-2">{scene.visual_description}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-medium text-gray-400 mb-1">나레이션</p>
+                        <p className="text-sm text-gray-800 font-medium line-clamp-2">{scene.narration}</p>
+                      </div>
+                      {scene.cta && (
+                        <div className="pt-2 border-t border-gray-100">
+                          <p className="text-xs font-bold text-orange-600 truncate">📞 {scene.cta}</p>
+                        </div>
+                      )}
+                    </>
                   )}
 
                   <div
@@ -804,21 +880,22 @@ export default function ShortsTab({ projectId, assets = [] }: ShortsTabProps) {
                       e.stopPropagation()
                       copyText(`화면: ${scene.visual_description}\n나레이션: ${scene.narration}`, `scene-${scene.scene_number}`)
                     }}
-                    className="w-full text-xs text-gray-400 hover:text-gray-600 flex items-center justify-center gap-1 pt-1 cursor-pointer"
+                    className="w-full text-xs text-gray-400 hover:text-gray-600 flex items-center justify-center gap-1 pt-2 cursor-pointer"
                   >
                     {copied === `scene-${scene.scene_number}`
                       ? <><Check size={11} className="text-green-500" /> 복사됨</>
                       : <><Copy size={11} /> 복사</>
                     }
                   </div>
-                </button>
-              ))}
+                </div>
+                )
+              })}
             </div>
 
             {/* 폰 미리보기 (xl 이상에서 우측 고정) */}
             <div className="hidden xl:block">
               <PhonePreview
-                script={script}
+                script={activeScript}
                 activeScene={activeScene}
                 onScene={setActiveScene}
                 photos={assets.filter(a => a.type === 'image' || !a.type).map(a => a.file_url)}
@@ -829,7 +906,7 @@ export default function ShortsTab({ projectId, assets = [] }: ShortsTabProps) {
           {/* 모바일용 폰 미리보기 (xl 미만) */}
           <div className="xl:hidden flex justify-center">
             <PhonePreview
-              script={script}
+              script={activeScript}
               activeScene={activeScene}
               onScene={setActiveScene}
               photos={assets.filter(a => a.type === 'image' || !a.type).map(a => a.file_url)}
@@ -840,17 +917,17 @@ export default function ShortsTab({ projectId, assets = [] }: ShortsTabProps) {
           <div className="card p-4">
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-sm font-semibold text-gray-700">
-                해시태그 ({(script.hashtags ?? []).length}개)
+                해시태그 ({(activeScript.hashtags ?? []).length}개)
               </h4>
               <button
-                onClick={() => copyText((script.hashtags ?? []).join(' '), 'hashtags')}
+                onClick={() => copyText((activeScript.hashtags ?? []).join(' '), 'hashtags')}
                 className="btn-secondary py-1.5 text-xs"
               >
                 {copied === 'hashtags' ? <><Check size={11} /> 복사됨</> : <><Copy size={11} /> 전체 복사</>}
               </button>
             </div>
             <div className="flex flex-wrap gap-1.5">
-              {(script.hashtags ?? []).map(tag => (
+              {(activeScript.hashtags ?? []).map(tag => (
                 <span key={tag} className="px-2.5 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
                   {tag}
                 </span>

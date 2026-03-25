@@ -136,6 +136,7 @@ export default function NewProjectPage() {
   const supabase = createClient()
   const [currentStep, setCurrentStep] = useState(0)
   const [submitting, setSubmitting] = useState(false)
+  const [nextLoading, setNextLoading] = useState(false)
   const [projectId, setProjectId] = useState<string | null>(null)
 
   const [form, setForm] = useState<FormData>({
@@ -195,6 +196,7 @@ export default function NewProjectPage() {
 
   const handleNext = async () => {
     if (currentStep === 0 && !projectId) {
+      setNextLoading(true)
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) { toast.error('로그인이 필요합니다'); return }
@@ -271,6 +273,8 @@ export default function NewProjectPage() {
       } catch (err: unknown) {
         toast.error(`저장 실패: ${err instanceof Error ? err.message : String(err)}`)
         return
+      } finally {
+        setNextLoading(false)
       }
     }
     setCurrentStep(prev => prev + 1)
@@ -653,6 +657,7 @@ export default function NewProjectPage() {
           onNext={handleNext}
           onSubmit={handleSubmit}
           isSubmitting={submitting}
+          isNextLoading={nextLoading}
           nextLabel="다음 단계"
           submitLabel="매물 등록 완료"
           canNext={canNext()}
