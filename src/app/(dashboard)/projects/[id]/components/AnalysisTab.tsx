@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   MapPin, TrendingUp, Building2, Target, FileText,
   Loader2, CheckCircle2, AlertCircle, RefreshCw, ChevronDown, ChevronUp,
@@ -1138,6 +1138,64 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
   const hasData = isCommercial ? hasCommercial : hasRealPrice
   const hasAnalysis = !!locationAnalysis
 
+  // ── 자동 수집 ──────────────────────────────────────────────
+  const [autoStep, setAutoStep] = useState<string | null>(null)
+  const [autoError, setAutoError] = useState<string | null>(null)
+  const ranRef = useRef(false)
+
+  useEffect(() => {
+    if (ranRef.current) return
+    ranRef.current = true
+    if (!project.lat || !project.lng) return
+
+    const needsPOI = !hasPOI
+    const needsData = !hasData
+    const needsKakao = !project.kakao_density
+    const needsPopulation = !project.population_data
+    if (!needsPOI && !needsData && !needsKakao && !needsPopulation) return
+
+    const supabase = createClient()
+    const post = async (url: string) => {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_id: projectId }),
+      })
+      const j = await res.json()
+      if (!res.ok) throw new Error(j.error ?? '수집 실패')
+    }
+
+    ;(async () => {
+      try {
+        if (needsPOI) {
+          setAutoStep('POI 수집 중...')
+          await post('/api/poi')
+        }
+        if (needsData) {
+          setAutoStep(isCommercial ? '상권 데이터 수집 중...' : '부동산 데이터 수집 중...')
+          const { error } = await supabase.functions.invoke(
+            isCommercial ? 'analyze-commercial' : 'collect-real-price',
+            { body: { project_id: projectId } }
+          )
+          if (error) throw new Error(error.message)
+        }
+        if (needsKakao) {
+          setAutoStep('업종 밀집도 분석 중...')
+          await post('/api/kakao-poi')
+        }
+        if (needsPopulation) {
+          setAutoStep('배후 인구 분석 중...')
+          await post('/api/population')
+        }
+        setAutoStep(null)
+        window.location.reload()
+      } catch (e: any) {
+        setAutoError(e.message ?? '자동 수집 실패')
+        setAutoStep(null)
+      }
+    })()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const workflowSteps = [
     { label: '좌표 변환', done: !!(project.lat && project.lng) },
     { label: 'POI 수집', done: hasPOI },
@@ -1152,11 +1210,23 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
       <div className="card p-4">
         <p className="text-xs text-gray-400 mb-3 font-medium uppercase tracking-wide">데이터 수집 현황</p>
         <WorkflowStatus steps={workflowSteps} />
-        {(!hasPOI || !hasData || !project.kakao_density) && (
+        {autoStep && (
+          <div className="flex items-center gap-2 mt-3 p-2.5 bg-blue-50 rounded-lg border border-blue-100">
+            <Loader2 size={13} className="text-blue-600 flex-shrink-0 animate-spin" />
+            <p className="text-xs text-blue-700 font-medium">{autoStep}</p>
+          </div>
+        )}
+        {autoError && (
+          <div className="flex items-center gap-2 mt-3 p-2.5 bg-red-50 rounded-lg border border-red-100">
+            <AlertCircle size={13} className="text-red-500 flex-shrink-0" />
+            <p className="text-xs text-red-600 font-medium">자동 수집 실패: {autoError}</p>
+          </div>
+        )}
+        {!autoStep && !autoError && (!hasPOI || !hasData || !project.kakao_density) && (
           <div className="flex items-center gap-2 mt-3 p-2.5 bg-brand-50 rounded-lg border border-brand-100">
             <AlertCircle size={13} className="text-brand-600 flex-shrink-0" />
             <p className="text-xs text-brand-700 font-medium">
-              모든 데이터를 수집해야 최종 AI 분석이 가능합니다. 아래 단계별 수집 버튼을 클릭하세요.
+              좌표가 없어 자동 수집을 건너뛰었습니다. 주소를 먼저 입력해주세요.
             </p>
           </div>
         )}

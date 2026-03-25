@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx supabase db execute --sql \"ALTER TABLE generated_contents ADD COLUMN IF NOT EXISTS titles text[] DEFAULT ''{}'';\")"
+      "Bash(npx supabase db execute --sql \"ALTER TABLE generated_contents ADD COLUMN IF NOT EXISTS titles text[] DEFAULT ''{}'';\")",
+      "Bash(git pull)",
+      "Bash(npm run type-check)"
     ]
   }
 }
