@@ -1149,10 +1149,14 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
     if (!project.lat || !project.lng) return
 
     const needsPOI = !hasPOI
-    const needsData = !hasData
+    // 비상업용도 실거래가 수집
+    const needsRealPrice = !isCommercial && !hasRealPrice
+    // 모든 매물: 유동인구 히트맵을 위해 상권 데이터 수집
+    const needsCommercial = !hasCommercial
     const needsKakao = !project.kakao_density
     const needsPopulation = !project.population_data
-    if (!needsPOI && !needsData && !needsKakao && !needsPopulation) return
+
+    if (!needsPOI && !needsRealPrice && !needsCommercial && !needsKakao && !needsPopulation) return
 
     const supabase = createClient()
     const post = async (url: string) => {
@@ -1168,15 +1172,17 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
     ;(async () => {
       try {
         if (needsPOI) {
-          setAutoStep('POI 수집 중...')
+          setAutoStep('주변 시설(POI) 수집 중...')
           await post('/api/poi')
         }
-        if (needsData) {
-          setAutoStep(isCommercial ? '상권 데이터 수집 중...' : '부동산 데이터 수집 중...')
-          const { error } = await supabase.functions.invoke(
-            isCommercial ? 'analyze-commercial' : 'collect-real-price',
-            { body: { project_id: projectId } }
-          )
+        if (needsRealPrice) {
+          setAutoStep('부동산 실거래가 수집 중...')
+          const { error } = await supabase.functions.invoke('collect-real-price', { body: { project_id: projectId } })
+          if (error) throw new Error(error.message)
+        }
+        if (needsCommercial) {
+          setAutoStep('유동인구 · 상권 데이터 수집 중...')
+          const { error } = await supabase.functions.invoke('analyze-commercial', { body: { project_id: projectId } })
           if (error) throw new Error(error.message)
         }
         if (needsKakao) {
@@ -1199,9 +1205,10 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
   const workflowSteps = [
     { label: '좌표 변환', done: !!(project.lat && project.lng) },
     { label: 'POI 수집', done: hasPOI },
-    { label: isCommercial ? '상권 데이터' : '부동산 데이터', done: hasData },
+    { label: '유동인구·상권', done: hasCommercial },
+    { label: '업종 밀집도', done: !!project.kakao_density },
     { label: '배후 인구', done: !!project.population_data },
-    { label: '입지 분석', done: hasAnalysis },
+    { label: 'AI 입지 분석', done: hasAnalysis },
   ]
 
   return (
@@ -1222,7 +1229,7 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
             <p className="text-xs text-red-600 font-medium">자동 수집 실패: {autoError}</p>
           </div>
         )}
-        {!autoStep && !autoError && (!hasPOI || !hasData || !project.kakao_density) && (
+        {!autoStep && !autoError && (!hasPOI || !hasCommercial || !project.kakao_density || !project.population_data) && (
           <div className="flex items-center gap-2 mt-3 p-2.5 bg-brand-50 rounded-lg border border-brand-100">
             <AlertCircle size={13} className="text-brand-600 flex-shrink-0" />
             <p className="text-xs text-brand-700 font-medium">
