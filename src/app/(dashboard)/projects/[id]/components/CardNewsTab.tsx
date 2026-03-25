@@ -5,7 +5,7 @@ import { toPng } from 'html-to-image'
 import {
   Wand2, Download, Image as ImageIcon, Sparkles, Loader2,
   Building2, MapPin, TrendingUp, Home, Phone,
-  ChevronLeft, ChevronRight, Copy, Check,
+  ChevronLeft, ChevronRight, Copy, Check, Paintbrush, ExternalLink,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { GeneratedContent } from '@/lib/types'
@@ -487,6 +487,8 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
   const [editedCards, setEditedCards] = useState<Record<number, Partial<CardSlide>>>({})
   const [customInstructions, setCustomInstructions] = useState('')
   const [showInstructions, setShowInstructions] = useState(true)
+  const [canvaLoading, setCanvaLoading] = useState(false)
+  const [canvaResult, setCanvaResult] = useState<{ design_id: string; edit_url: string; png_url?: string } | null>(null)
   const cardRef = useRef<HTMLDivElement>(null)
 
   const selected = contents.find(c => c.id === selectedId)
@@ -613,6 +615,58 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
     }
   }
 
+  const handleCanvaDesign = async () => {
+    const card = slides[activeSlide]
+    if (!card) { toast.error('카드를 먼저 생성하세요'); return }
+    setCanvaLoading(true)
+    try {
+      // 1. 현재 카드에 연결된 사진 업로드
+      const photoUrl = assets.length > 0 ? assignPhoto(card.order, assets) : undefined
+      let asset_id: string | undefined
+      if (photoUrl) {
+        const assetRes = await fetch('/api/canva/assets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image_url: photoUrl, name: `card-${card.order}` }),
+        })
+        if (assetRes.ok) {
+          const assetJson = await assetRes.json()
+          asset_id = assetJson.asset_id
+        }
+      }
+
+      // 2. Autofill 실행
+      const autofillRes = await fetch('/api/canva/autofill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ card: mergeCard(card), asset_id, content_id: selectedId }),
+      })
+      const autofillJson = await autofillRes.json()
+      if (!autofillRes.ok) throw new Error(autofillJson.error ?? 'Autofill 실패')
+
+      const { design_id, edit_url } = autofillJson
+
+      // 3. PNG Export
+      let png_url: string | undefined
+      const exportRes = await fetch('/api/canva/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ design_id, format: 'png' }),
+      })
+      if (exportRes.ok) {
+        const exportJson = await exportRes.json()
+        png_url = exportJson.url
+      }
+
+      setCanvaResult({ design_id, edit_url, png_url })
+      toast.success('Canva 디자인 생성 완료!')
+    } catch (err: any) {
+      toast.error(err.message ?? 'Canva 디자인 생성 실패')
+    } finally {
+      setCanvaLoading(false)
+    }
+  }
+
   return (
     <div className="space-y-5">
       {/* ── 상단 컨트롤 바 ── */}
@@ -695,6 +749,20 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
                 <option key={c.id} value={c.id}>버전 {c.version ?? (contents.length - i)}</option>
               ))}
             </select>
+          )}
+
+          {/* Canva 디자인 버튼 (슬라이드 있을 때만) */}
+          {slides.length > 0 && (
+            <button
+              onClick={handleCanvaDesign}
+              disabled={canvaLoading}
+              className="btn-secondary text-xs gap-1.5 border-violet-200 text-violet-700 hover:border-violet-400 hover:bg-violet-50"
+            >
+              {canvaLoading
+                ? <><Loader2 size={13} className="animate-spin" /> Canva 처리중...</>
+                : <><Paintbrush size={13} /> Canva 디자인</>
+              }
+            </button>
           )}
 
           {/* 생성 버튼 */}
@@ -948,6 +1016,41 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
                 ))}
               </div>
             </div>
+
+            {/* Canva 결과 */}
+            {canvaResult && (
+              <div className="card p-4 border-violet-200 bg-violet-50">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Paintbrush size={14} className="text-violet-600" />
+                    <p className="text-sm font-semibold text-violet-800">Canva 디자인 완료</p>
+                  </div>
+                  <button onClick={() => setCanvaResult(null)} className="text-xs text-violet-400 hover:text-violet-600">닫기</button>
+                </div>
+                {canvaResult.png_url && (
+                  <img src={canvaResult.png_url} alt="Canva 디자인" className="rounded-xl w-full mb-3 shadow-sm" />
+                )}
+                <div className="flex gap-2">
+                  <a
+                    href={canvaResult.edit_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-secondary text-xs gap-1.5 border-violet-200 text-violet-700 hover:border-violet-400"
+                  >
+                    <ExternalLink size={12} /> Canva에서 편집
+                  </a>
+                  {canvaResult.png_url && (
+                    <a
+                      href={canvaResult.png_url}
+                      download={`canva-card-${activeSlide + 1}.png`}
+                      className="btn-secondary text-xs gap-1.5"
+                    >
+                      <Download size={12} /> PNG 저장
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* 다운로드 */}
             <div className="card p-4 bg-gray-50 border-dashed flex items-center justify-between">
