@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { flushSync } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { StepperHeader, StepperNav } from '@/components/ui/StepperForm'
 import AssetUploader from '@/components/ui/AssetUploader'
@@ -196,7 +197,7 @@ export default function NewProjectPage() {
 
   const handleNext = async () => {
     if (currentStep === 0 && !projectId) {
-      setNextLoading(true)
+      flushSync(() => setNextLoading(true))
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) { toast.error('로그인이 필요합니다'); return }
@@ -222,7 +223,7 @@ export default function NewProjectPage() {
           const geo = await geocodeAddress(form.address)
           if (geo) { lat = geo.lat; lng = geo.lng; jibunAddress = geo.jibun_address }
           else toast('주소 좌표를 찾지 못했습니다.', { duration: 5000 })
-        } catch { toast('주소 좌표 변환 오류', { duration: 5000 }) }
+        } catch { /* 좌표 변환 실패 시 null로 저장 (비치명적) */ }
 
         const { data, error } = await supabase.from('projects').insert({
           org_id: membership.org_id,
@@ -411,7 +412,7 @@ export default function NewProjectPage() {
                     </TCell>
                     <TLabel>해당층/총층</TLabel>
                     <TCell>
-                      <div className="flex items-center gap-1 flex-wrap">
+                      <div className="flex items-center gap-1 flex-nowrap whitespace-nowrap">
                         <TInput
                           value={form.whole_building ? '전체' : form.floor}
                           onChange={v => set('floor', v)}
@@ -426,7 +427,7 @@ export default function NewProjectPage() {
                         <button
                           type="button"
                           onClick={toggleWholeBuilding}
-                          className={`ml-1 px-2 py-0.5 rounded text-[11px] border transition-colors ${form.whole_building ? 'bg-brand-600 text-white border-brand-600' : 'border-gray-300 text-gray-500 hover:border-brand-400'}`}
+                          className={`ml-1 px-2 py-0.5 rounded text-[11px] border transition-colors flex-shrink-0 ${form.whole_building ? 'bg-brand-600 text-white border-brand-600' : 'border-gray-300 text-gray-500 hover:border-brand-400'}`}
                         >
                           건물전체
                         </button>
@@ -486,13 +487,13 @@ export default function NewProjectPage() {
                   <tr>
                     <TLabel>주 차 대 수</TLabel>
                     <TCell colSpan={5}>
-                      <div className="flex gap-4">
-                        <div className="flex items-center gap-1 text-xs">
+                      <div className="flex gap-4 flex-nowrap">
+                        <div className="flex items-center gap-1 text-xs whitespace-nowrap">
                           <span className="text-gray-500">대장상</span>
                           <TInput value={form.parking_legal} onChange={v => set('parking_legal', v)} placeholder="12" type="number" className="w-12" />
                           <span className="text-gray-400">대</span>
                         </div>
-                        <div className="flex items-center gap-1 text-xs">
+                        <div className="flex items-center gap-1 text-xs whitespace-nowrap">
                           <span className="text-gray-500">실주차</span>
                           <TInput value={form.parking_actual} onChange={v => set('parking_actual', v)} placeholder="20" type="number" className="w-12" />
                           <span className="text-gray-400">대</span>
