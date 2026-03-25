@@ -31,13 +31,13 @@ interface Row {
   wide?: boolean  // 값 칸이 3칸 span
 }
 
-function Cell({ label, value, highlight }: { label: string; value: React.ReactNode; highlight?: boolean }) {
+function Cell({ label, value, highlight, nowrap }: { label: string; value: React.ReactNode; highlight?: boolean; nowrap?: boolean }) {
   return (
     <>
       <td className="border border-gray-300 bg-blue-50 px-3 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap">
         {label}
       </td>
-      <td className={`border border-gray-300 px-3 py-2 text-xs ${highlight ? 'text-red-600 font-bold' : 'text-gray-800'}`}>
+      <td className={`border border-gray-300 px-3 py-2 text-xs ${highlight ? 'text-red-600 font-bold' : 'text-gray-800'} ${nowrap ? 'whitespace-nowrap' : ''}`}>
         {value || '-'}
       </td>
     </>
@@ -78,7 +78,7 @@ export default function PropertyInfoTable({ project, org, agentName, className =
           {/* Row 2: 주용도 + 해당층/총층 */}
           <tr>
             <Cell label="주 용 도" value={project.main_use} />
-            <Cell label="해당층/총층" value={
+            <Cell label="해당층/총층" nowrap value={
               project.floor || project.total_floors
                 ? `${project.floor ?? '-'}층 / ${project.total_floors ?? '-'}층`
                 : '-'
@@ -96,9 +96,9 @@ export default function PropertyInfoTable({ project, org, agentName, className =
             <Cell label="대지 면적(㎡)" value={formatArea(project.land_area)} />
             <Cell label="사용승인일" value={project.approval_date} />
             <Cell label="연 면 적(㎡)" value={formatArea(project.total_area)} />
-            <Cell label="주차대수" value={
+            <Cell label="주차대수" nowrap value={
               project.parking_legal || project.parking_actual
-                ? `대장상: ${project.parking_legal ?? '-'}대 / 실주차: ${project.parking_actual ?? '-'}대`
+                ? `대장 ${project.parking_legal ?? '-'}대 / 실 ${project.parking_actual ?? '-'}대`
                 : '-'
             } />
           </tr>
