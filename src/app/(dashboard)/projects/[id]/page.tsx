@@ -99,7 +99,17 @@ export default async function ProjectDetailPage({
             </div>
             <h1 className="text-xl font-bold text-gray-900 leading-tight">{project.address}</h1>
             <div className="flex items-center gap-3 mt-1.5 text-sm text-gray-500">
-              {project.price && <span className="font-medium text-gray-800">{formatPrice(project.price)}</span>}
+              {project.transaction_type === 'rent' && (project.deposit || project.monthly_rent) && (
+                <span className="font-medium text-gray-800">
+                  {project.deposit ? formatPrice(project.deposit) : '-'} / {project.monthly_rent ? formatPrice(project.monthly_rent) : '-'}
+                </span>
+              )}
+              {project.transaction_type === 'lease' && project.deposit && (
+                <span className="font-medium text-gray-800">{formatPrice(project.deposit)}</span>
+              )}
+              {(!project.transaction_type || project.transaction_type === 'sale') && project.price && (
+                <span className="font-medium text-gray-800">{formatPrice(project.price)}</span>
+              )}
               {project.area && <span>{formatArea(project.area)}</span>}
               {project.floor && <span>{project.floor}층 / {project.total_floors}층</span>}
               {project.direction && <span>{project.direction}</span>}
@@ -163,7 +173,17 @@ export default async function ProjectDetailPage({
                   {[
                     { label: '주소', value: project.address },
                     { label: '매물 유형', value: getPropertyTypeLabel(project.property_type ?? '') },
-                    { label: '매매가', value: project.price ? formatPrice(project.price) : '—' },
+                    {
+                      label: project.transaction_type === 'rent' ? '보증금/월세'
+                        : project.transaction_type === 'lease' ? '전세보증금' : '매매가',
+                      value: project.transaction_type === 'rent'
+                        ? (project.deposit || project.monthly_rent
+                          ? `${project.deposit ? formatPrice(project.deposit) : '-'} / ${project.monthly_rent ? formatPrice(project.monthly_rent) : '-'}`
+                          : '—')
+                        : project.transaction_type === 'lease'
+                        ? (project.deposit ? formatPrice(project.deposit) : '—')
+                        : (project.price ? formatPrice(project.price) : '—')
+                    },
                     { label: '전용면적', value: project.area ? formatArea(project.area) : '—' },
                     { label: '층수', value: project.floor ? `${project.floor}층 / ${project.total_floors}층` : '—' },
                     { label: '방향', value: project.direction ?? '—' },

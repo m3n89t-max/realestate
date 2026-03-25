@@ -5,20 +5,19 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatPrice(priceInManwon: number): string {
-  if (!priceInManwon) return '0원'
-  const price = priceInManwon * 10000
+export function formatPrice(priceInWon: number): string {
+  if (!priceInWon) return '0원'
 
-  if (price >= 100000000) {
-    const eok = Math.floor(price / 100000000)
-    const man = Math.floor((price % 100000000) / 10000)
+  if (priceInWon >= 100000000) {
+    const eok = Math.floor(priceInWon / 100000000)
+    const man = Math.floor((priceInWon % 100000000) / 10000)
     if (man === 0) return `${eok}억`
     return `${eok}억 ${man.toLocaleString()}만`
   }
-  if (price >= 10000) {
-    return `${Math.floor(price / 10000).toLocaleString()}만`
+  if (priceInWon >= 10000) {
+    return `${Math.floor(priceInWon / 10000).toLocaleString()}만`
   }
-  return `${price.toLocaleString()}원`
+  return `${priceInWon.toLocaleString()}원`
 }
 
 export function formatArea(area: number): string {
