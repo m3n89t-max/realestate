@@ -327,15 +327,15 @@ export default function KakaoMap({
 
       rows += `
         <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px;">
-          <span style="color:#6b7280;">주중 카드이용</span>
+          <span style="color:#6b7280;">주중 카드사용</span>
           <span style="font-weight:600;color:#1e293b;">${weekday.toLocaleString()}명</span>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px;">
-          <span style="color:#6b7280;">주말 카드이용</span>
+          <span style="color:#6b7280;">주말 카드사용</span>
           <span style="font-weight:600;color:#1e293b;">${weekend.toLocaleString()}명</span>
         </div>
         ${peakTime ? `<div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px;"><span style="color:#6b7280;">피크 시간대</span><span style="font-weight:600;color:#7c3aed;">${peakTime}</span></div>` : ''}
-        ${monthlySales > 0 ? `<div style="display:flex;justify-content:space-between;font-size:10px;margin-top:4px;padding-top:4px;border-top:1px dashed #e0e7ff;"><span style="color:#6b7280;">${latestMonth} 카드매출</span><span style="font-weight:700;color:#059669;">${Math.round(monthlySales / 10000).toLocaleString()}만원</span></div>` : ''}
+        ${monthlySales > 0 ? `<div style="display:flex;justify-content:space-between;font-size:10px;margin-top:4px;padding-top:4px;border-top:1px dashed #e0e7ff;"><span style="color:#6b7280;">${latestMonth} 이용금액</span><span style="font-weight:700;color:#059669;">${Math.round(monthlySales / 10000).toLocaleString()}만원</span></div>` : ''}
       `
       source += '제주데이터허브'
     }
@@ -352,16 +352,16 @@ export default function KakaoMap({
       rows += `
         ${hasJejuCard ? '<div style="margin-top:6px;padding-top:6px;border-top:1px solid #f3f4f6;"></div>' : ''}
         ${areaName ? `<div style="font-size:9px;color:#6366f1;font-weight:600;margin-bottom:4px;">📍 ${areaName}${topCat ? ` · ${topCat}` : ''}</div>` : ''}
-        ${monthly > 0 ? `<div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px;"><span style="color:#6b7280;">월 카드매출</span><span style="font-weight:700;color:#059669;">${Math.round(monthly / 10000).toLocaleString()}만원</span></div>` : ''}
-        ${weekdaySales > 0 ? `<div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px;"><span style="color:#6b7280;">주중 매출</span><span style="font-weight:600;color:#1e293b;">${Math.round(weekdaySales / 10000).toLocaleString()}만원</span></div>` : ''}
-        ${weekendSales > 0 ? `<div style="display:flex;justify-content:space-between;font-size:10px;"><span style="color:#6b7280;">주말 매출</span><span style="font-weight:600;color:#1e293b;">${Math.round(weekendSales / 10000).toLocaleString()}만원</span></div>` : ''}
+        ${monthly > 0 ? `<div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px;"><span style="color:#6b7280;">월 카드사용금액</span><span style="font-weight:700;color:#059669;">${Math.round(monthly / 10000).toLocaleString()}만원</span></div>` : ''}
+        ${weekdaySales > 0 ? `<div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px;"><span style="color:#6b7280;">주중 사용금액</span><span style="font-weight:600;color:#1e293b;">${Math.round(weekdaySales / 10000).toLocaleString()}만원</span></div>` : ''}
+        ${weekendSales > 0 ? `<div style="display:flex;justify-content:space-between;font-size:10px;"><span style="color:#6b7280;">주말 사용금액</span><span style="font-weight:600;color:#1e293b;">${Math.round(weekendSales / 10000).toLocaleString()}만원</span></div>` : ''}
       `
       source += (source ? ' · ' : '') + '소상공인진흥공단'
     }
 
     const content = `
       <div style="background:#fff;border:1.5px solid #6366f1;border-radius:12px;padding:10px 13px;box-shadow:0 2px 10px rgba(0,0,0,0.13);min-width:170px;font-family:sans-serif;">
-        <div style="font-size:11px;font-weight:700;color:#4f46e5;margin-bottom:6px;border-bottom:1px solid #e0e7ff;padding-bottom:4px;">💳 카드 매출 현황</div>
+        <div style="font-size:11px;font-weight:700;color:#4f46e5;margin-bottom:6px;border-bottom:1px solid #e0e7ff;padding-bottom:4px;">💳 카드 사용량 현황</div>
         ${rows}
         <div style="font-size:9px;color:#9ca3af;text-align:right;margin-top:6px;">${source}</div>
       </div>

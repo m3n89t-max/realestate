@@ -687,14 +687,12 @@ function MapSection({
         {/* 유동인구 */}
         <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
           <p className="font-bold text-gray-700 mb-1.5 flex items-center gap-1">
-            <span className="w-3 h-3 rounded-full border-2 inline-block flex-shrink-0" style={{borderColor: hasCardFp ? '#2563eb' : '#0891b2'}} />
-            유동인구 분석
+            <span className="w-3 h-3 rounded-full border-2 inline-block flex-shrink-0" style={{borderColor:'#2563eb'}} />
+            유동인구 추정
           </p>
           <p className="text-[10px] text-gray-500 leading-relaxed">
-            {hasCardFp
-              ? <>💳 제주 카드 이용량 기반<br/>300m 반경 주중·주말 이용자 수</>
-              : <>🏪 소상공인 상권 유동인구<br/>300m 반경 주중 평균 유동인구</>
-            }
+            💳 주중·주말 카드 사용량 기반 유동인구 추정 (전국)
+            {hasCardFp && <><br/><span className="text-indigo-500 font-medium">제주: 카드이용자 수 직접 반영</span></>}
           </p>
           <div className="flex gap-1.5 mt-1.5">
             <span className="flex items-center gap-0.5 text-[9px] text-gray-500"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#7c3aed'}} />고</span>
