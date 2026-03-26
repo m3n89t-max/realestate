@@ -18,6 +18,7 @@ interface KakaoMapProps {
   locationAnalysis?: any
   populationData?: any
   commercialData?: any
+  cardData?: any
 }
 
 const POI_HEATMAP_WEIGHT: Record<string, number> = {
@@ -58,7 +59,7 @@ function drawHeatmap(
 }
 
 export default function KakaoMap({
-  lat, lng, level = 4, className, style, poiData, kakaoDensity, locationAnalysis, populationData, commercialData
+  lat, lng, level = 4, className, style, poiData, kakaoDensity, locationAnalysis, populationData, commercialData, cardData
 }: KakaoMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef    = useRef<HTMLCanvasElement>(null)
@@ -67,6 +68,7 @@ export default function KakaoMap({
   const popLabelRef     = useRef<any>(null)
   const flpopCircleRef  = useRef<any>(null)
   const flpopLabelRef   = useRef<any>(null)
+  const cardOverlayRef  = useRef<any>(null)
   const kakaoDensityRef = useRef(kakaoDensity)
   const [showHeatmap, setShowHeatmap] = useState(false)
   const [mapReady, setMapReady] = useState(false)
@@ -232,7 +234,7 @@ export default function KakaoMap({
     popLabelRef.current = label
   }, [populationData, lat, lng, mapReady])
 
-  // ── Effect 3: 유동인구 원 (commercial_data.floating_population)
+  // ── Effect 3: 유동인구 원 (cardData 우선, fallback: commercial_data.floating_population)
   useEffect(() => {
     const map = mapRef.current
     if (!map || !mapReady || !window.kakao?.maps) return
@@ -240,15 +242,28 @@ export default function KakaoMap({
     if (flpopCircleRef.current) { flpopCircleRef.current.setMap(null); flpopCircleRef.current = null }
     if (flpopLabelRef.current)  { flpopLabelRef.current.setMap(null);  flpopLabelRef.current  = null }
 
-    const fp = commercialData?.floating_population
-    if (!fp?.weekday) return
+    // cardData 우선 사용, 없으면 commercialData fallback
+    const useCard = cardData?.has_data && cardData?.floating_population?.weekday
+    const weekdayCount: number = useCard
+      ? cardData.floating_population.weekday
+      : (commercialData?.floating_population?.weekday ?? 0)
+    const byHour: number[] | undefined = useCard
+      ? cardData.floating_population.by_hour
+      : commercialData?.floating_population?.by_hour
+    const peakTimeLabel: string | undefined = useCard
+      ? cardData.floating_population.peak_time
+      : undefined
+
+    if (!weekdayCount) return
 
     const center = new window.kakao.maps.LatLng(lat, lng)
-    // 유동인구 원: 300m (업종밀집도 500m, 배후인구 500m과 겹치지 않게 더 작게)
     const flRadius = 300
 
-    // 유동인구 수에 따른 색상: 고(>10000) 보라, 중(2000-10000) 파랑, 저(<2000) 하늘
-    const color = fp.weekday > 10000 ? '#7c3aed' : fp.weekday > 2000 ? '#2563eb' : '#0891b2'
+    // 카드 기반 색상: 고(>3000) 보라, 중(500-3000) 파랑, 저(<500) 하늘 (카드 이용자 수는 실제 유동인구보다 적음)
+    // 상권 기반 색상: 고(>10000) 보라, 중(2000-10000) 파랑, 저(<2000) 하늘
+    const color = useCard
+      ? (weekdayCount > 3000 ? '#7c3aed' : weekdayCount > 500 ? '#2563eb' : '#0891b2')
+      : (weekdayCount > 10000 ? '#7c3aed' : weekdayCount > 2000 ? '#2563eb' : '#0891b2')
 
     const circle = new window.kakao.maps.Circle({
       map, center, radius: flRadius,
@@ -263,21 +278,74 @@ export default function KakaoMap({
     flpopCircleRef.current = circle
 
     // 피크 시간대 계산
-    const hourLabels = ['0-6시', '6-11시', '11-14시', '14-17시', '17-21시', '21-24시']
-    const peakIdx = fp.by_hour ? fp.by_hour.indexOf(Math.max(...fp.by_hour)) : -1
-    const peakLabel = peakIdx >= 0 ? hourLabels[peakIdx] : ''
+    let peakLabel = peakTimeLabel ?? ''
+    if (!peakLabel && byHour && byHour.length > 0) {
+      const hourLabels = ['0-6시', '6-11시', '11-14시', '14-17시', '17-21시', '21-24시']
+      const peakIdx = byHour.indexOf(Math.max(...byHour))
+      peakLabel = peakIdx >= 0 ? hourLabels[peakIdx] : ''
+    }
 
-    // 라벨: 원 아래쪽에 배치 (배후인구 라벨은 위쪽이므로 분리)
     const labelPos = new window.kakao.maps.LatLng(lat - (flRadius / 111_000) * 1.1, lng)
+    const sourceTag = useCard ? '카드' : '상권'
     const label = new window.kakao.maps.CustomOverlay({
       map,
       position: labelPos,
-      content: `<div style="background:${color};color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;white-space:nowrap;opacity:0.92;">🚶 주중 ${fp.weekday.toLocaleString()}명${peakLabel ? ` · 피크 ${peakLabel}` : ''}</div>`,
+      content: `<div style="background:${color};color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;white-space:nowrap;opacity:0.92;">🚶 주중 ${weekdayCount.toLocaleString()}명(${sourceTag})${peakLabel ? ` · 피크 ${peakLabel}` : ''}</div>`,
       yAnchor: 0,
     })
     label.setMap(map)
     flpopLabelRef.current = label
-  }, [commercialData, lat, lng, mapReady])
+  }, [commercialData, cardData, lat, lng, mapReady])
+
+  // ── Effect 4: 카드 매출 현황 오버레이
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady || !window.kakao?.maps) return
+
+    if (cardOverlayRef.current) { cardOverlayRef.current.setMap(null); cardOverlayRef.current = null }
+
+    if (!cardData?.has_data) return
+
+    const fp = cardData.floating_population
+    const cs = cardData.card_sales
+    const weekday = fp?.weekday ?? 0
+    const weekend = fp?.weekend ?? 0
+    const peakTime = fp?.peak_time ?? ''
+    const monthlySales = cs?.monthly_sales ?? 0
+    const latestMonth = cs?.latest_month ?? ''
+
+    const monthlySalesStr = monthlySales > 0
+      ? `${Math.round(monthlySales / 10000).toLocaleString()}만원`
+      : '데이터 없음'
+
+    const content = `
+      <div style="background:#fff;border:1.5px solid #6366f1;border-radius:12px;padding:10px 13px;box-shadow:0 2px 10px rgba(0,0,0,0.13);min-width:160px;font-family:sans-serif;">
+        <div style="font-size:11px;font-weight:700;color:#4f46e5;margin-bottom:6px;border-bottom:1px solid #e0e7ff;padding-bottom:4px;">💳 카드 이용 현황</div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px;">
+          <span style="color:#6b7280;">주중 이용자</span>
+          <span style="font-weight:600;color:#1e293b;">${weekday.toLocaleString()}명</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px;">
+          <span style="color:#6b7280;">주말 이용자</span>
+          <span style="font-weight:600;color:#1e293b;">${weekend.toLocaleString()}명</span>
+        </div>
+        ${peakTime ? `<div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px;"><span style="color:#6b7280;">피크 시간대</span><span style="font-weight:600;color:#7c3aed;">${peakTime}</span></div>` : ''}
+        ${monthlySales > 0 ? `<div style="display:flex;justify-content:space-between;font-size:10px;margin-top:4px;padding-top:4px;border-top:1px solid #f3f4f6;"><span style="color:#6b7280;">${latestMonth} 매출</span><span style="font-weight:700;color:#059669;">${monthlySalesStr}</span></div>` : ''}
+        <div style="font-size:9px;color:#9ca3af;text-align:right;margin-top:4px;">제주데이터허브</div>
+      </div>
+    `
+
+    const overlayPos = new window.kakao.maps.LatLng(lat, lng + 0.003)
+    const overlay = new window.kakao.maps.CustomOverlay({
+      map,
+      position: overlayPos,
+      content,
+      yAnchor: 0.5,
+      xAnchor: 0,
+    })
+    overlay.setMap(map)
+    cardOverlayRef.current = overlay
+  }, [cardData, lat, lng, mapReady])
 
   if (!appKey) {
     return (
@@ -288,6 +356,9 @@ export default function KakaoMap({
   }
 
   const hasPoi = poiData && Object.keys(poiData).length > 0
+  const hasCardFp = !!(cardData?.has_data && cardData?.floating_population?.weekday)
+  const hasCommercialFp = !!(commercialData?.floating_population?.weekday)
+  const hasFlpop = hasCardFp || hasCommercialFp
 
   return (
     <div className={`relative ${className || ''}`} style={style}>
@@ -320,21 +391,75 @@ export default function KakaoMap({
         </button>
       )}
 
-      {/* 히트맵 색상 범례 */}
-      {hasPoi && showHeatmap && (
-        <div className="absolute bottom-10 left-28 z-20 bg-white/90 backdrop-blur-sm px-2.5 py-1.5 rounded-xl shadow-md border border-gray-200 text-[10px] text-gray-600">
-          <div className="flex items-center gap-1.5 mb-1 font-medium text-gray-500">유동인구 밀집도</div>
-          <div className="flex items-center gap-1">
-            <div className="flex gap-0.5">
+      {/* 히트맵 + 원 색상 가이드 범례 */}
+      <div className="absolute bottom-2 left-2 z-20 bg-white/93 backdrop-blur-sm px-3 py-2 rounded-xl shadow-md border border-gray-200 text-[10px] text-gray-600 max-w-[220px]">
+        <p className="font-bold text-gray-700 mb-1.5 text-[11px]">🗺 지도 범례</p>
+
+        {/* 히트맵 범례 */}
+        {hasPoi && showHeatmap && (
+          <div className="mb-1.5 pb-1.5 border-b border-gray-100">
+            <p className="text-[9px] font-semibold text-orange-500 mb-0.5">🔥 유동인구 히트맵</p>
+            <div className="flex items-center gap-1">
               <span className="w-3 h-3 rounded-sm" style={{background:'rgba(239,68,68,0.8)'}} />
               <span className="w-3 h-3 rounded-sm" style={{background:'rgba(234,179,8,0.6)'}} />
               <span className="w-3 h-3 rounded-sm" style={{background:'rgba(59,130,246,0.4)'}} />
+              <span className="text-gray-400 ml-0.5">높음 → 낮음</span>
             </div>
-            <span className="text-gray-400">높음 → 낮음</span>
+            <p className="text-[9px] text-gray-400 mt-0.5">POI 집객시설(지하철·마트 등) 기반</p>
           </div>
-          <p className="mt-1 text-[9px] text-gray-400">지하철·마트·편의점 등 집객시설 기반 추정</p>
+        )}
+
+        {/* 원 범례 */}
+        <div className="space-y-1">
+          {/* 업종 밀집도 원 */}
+          <div className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-full border-2 flex-shrink-0" style={{borderColor:'#3b82f6', background:'rgba(96,165,250,0.15)'}} />
+            <span className="text-gray-600">업종 밀집도 <span className="text-gray-400">(카카오 500m)</span></span>
+          </div>
+
+          {/* 유동인구 원 */}
+          {hasFlpop && (
+            <div>
+              <div className="flex items-start gap-1.5">
+                <span className="w-3 h-3 rounded-full border-2 flex-shrink-0 mt-0.5" style={{borderColor: hasCardFp ? '#2563eb' : '#0891b2', background: hasCardFp ? 'rgba(37,99,235,0.12)' : 'rgba(8,145,178,0.12)'}} />
+                <div>
+                  <span className="text-gray-600">유동인구 <span className="text-gray-400">(300m)</span></span>
+                  <p className="text-[9px] text-gray-400">
+                    {hasCardFp ? '💳 카드 이용량 기반 (제주데이터허브)' : '🏪 상권 유동인구 기반 (소상공인진흥공단)'}
+                  </p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="flex items-center gap-0.5">
+                      <span className="inline-block w-2.5 h-2.5 rounded-full" style={{background:'#7c3aed'}} />
+                      <span className="text-gray-400">고</span>
+                    </span>
+                    <span className="flex items-center gap-0.5">
+                      <span className="inline-block w-2.5 h-2.5 rounded-full" style={{background:'#2563eb'}} />
+                      <span className="text-gray-400">중</span>
+                    </span>
+                    <span className="flex items-center gap-0.5">
+                      <span className="inline-block w-2.5 h-2.5 rounded-full" style={{background:'#0891b2'}} />
+                      <span className="text-gray-400">저</span>
+                    </span>
+                    {hasCardFp && <span className="text-[9px] text-gray-400">(기준: 3000/500명)</span>}
+                    {!hasCardFp && <span className="text-[9px] text-gray-400">(기준: 10000/2000명)</span>}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 배후인구 원 */}
+          {populationData?.total_population > 0 && (
+            <div className="flex items-start gap-1.5">
+              <span className="w-3 h-3 rounded-full border-2 border-dashed flex-shrink-0 mt-0.5" style={{borderColor:'#ef4444', background:'rgba(239,68,68,0.05)'}} />
+              <div>
+                <span className="text-gray-600">배후 인구 <span className="text-gray-400">(500m)</span></span>
+                <p className="text-[9px] text-gray-400">👥 SGIS 통계청 인구밀도 기반</p>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* 배후 인구 분석 팝업 */}
       {populationData && (

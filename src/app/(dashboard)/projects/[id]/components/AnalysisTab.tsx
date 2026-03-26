@@ -577,7 +577,7 @@ function KakaoDensityPanel({ kakao_density, projectId, lat, lng }: {
 
 // ── 지도 섹션 ─────────────────────────────────────────────────
 function MapSection({
-  lat, lng, poi_data, kakao_density, locationAnalysis, population_data, real_price_data, projectId, commercial_data,
+  lat, lng, poi_data, kakao_density, locationAnalysis, population_data, real_price_data, projectId, commercial_data, card_data,
 }: {
   lat: number | null
   lng: number | null
@@ -588,6 +588,7 @@ function MapSection({
   real_price_data: RealPriceItem[] | null
   projectId: string
   commercial_data?: any
+  card_data?: any
 }) {
   const [loading, setLoading] = useState(false)
   const supabase = createClient()
@@ -660,7 +661,7 @@ function MapSection({
         </button>
       </div>
       <div className="rounded-xl overflow-hidden border border-gray-100 relative">
-        <KakaoMap lat={lat} lng={lng} level={4} style={{ width: '100%', height: 380 }} poiData={poi_data} kakaoDensity={kakao_density} locationAnalysis={locationAnalysis} populationData={population_data} commercialData={commercial_data} />
+        <KakaoMap lat={lat} lng={lng} level={4} style={{ width: '100%', height: 380 }} poiData={poi_data} kakaoDensity={kakao_density} locationAnalysis={locationAnalysis} populationData={population_data} commercialData={commercial_data} cardData={card_data} />
         <a
           href={`https://map.kakao.com/link/map/${lat},${lng}`}
           target="_blank"
@@ -1273,6 +1274,7 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
           real_price_data={isCommercial ? null : project.real_price_data}
           projectId={projectId}
           commercial_data={project.commercial_data}
+          card_data={project.card_data}
         />
       </div>
 
