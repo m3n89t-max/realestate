@@ -165,9 +165,12 @@ function LocationCard({ card, theme, photo, filterCss }: { card: CardSlide; them
 }
 
 function CompositionCard({ card, theme, photo }: { card: CardSlide; theme: Theme; photo?: string }) {
+  const specs = card.spec_grid ?? []
   return (
     <div className="relative aspect-square rounded-[32px] overflow-hidden shadow-2xl" style={{ background: theme.light }}>
-      <div className="absolute top-0 left-0 right-0 p-4" style={{ background: theme.accent }}>
+      {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover opacity-[0.08]" />}
+      <div className="absolute inset-0" style={{ background: `linear-gradient(160deg, ${theme.accent}18 0%, transparent 50%)` }} />
+      <div className="absolute top-0 left-0 right-0 p-4 z-10" style={{ background: theme.accent }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-white">
             <Building2 size={15} />
@@ -176,19 +179,20 @@ function CompositionCard({ card, theme, photo }: { card: CardSlide; theme: Theme
           <span className="text-white/70 text-[10px] font-medium">3 / 6</span>
         </div>
       </div>
-      <div className="absolute top-[52px] inset-x-3 bottom-3">
-        {card.spec_grid && card.spec_grid.length > 0 ? (
-          <div className={`grid gap-2 h-full ${card.spec_grid.length >= 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-            {card.spec_grid.slice(0, 2).map((spec, i) => (
-              <div key={i} className="rounded-xl p-3 flex flex-col" style={{ background: i === 0 ? `${theme.accent}22` : `${theme.mid}15` }}>
-                <p className="text-[11px] font-black mb-2 pb-1.5 border-b" style={{ color: theme.dark, borderColor: `${theme.accent}40` }}>{spec.label}</p>
-                <p className="text-[11px] leading-relaxed flex-1 whitespace-pre-line" style={{ color: theme.dark }}>{spec.value}</p>
+      <div className="absolute top-[52px] inset-x-3 bottom-3 z-10">
+        {specs.length > 0 ? (
+          <div className={`grid gap-2 h-full ${specs.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            {specs.slice(0, 6).map((spec, i) => (
+              <div key={i} className="rounded-xl p-2.5 flex flex-col justify-center shadow-sm"
+                style={{ background: i % 2 === 0 ? `${theme.accent}22` : `${theme.mid}14` }}>
+                <p className="text-[10px] font-black mb-1 uppercase tracking-wide" style={{ color: theme.accent }}>{spec.label}</p>
+                <p className="text-[12px] font-bold leading-snug whitespace-pre-line" style={{ color: theme.dark }}>{spec.value}</p>
               </div>
             ))}
           </div>
         ) : card.points && card.points.length > 0 ? (
           <div className="mt-1 space-y-2">
-            {card.points.slice(0, 4).map((pt, i) => (
+            {card.points.slice(0, 5).map((pt, i) => (
               <div key={i} className="flex items-start gap-2 p-2.5 rounded-xl" style={{ background: `${theme.accent}18` }}>
                 <span style={{ color: theme.accent }} className="flex-shrink-0 font-black text-[13px]">●</span>
                 <span className="text-[11px] leading-snug" style={{ color: theme.dark }}>{pt}</span>
@@ -197,11 +201,6 @@ function CompositionCard({ card, theme, photo }: { card: CardSlide; theme: Theme
           </div>
         ) : null}
       </div>
-      {photo && (
-        <div className="absolute bottom-3 right-3 w-14 h-14 rounded-xl overflow-hidden opacity-50 shadow-md">
-          <img src={photo} alt="" className="w-full h-full object-cover" />
-        </div>
-      )}
     </div>
   )
 }
@@ -232,7 +231,7 @@ function InvestmentCard({ card, theme, photo, filterCss }: { card: CardSlide; th
         {card.body && <p className="text-[13px] font-medium mb-2 leading-snug">{card.body}</p>}
         {card.points && card.points.length > 0 && (
           <div className="space-y-1.5">
-            {card.points.slice(0, 2).map((pt, i) => (
+            {card.points.slice(0, 3).map((pt, i) => (
               <div key={i} className="flex items-start gap-2 text-[11px] opacity-90">
                 <span style={{ color: theme.accent }} className="flex-shrink-0 mt-0.5 font-bold">▶</span>
                 <span className="leading-snug">{pt}</span>
@@ -305,9 +304,11 @@ function CtaCard({ card, theme, photo, filterCss }: { card: CardSlide; theme: Th
           </div>
         )}
         {card.hashtags && card.hashtags.length > 0 && (
-          <p className="text-[10px] opacity-45 leading-relaxed">
-            {card.hashtags.slice(0, 5).map(t => t.startsWith('#') ? t : `#${t}`).join(' ')}
-          </p>
+          <div className="flex flex-wrap gap-x-1.5 gap-y-0.5 justify-center">
+            {card.hashtags.slice(0, 12).map((t, i) => (
+              <span key={i} className="text-[9px] opacity-40">{t.startsWith('#') ? t : `#${t}`}</span>
+            ))}
+          </div>
         )}
       </div>
     </div>
