@@ -1135,6 +1135,7 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
   const hasPOI = project.poi_data != null && Object.keys(project.poi_data).length > 0
   const hasRealPrice = project.real_price_data != null
   const hasCommercial = project.commercial_data != null
+  const hasTourism = project.tourism_data != null
   const hasData = isCommercial ? hasCommercial : hasRealPrice
   const hasAnalysis = !!locationAnalysis
 
@@ -1155,8 +1156,9 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
     const needsCommercial = !hasCommercial
     const needsKakao = !project.kakao_density
     const needsPopulation = !project.population_data
+    const needsTourism = !hasTourism
 
-    if (!needsPOI && !needsRealPrice && !needsCommercial && !needsKakao && !needsPopulation) return
+    if (!needsPOI && !needsRealPrice && !needsCommercial && !needsKakao && !needsPopulation && !needsTourism) return
 
     const supabase = createClient()
     const post = async (url: string) => {
@@ -1193,6 +1195,11 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
           setAutoStep('배후 인구 분석 중...')
           await post('/api/population')
         }
+        if (needsTourism) {
+          setAutoStep('관광 시설 데이터 수집 중...')
+          const { error } = await supabase.functions.invoke('analyze-tourism', { body: { project_id: projectId } })
+          if (error) throw new Error(error.message)
+        }
         setAutoStep(null)
         window.location.reload()
       } catch (e: any) {
@@ -1208,6 +1215,7 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
     { label: '유동인구·상권', done: hasCommercial },
     { label: '업종 밀집도', done: !!project.kakao_density },
     { label: '배후 인구', done: !!project.population_data },
+    { label: '관광 시설', done: hasTourism },
     { label: 'AI 입지 분석', done: hasAnalysis },
   ]
 
@@ -1301,6 +1309,67 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
           </div>
         </div>
       </div>
+
+      {/* Step 4: 관광 시설 */}
+      {project.tourism_data && (
+        <div className="card p-5 bg-gray-50/50">
+          <h3 className="section-title flex items-center gap-2 mb-4">
+            <span className="w-5 h-5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-xs font-bold shadow-sm">4</span>
+            관광 시설 현황
+            <span className="ml-auto text-[10px] text-gray-400">{project.tourism_data.radius_m ?? 1000}m 반경 · 한국관광공사 TourAPI</span>
+          </h3>
+          <div className="space-y-3">
+            {/* 관광 활성도 지수 */}
+            <div className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-100">
+              <div className="flex-1">
+                <p className="text-xs text-gray-500 mb-1">관광 활성도 지수</p>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-sky-400 to-blue-600 transition-all"
+                      style={{ width: `${project.tourism_data.tourism_index ?? 0}%` }}
+                    />
+                  </div>
+                  <span className="text-sm font-bold text-sky-700">{project.tourism_data.tourism_index ?? 0}/100</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] text-gray-400">총 시설 수</p>
+                <p className="text-lg font-bold text-gray-800">{project.tourism_data.total_count ?? 0}개</p>
+              </div>
+            </div>
+            {/* 유형별 카운트 */}
+            {project.tourism_data.by_type && (
+              <div className="grid grid-cols-3 gap-1.5">
+                {Object.entries(project.tourism_data.by_type as Record<string, number>).map(([label, count]) => (
+                  <div key={label} className="p-2 bg-white rounded-lg border border-gray-100 text-center">
+                    <p className="text-[10px] text-gray-500">{label}</p>
+                    <p className="text-sm font-bold text-gray-800">{count}개</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* 주요 관광지 top5 */}
+            {project.tourism_data.top_spots?.length > 0 && (
+              <div className="p-3 bg-white rounded-xl border border-gray-100">
+                <p className="text-xs font-semibold text-gray-600 mb-2">주요 관광지 (거리순)</p>
+                <div className="space-y-1.5">
+                  {project.tourism_data.top_spots.map((spot: any, i: number) => (
+                    <div key={i} className="flex items-center gap-2 text-xs">
+                      <span className="w-4 h-4 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-[9px] font-bold flex-shrink-0">{i + 1}</span>
+                      <span className="font-medium text-gray-700 truncate">{spot.title}</span>
+                      <span className="ml-auto text-gray-400 flex-shrink-0">{spot.dist ? `${Math.round(spot.dist)}m` : ''}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {project.tourism_data.total_count === 0 && (
+              <p className="text-xs text-gray-400 text-center py-2">반경 1km 내 관광시설 데이터 없음</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 최종 단계: AI 분석 보고서 (하단 배치) */}
       <div className="relative mt-10">
