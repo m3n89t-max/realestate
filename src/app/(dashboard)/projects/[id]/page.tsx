@@ -25,13 +25,13 @@ interface Params {
 
 const TABS = [
   { id: 'overview', label: '개요' },
-  { id: 'analysis', label: '입지분석' },
-  { id: 'blog', label: '블로그 글' },
-  { id: 'card_news', label: '카드뉴스' },
-  { id: 'shorts', label: '쇼츠' },
   { id: 'docs', label: '서류' },
-  { id: 'tasks', label: '작업 현황' },
+  { id: 'analysis', label: '입지분석' },
+  { id: 'card_news', label: '카드뉴스' },
+  { id: 'blog', label: '블로그 글' },
+  { id: 'shorts', label: '쇼츠' },
   { id: 'package', label: '패키지' },
+  { id: 'tasks', label: '작업 현황' },
 ]
 
 export default async function ProjectDetailPage({

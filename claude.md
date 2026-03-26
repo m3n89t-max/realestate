@@ -33,7 +33,45 @@ npx supabase functions deploy <function-name>
 
 - `src/app/(auth)/` - 인증 불필요 라우트 (login, onboarding). layout.tsx에 `force-dynamic` 적용.
 - `src/app/(dashboard)/` - 인증 필요 라우트. layout.tsx가 Supabase 세션 + 조직 정보 + 에이전트 상태 로드.
-- `src/app/(dashboard)/projects/[id]/page.tsx` - 탭 기반 매물 상세 (overview/analysis/blog/card_news/shorts/docs/tasks/package). URL searchParam `tab`으로 탭 제어.
+- `src/app/(dashboard)/projects/[id]/page.tsx` - 탭 기반 매물 상세. URL searchParam `tab`으로 탭 제어.
+
+## 매물 상세 탭 구성 & 자동화 업무 흐름도
+
+```
+[개요] → [서류] → [입지분석] → [카드뉴스] → [블로그 글] → [쇼츠] → [패키지] → [작업 현황]
+```
+
+### 탭별 역할
+
+| 탭 ID | 라벨 | 역할 |
+|-------|------|------|
+| `overview` | 개요 | 매물 기본정보 요약, 사진 갤러리 |
+| `docs` | 서류 | 건축물대장 등 문서 수집/관리 |
+| `analysis` | 입지분석 | 자동 데이터 수집 + AI 입지분석 |
+| `card_news` | 카드뉴스 | AI 카드뉴스 슬라이드 생성 |
+| `blog` | 블로그 글 | SEO 블로그 생성 + 네이버 업로드 |
+| `shorts` | 쇼츠 | 유튜브 쇼츠 스크립트 생성 |
+| `package` | 패키지 | 콘텐츠 패키지 묶음 |
+| `tasks` | 작업 현황 | 자동화 작업 큐 상태 |
+
+### 입지분석 탭 자동화 흐름 (탭 진입 시 자동 실행)
+
+```
+좌표 변환 (매물 등록 시)
+    ↓
+① POI 수집          ← /api/poi  (카카오 Places API)
+    ↓
+② 유동인구·상권      ← analyze-commercial Edge Fn (소상공인 상권정보 API)
+    ↓
+③ 업종 밀집도        ← /api/kakao-poi  (카카오 카테고리 검색)
+    ↓
+④ 배후 인구          ← /api/population  (SGIS 통계지리정보원)
+    ↓ (모두 완료 후 수동 클릭)
+⑤ AI 입지 분석       ← analyze-location Edge Fn (GPT-4o)
+```
+
+- ①~④는 탭 진입 시 누락된 항목만 자동 수집 후 페이지 새로고침
+- ⑤ AI 입지분석은 항상 수동 실행 (버튼 클릭)
 
 **중요 패턴:**
 - Supabase를 직접 사용하는 Server Component 페이지는 반드시 `export const dynamic = 'force-dynamic'` 선언 필요.
@@ -74,7 +112,7 @@ Deno.serve(async (req) => {
 
 핵심 테이블: `organizations`, `memberships`, `projects`, `assets`, `generated_contents`, `documents`, `tasks`, `agent_connections`, `location_analyses`, `usage_logs`
 
-마이그레이션 파일: `supabase/migrations/` (001~019 순서)
+마이그레이션 파일: `supabase/migrations/` (001~023 순서)
 
 ### Task Queue
 

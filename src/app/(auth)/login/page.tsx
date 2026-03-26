@@ -17,6 +17,7 @@ export default function LoginPage() {
   const supabase = createClient()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [fullName, setFullName] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [mode, setMode] = useState<'login' | 'signup'>('login')
@@ -32,7 +33,15 @@ export default function LoginPage() {
         router.push('/dashboard')
         router.refresh()
       } else {
-        const { error } = await supabase.auth.signUp({ email, password })
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: fullName,
+            }
+          }
+        })
         if (error) throw error
         toast.success('가입 확인 이메일을 발송했습니다')
       }
@@ -123,6 +132,24 @@ export default function LoginPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            {mode === 'signup' && (
+              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                <label className="block text-sm font-medium text-stone-700 mb-2">Full Name</label>
+                <div className="relative">
+                  <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 opacity-0" />
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] border-2 border-stone-400 rounded-sm" />
+                  <input
+                    type="text"
+                    value={fullName}
+                    onChange={e => setFullName(e.target.value)}
+                    placeholder="Your Name"
+                    className="w-full pl-12 pr-4 py-3.5 bg-white border border-stone-200 rounded-xl text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-400 focus:border-transparent transition-all"
+                    required={mode === 'signup'}
+                  />
+                </div>
+              </div>
+            )}
+
             <div>
               <label className="block text-sm font-medium text-stone-700 mb-2">Email Address</label>
               <div className="relative">
