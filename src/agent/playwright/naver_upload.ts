@@ -47,8 +47,26 @@ export async function uploadNaverBlog(
     const context = await chromium.launchPersistentContext(agentProfileDir, {
         channel: 'msedge',
         headless: false,
-        args: ['--start-maximized'],
+        args: [
+            '--start-maximized',
+            '--disable-blink-features=AutomationControlled',
+            '--no-sandbox',
+            '--disable-infobars',
+        ],
         locale: 'ko-KR',
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0',
+        ignoreDefaultArgs: ['--enable-automation'],
+    });
+
+    // 자동화 시그니처 마스킹 (캡챠 우회)
+    await context.addInitScript(() => {
+        Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        delete (window as any).cdc_adoQpoasnfa76pfcZLmcfl_Array;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        delete (window as any).cdc_adoQpoasnfa76pfcZLmcfl_Promise;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        delete (window as any).cdc_adoQpoasnfa76pfcZLmcfl_Symbol;
     });
 
     const browser = { close: async () => { try { await context.close(); } catch { } } };
@@ -74,29 +92,37 @@ export async function uploadNaverBlog(
                 waitUntil: 'domcontentloaded',
                 timeout: 30_000,
             });
-            await page.waitForTimeout(2000);
+            await page.waitForTimeout(1500 + Math.random() * 1000);
 
-            // JS로 직접 값 주입 (봇 탐지 우회)
-            await page.evaluate((id) => {
-                const el = document.querySelector('#id') as HTMLInputElement;
-                if (el) { el.focus(); el.value = id; el.dispatchEvent(new Event('input', { bubbles: true })); }
-            }, creds.id);
-            await page.waitForTimeout(800);
+            // 사람처럼 클릭 후 한 글자씩 타이핑 (봇 탐지 우회)
+            const idField = page.locator('#id');
+            await idField.click();
+            await page.waitForTimeout(300 + Math.random() * 200);
+            for (const ch of creds.id) {
+                await page.keyboard.type(ch, { delay: 80 + Math.random() * 120 });
+            }
+            await page.waitForTimeout(500 + Math.random() * 500);
 
-            await page.evaluate((pw) => {
-                const el = document.querySelector('#pw') as HTMLInputElement;
-                if (el) { el.focus(); el.value = pw; el.dispatchEvent(new Event('input', { bubbles: true })); }
-            }, creds.pw);
-            await page.waitForTimeout(800);
+            const pwField = page.locator('#pw');
+            await pwField.click();
+            await page.waitForTimeout(300 + Math.random() * 200);
+            for (const ch of creds.pw) {
+                await page.keyboard.type(ch, { delay: 80 + Math.random() * 120 });
+            }
+            await page.waitForTimeout(800 + Math.random() * 500);
 
             await page.locator('#log\\.login').click();
             await page.waitForTimeout(5000);
 
-            // CAPTCHA 대기
-            const hasCaptcha = await page.locator('#captcha, .captcha_wrap').count() > 0;
+            // CAPTCHA 감지 — 사용자가 직접 풀 때까지 대기 (최대 3분)
+            const hasCaptcha = await page.locator('#captcha, .captcha_wrap, [class*="captcha"]').count() > 0;
             if (hasCaptcha) {
-                await progress(config, task.id, '⚠️ CAPTCHA 감지 — 수동 입력 대기 (120초)...', 15);
-                await page.waitForURL('**/naver.com/**', { timeout: 120_000 }).catch(() => { });
+                await progress(config, task.id, '⚠️ 캡챠 발생 — 브라우저에서 직접 캡챠를 풀어주세요 (최대 3분 대기)...', 15);
+                await page.waitForFunction(
+                    () => !document.querySelector('#captcha, .captcha_wrap, [class*="captcha"]'),
+                    { timeout: 180_000 }
+                ).catch(() => { });
+                await page.waitForTimeout(2000);
             }
 
             await progress(config, task.id, '로그인 완료.', 25);
