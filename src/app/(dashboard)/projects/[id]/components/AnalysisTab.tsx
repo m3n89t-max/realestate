@@ -1200,7 +1200,8 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
         if (needsTourism) {
           setAutoStep('관광 시설 데이터 수집 중...')
           const { error } = await supabase.functions.invoke('analyze-tourism', { body: { project_id: projectId } })
-          if (error) throw new Error(error.message)
+          // TOUR_API_KEY 미설정 시 에러 무시
+          if (error) console.warn('[analyze-tourism] skipped:', error.message)
         }
         if (needsCardData) {
           setAutoStep('카드 이용 데이터 수집 중...')
