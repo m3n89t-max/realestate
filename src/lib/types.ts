@@ -171,6 +171,7 @@ export interface Project {
   kakao_density?: KakaoDensity | null
   population_data?: PopulationData | null
   tourism_data?: any | null
+  card_data?: any | null
   created_at: string
   updated_at: string
 }

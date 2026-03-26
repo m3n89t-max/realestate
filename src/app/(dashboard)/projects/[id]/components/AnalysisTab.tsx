@@ -1136,6 +1136,7 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
   const hasRealPrice = project.real_price_data != null
   const hasCommercial = project.commercial_data != null
   const hasTourism = project.tourism_data != null
+  const hasCardData = project.card_data != null
   const hasData = isCommercial ? hasCommercial : hasRealPrice
   const hasAnalysis = !!locationAnalysis
 
@@ -1157,8 +1158,9 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
     const needsKakao = !project.kakao_density
     const needsPopulation = !project.population_data
     const needsTourism = !hasTourism
+    const needsCardData = !hasCardData
 
-    if (!needsPOI && !needsRealPrice && !needsCommercial && !needsKakao && !needsPopulation && !needsTourism) return
+    if (!needsPOI && !needsRealPrice && !needsCommercial && !needsKakao && !needsPopulation && !needsTourism && !needsCardData) return
 
     const supabase = createClient()
     const post = async (url: string) => {
@@ -1200,6 +1202,12 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
           const { error } = await supabase.functions.invoke('analyze-tourism', { body: { project_id: projectId } })
           if (error) throw new Error(error.message)
         }
+        if (needsCardData) {
+          setAutoStep('카드 이용 데이터 수집 중...')
+          const { error } = await supabase.functions.invoke('analyze-jeju-card', { body: { project_id: projectId } })
+          // 키 미설정 시 에러 무시 (제주 외 지역에서도 동작)
+          if (error) console.warn('[analyze-jeju-card] skipped:', error.message)
+        }
         setAutoStep(null)
         window.location.reload()
       } catch (e: any) {
@@ -1216,6 +1224,7 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
     { label: '업종 밀집도', done: !!project.kakao_density },
     { label: '배후 인구', done: !!project.population_data },
     { label: '관광 시설', done: hasTourism },
+    { label: '카드 이용 현황', done: hasCardData },
     { label: 'AI 입지 분석', done: hasAnalysis },
   ]
 
@@ -1367,6 +1376,105 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
             {project.tourism_data.total_count === 0 && (
               <p className="text-xs text-gray-400 text-center py-2">반경 1km 내 관광시설 데이터 없음</p>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* 카드 이용 현황 (제주데이터허브) */}
+      {project.card_data?.has_data && (
+        <div className="card p-5 bg-gray-50/50">
+          <h3 className="section-title flex items-center gap-2 mb-4">
+            <span className="text-base">💳</span>
+            카드 이용 현황
+            <span className="ml-auto text-[10px] text-gray-400">제주데이터허브 · 내국인 관광객 기준</span>
+          </h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* 유동인구 추정 */}
+            <div className="p-3 bg-white rounded-xl border border-gray-100">
+              <p className="text-xs font-semibold text-gray-600 mb-3">카드 이용자 수 (유동인구 추정)</p>
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <div className="p-2 bg-blue-50 rounded-lg text-center">
+                  <p className="text-[10px] text-gray-500">주중 평균</p>
+                  <p className="text-sm font-bold text-blue-700">
+                    {(project.card_data.floating_population?.weekday ?? 0).toLocaleString()}명
+                  </p>
+                </div>
+                <div className="p-2 bg-purple-50 rounded-lg text-center">
+                  <p className="text-[10px] text-gray-500">주말 평균</p>
+                  <p className="text-sm font-bold text-purple-700">
+                    {(project.card_data.floating_population?.weekend ?? 0).toLocaleString()}명
+                  </p>
+                </div>
+              </div>
+              {/* 시간대별 바 차트 */}
+              {project.card_data.floating_population?.by_hour?.length > 0 && (() => {
+                const hours: number[] = project.card_data.floating_population.by_hour
+                const labels: string[] = project.card_data.floating_population.by_hour_labels ?? ['밤','오전','점심','오후','저녁']
+                const max = Math.max(...hours, 1)
+                return (
+                  <div>
+                    <p className="text-[10px] text-gray-400 mb-1.5">시간대별 이용자 수</p>
+                    <div className="flex items-end gap-1 h-12">
+                      {hours.map((v, i) => (
+                        <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
+                          <div
+                            className="w-full rounded-t bg-blue-400 transition-all"
+                            style={{ height: `${Math.max((v / max) * 44, 2)}px` }}
+                          />
+                          <span className="text-[8px] text-gray-400">{labels[i]}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {project.card_data.floating_population.peak_time && (
+                      <p className="text-[10px] text-gray-500 mt-1">
+                        피크: <span className="font-semibold text-blue-600">{project.card_data.floating_population.peak_time}</span>
+                      </p>
+                    )}
+                  </div>
+                )
+              })()}
+            </div>
+
+            {/* 카드 매출 + 요일별 */}
+            <div className="space-y-2">
+              <div className="p-3 bg-white rounded-xl border border-gray-100">
+                <p className="text-xs font-semibold text-gray-600 mb-2">카드 매출</p>
+                {project.card_data.card_sales?.latest_month && (
+                  <p className="text-[10px] text-gray-400 mb-1">{project.card_data.card_sales.latest_month} 기준</p>
+                )}
+                <p className="text-lg font-bold text-green-700">
+                  {project.card_data.card_sales?.monthly_sales > 0
+                    ? `${Math.round(project.card_data.card_sales.monthly_sales / 10000).toLocaleString()}만원`
+                    : '데이터 없음'}
+                </p>
+              </div>
+              {/* 요일별 */}
+              {project.card_data.by_day && Object.keys(project.card_data.by_day).length > 0 && (() => {
+                const DAY_ORDER = ['월','화','수','목','금','토','일']
+                const byDay = project.card_data.by_day as Record<string, number>
+                const max = Math.max(...Object.values(byDay), 1)
+                return (
+                  <div className="p-3 bg-white rounded-xl border border-gray-100">
+                    <p className="text-xs font-semibold text-gray-600 mb-2">요일별 이용자 수</p>
+                    <div className="flex items-end gap-1 h-10">
+                      {DAY_ORDER.map(day => {
+                        const v = byDay[day] ?? 0
+                        const isWeekend = day === '토' || day === '일'
+                        return (
+                          <div key={day} className="flex-1 flex flex-col items-center gap-0.5">
+                            <div
+                              className={`w-full rounded-t ${isWeekend ? 'bg-purple-400' : 'bg-blue-400'}`}
+                              style={{ height: `${Math.max((v / max) * 36, 2)}px` }}
+                            />
+                            <span className="text-[8px] text-gray-400">{day}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
           </div>
         </div>
       )}
