@@ -112,7 +112,15 @@ Deno.serve(async (req) => {
     if (!lat || !lng) throw new Error('주소 좌표를 찾을 수 없습니다')
 
     const serviceKey = Deno.env.get('TOUR_API_KEY') ?? ''
-    if (!serviceKey) throw new Error('TOUR_API_KEY가 설정되지 않았습니다')
+    if (!serviceKey) {
+      // 키 미설정 시 placeholder 저장 → 재시도 루프 방지
+      await supabaseClient.from('projects')
+        .update({ tourism_data: { available: false, reason: 'TOUR_API_KEY not configured' } })
+        .eq('id', project_id)
+      return new Response(JSON.stringify({ success: true, skipped: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
 
     // 모든 contentType 병렬 수집 (1km 반경)
     const RADIUS = 1000

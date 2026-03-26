@@ -65,7 +65,15 @@ Deno.serve(async (req) => {
     if (!project_id) throw new Error('project_id가 필요합니다')
 
     const appKey = Deno.env.get('JEJU_DATA_HUB_KEY') ?? ''
-    if (!appKey) throw new Error('JEJU_DATA_HUB_KEY가 설정되지 않았습니다')
+    if (!appKey) {
+      // 키 미설정 시 placeholder 저장 → 재시도 루프 방지
+      await supabaseClient.from('projects')
+        .update({ card_data: { available: false, reason: 'JEJU_DATA_HUB_KEY not configured' } })
+        .eq('id', project_id)
+      return new Response(JSON.stringify({ success: true, skipped: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
 
     // 최근 12개월 데이터 조회
     const { startDate, endDate } = dateRange(12)
