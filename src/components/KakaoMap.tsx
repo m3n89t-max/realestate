@@ -298,41 +298,73 @@ export default function KakaoMap({
     flpopLabelRef.current = label
   }, [commercialData, cardData, lat, lng, mapReady])
 
-  // ── Effect 4: 카드 매출 현황 오버레이
+  // ── Effect 4: 카드·상권 매출 현황 오버레이 (제주=카드, 전국=상권매출 병행)
   useEffect(() => {
     const map = mapRef.current
     if (!map || !mapReady || !window.kakao?.maps) return
 
     if (cardOverlayRef.current) { cardOverlayRef.current.setMap(null); cardOverlayRef.current = null }
 
-    if (!cardData?.has_data) return
+    // 제주 카드 데이터
+    const hasJejuCard = cardData?.has_data === true
+    // 전국 상권 매출 데이터 (소상공인진흥공단 trdarSalersList)
+    const commercialSales = commercialData?.sales_data
+    const hasCommercialSales = !!(commercialSales?.monthly_sales > 0 || commercialSales?.area_name)
 
-    const fp = cardData.floating_population
-    const cs = cardData.card_sales
-    const weekday = fp?.weekday ?? 0
-    const weekend = fp?.weekend ?? 0
-    const peakTime = fp?.peak_time ?? ''
-    const monthlySales = cs?.monthly_sales ?? 0
-    const latestMonth = cs?.latest_month ?? ''
+    if (!hasJejuCard && !hasCommercialSales) return
 
-    const monthlySalesStr = monthlySales > 0
-      ? `${Math.round(monthlySales / 10000).toLocaleString()}만원`
-      : '데이터 없음'
+    let rows = ''
+    let source = ''
 
-    const content = `
-      <div style="background:#fff;border:1.5px solid #6366f1;border-radius:12px;padding:10px 13px;box-shadow:0 2px 10px rgba(0,0,0,0.13);min-width:160px;font-family:sans-serif;">
-        <div style="font-size:11px;font-weight:700;color:#4f46e5;margin-bottom:6px;border-bottom:1px solid #e0e7ff;padding-bottom:4px;">💳 카드 이용 현황</div>
+    if (hasJejuCard) {
+      // ── 제주 카드 데이터 행
+      const fp = cardData.floating_population
+      const cs = cardData.card_sales
+      const weekday: number = fp?.weekday ?? 0
+      const weekend: number = fp?.weekend ?? 0
+      const peakTime: string = fp?.peak_time ?? ''
+      const monthlySales: number = cs?.monthly_sales ?? 0
+      const latestMonth: string = cs?.latest_month ?? ''
+
+      rows += `
         <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px;">
-          <span style="color:#6b7280;">주중 이용자</span>
+          <span style="color:#6b7280;">주중 카드이용</span>
           <span style="font-weight:600;color:#1e293b;">${weekday.toLocaleString()}명</span>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px;">
-          <span style="color:#6b7280;">주말 이용자</span>
+          <span style="color:#6b7280;">주말 카드이용</span>
           <span style="font-weight:600;color:#1e293b;">${weekend.toLocaleString()}명</span>
         </div>
         ${peakTime ? `<div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px;"><span style="color:#6b7280;">피크 시간대</span><span style="font-weight:600;color:#7c3aed;">${peakTime}</span></div>` : ''}
-        ${monthlySales > 0 ? `<div style="display:flex;justify-content:space-between;font-size:10px;margin-top:4px;padding-top:4px;border-top:1px solid #f3f4f6;"><span style="color:#6b7280;">${latestMonth} 매출</span><span style="font-weight:700;color:#059669;">${monthlySalesStr}</span></div>` : ''}
-        <div style="font-size:9px;color:#9ca3af;text-align:right;margin-top:4px;">제주데이터허브</div>
+        ${monthlySales > 0 ? `<div style="display:flex;justify-content:space-between;font-size:10px;margin-top:4px;padding-top:4px;border-top:1px dashed #e0e7ff;"><span style="color:#6b7280;">${latestMonth} 카드매출</span><span style="font-weight:700;color:#059669;">${Math.round(monthlySales / 10000).toLocaleString()}만원</span></div>` : ''}
+      `
+      source += '제주데이터허브'
+    }
+
+    if (hasCommercialSales) {
+      // ── 전국 상권 카드 매출 행
+      const sd = commercialSales
+      const monthly = sd.monthly_sales ?? 0
+      const weekdaySales = sd.weekly_sales ?? 0
+      const weekendSales = sd.weekend_sales ?? 0
+      const areaName: string = sd.area_name ?? ''
+      const topCat: string = sd.top_category ?? ''
+
+      rows += `
+        ${hasJejuCard ? '<div style="margin-top:6px;padding-top:6px;border-top:1px solid #f3f4f6;"></div>' : ''}
+        ${areaName ? `<div style="font-size:9px;color:#6366f1;font-weight:600;margin-bottom:4px;">📍 ${areaName}${topCat ? ` · ${topCat}` : ''}</div>` : ''}
+        ${monthly > 0 ? `<div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px;"><span style="color:#6b7280;">월 카드매출</span><span style="font-weight:700;color:#059669;">${Math.round(monthly / 10000).toLocaleString()}만원</span></div>` : ''}
+        ${weekdaySales > 0 ? `<div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px;"><span style="color:#6b7280;">주중 매출</span><span style="font-weight:600;color:#1e293b;">${Math.round(weekdaySales / 10000).toLocaleString()}만원</span></div>` : ''}
+        ${weekendSales > 0 ? `<div style="display:flex;justify-content:space-between;font-size:10px;"><span style="color:#6b7280;">주말 매출</span><span style="font-weight:600;color:#1e293b;">${Math.round(weekendSales / 10000).toLocaleString()}만원</span></div>` : ''}
+      `
+      source += (source ? ' · ' : '') + '소상공인진흥공단'
+    }
+
+    const content = `
+      <div style="background:#fff;border:1.5px solid #6366f1;border-radius:12px;padding:10px 13px;box-shadow:0 2px 10px rgba(0,0,0,0.13);min-width:170px;font-family:sans-serif;">
+        <div style="font-size:11px;font-weight:700;color:#4f46e5;margin-bottom:6px;border-bottom:1px solid #e0e7ff;padding-bottom:4px;">💳 카드 매출 현황</div>
+        ${rows}
+        <div style="font-size:9px;color:#9ca3af;text-align:right;margin-top:6px;">${source}</div>
       </div>
     `
 
@@ -346,7 +378,7 @@ export default function KakaoMap({
     })
     overlay.setMap(map)
     cardOverlayRef.current = overlay
-  }, [cardData, lat, lng, mapReady])
+  }, [cardData, commercialData, lat, lng, mapReady])
 
   if (!appKey) {
     return (
@@ -454,10 +486,12 @@ export default function KakaoMap({
               )}
             </div>
 
-            {/* 대도시 안내 */}
+            {/* 카드 매출 데이터 안내 */}
             <div className="mt-2 pt-2 border-t border-gray-100 text-[9px] text-gray-400 leading-relaxed">
-              ※ 제주 외 지역은 카드 이용 데이터 미제공<br/>
-              (소상공인 상권 유동인구로 대체 표시)
+              💳 <span className="font-medium text-gray-500">카드 매출 오버레이</span><br/>
+              · 제주: 카드 이용자 수 + 매출 (제주데이터허브)<br/>
+              · 전국: 상권 카드 매출 (소상공인진흥공단)<br/>
+              <span className="text-[8px]">※ 상권 미등록 지역은 표시 안됨</span>
             </div>
           </div>
         )}
