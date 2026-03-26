@@ -108,9 +108,9 @@ export default function KakaoMap({
           }).setMap(map)
         }
 
-        // 3. 시설 밀집도 히트맵 (네이티브 Canvas)
+        // 3. 유동인구 히트맵 (네이티브 Canvas) — POI + kakaoDensity 아이템 좌표 활용
         const canvas = canvasRef.current
-        if (!canvas || !poiData) return
+        if (!canvas) return
 
         const toPixel = (iLat: number, iLng: number) => {
           const b  = map.getBounds()
@@ -125,24 +125,47 @@ export default function KakaoMap({
         }
 
         const render = () => {
-          canvas.width  = container.offsetWidth
-          canvas.height = container.offsetHeight
+          const w = container.offsetWidth
+          const h = container.offsetHeight
+          if (!w || !h) return  // 컨테이너 미준비 시 스킵
+          canvas.width  = w
+          canvas.height = h
           const points: { x: number; y: number; value: number }[] = []
-          Object.entries(poiData!).forEach(([cat, items]) => {
-            const w = POI_HEATMAP_WEIGHT[cat] || 2
-            items.forEach(item => {
-              if (item.lat && item.lng) {
-                const pt = toPixel(item.lat, item.lng)
-                if (pt.x > -80 && pt.x < canvas.width + 80 && pt.y > -80 && pt.y < canvas.height + 80) {
-                  points.push({ ...pt, value: w })
+
+          // POI 데이터 포인트
+          if (poiData) {
+            Object.entries(poiData).forEach(([cat, items]) => {
+              const weight = POI_HEATMAP_WEIGHT[cat] || 2
+              items.forEach(item => {
+                if (item.lat && item.lng) {
+                  const pt = toPixel(item.lat, item.lng)
+                  if (pt.x > -80 && pt.x < canvas.width + 80 && pt.y > -80 && pt.y < canvas.height + 80) {
+                    points.push({ ...pt, value: weight })
+                  }
                 }
-              }
+              })
             })
-          })
+          }
+
+          // kakaoDensity 아이템 포인트 (업종별 개별 시설 좌표)
+          if (kakaoDensityRef.current?.categories) {
+            Object.entries(kakaoDensityRef.current.categories).forEach(([, cat]: [string, any]) => {
+              (cat.items || []).forEach((item: any) => {
+                if (item.lat && item.lng) {
+                  const pt = toPixel(item.lat, item.lng)
+                  if (pt.x > -80 && pt.x < canvas.width + 80 && pt.y > -80 && pt.y < canvas.height + 80) {
+                    points.push({ ...pt, value: 3 })
+                  }
+                }
+              })
+            })
+          }
+
           drawHeatmap(canvas, points)
         }
 
-        render()
+        // 컨테이너 레이아웃 완료 후 렌더 (requestAnimationFrame)
+        requestAnimationFrame(render)
         window.kakao.maps.event.addListener(map, 'zoom_changed', render)
         window.kakao.maps.event.addListener(map, 'dragend', render)
       })
@@ -174,9 +197,8 @@ export default function KakaoMap({
     if (!populationData?.total_population || !populationData?.density || populationData.density <= 0) return
 
     const center = new window.kakao.maps.LatLng(lat, lng)
-    // 반경: kakaoDensity 분석반경의 1.5배, 없으면 700m 고정 (행정구역 면적 기반 계산은 너무 광범위)
-    const baseRadius = kakaoDensityRef.current?.radius_m ?? 700
-    const clampedRadius = Math.round(Math.min(baseRadius * 1.5, 2000))
+    // 배후인구 반경: 500m 고정 (업종밀집도와 같은 분석범위)
+    const popRadius = 500
 
     const density = populationData.density
     const color = density > 5000 ? '#ef4444' : density > 1000 ? '#f97316' : '#22c55e'
@@ -184,19 +206,20 @@ export default function KakaoMap({
     const circle = new window.kakao.maps.Circle({
       map,
       center,
-      radius: clampedRadius,
+      radius: popRadius,
       strokeWeight: 2,
       strokeColor: color,
-      strokeOpacity: 0.7,
+      strokeOpacity: 0.6,
       strokeStyle: 'dashed',
       fillColor: color,
-      fillOpacity: 0.06,
+      fillOpacity: 0.05,
     })
     circle.setMap(map)
     popCircleRef.current = circle
 
+    // 라벨은 원 위쪽에 배치
     const labelPos = new window.kakao.maps.LatLng(
-      lat + (clampedRadius / 111_000) * 0.85,
+      lat + (popRadius / 111_000) * 0.9,
       lng
     )
     const label = new window.kakao.maps.CustomOverlay({
@@ -221,19 +244,20 @@ export default function KakaoMap({
     if (!fp?.weekday) return
 
     const center = new window.kakao.maps.LatLng(lat, lng)
-    const radius = kakaoDensityRef.current?.radius_m ?? 500  // 상권 분석 반경 그대로 사용
+    // 유동인구 원: 300m (업종밀집도 500m, 배후인구 500m과 겹치지 않게 더 작게)
+    const flRadius = 300
 
     // 유동인구 수에 따른 색상: 고(>10000) 보라, 중(2000-10000) 파랑, 저(<2000) 하늘
     const color = fp.weekday > 10000 ? '#7c3aed' : fp.weekday > 2000 ? '#2563eb' : '#0891b2'
 
     const circle = new window.kakao.maps.Circle({
-      map, center, radius,
+      map, center, radius: flRadius,
       strokeWeight: 2,
       strokeColor: color,
-      strokeOpacity: 0.8,
-      strokeStyle: 'shortdot',
+      strokeOpacity: 0.9,
+      strokeStyle: 'solid',
       fillColor: color,
-      fillOpacity: 0.08,
+      fillOpacity: 0.1,
     })
     circle.setMap(map)
     flpopCircleRef.current = circle
@@ -243,11 +267,12 @@ export default function KakaoMap({
     const peakIdx = fp.by_hour ? fp.by_hour.indexOf(Math.max(...fp.by_hour)) : -1
     const peakLabel = peakIdx >= 0 ? hourLabels[peakIdx] : ''
 
-    const labelPos = new window.kakao.maps.LatLng(lat - (radius / 111_000) * 0.85, lng)
+    // 라벨: 원 아래쪽에 배치 (배후인구 라벨은 위쪽이므로 분리)
+    const labelPos = new window.kakao.maps.LatLng(lat - (flRadius / 111_000) * 1.1, lng)
     const label = new window.kakao.maps.CustomOverlay({
       map,
       position: labelPos,
-      content: `<div style="background:${color};color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;white-space:nowrap;opacity:0.92;display:flex;align-items:center;gap:4px;">🚶 주중 ${fp.weekday.toLocaleString()}명${peakLabel ? ` · 피크 ${peakLabel}` : ''}</div>`,
+      content: `<div style="background:${color};color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;white-space:nowrap;opacity:0.92;">🚶 주중 ${fp.weekday.toLocaleString()}명${peakLabel ? ` · 피크 ${peakLabel}` : ''}</div>`,
       yAnchor: 0,
     })
     label.setMap(map)
