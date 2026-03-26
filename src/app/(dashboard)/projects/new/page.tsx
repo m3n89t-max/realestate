@@ -261,7 +261,10 @@ export default function NewProjectPage() {
           status: 'draft',
         }).select().single()
 
-        if (error) throw error
+        if (error) {
+          console.error('[projects.insert] error:', error)
+          throw new Error(`[${error.code}] ${error.message}${error.details ? ' | ' + error.details : ''}${error.hint ? ' | hint: ' + error.hint : ''}`)
+        }
         setProjectId(data.id)
 
         try {
@@ -272,7 +275,9 @@ export default function NewProjectPage() {
 
         toast.success('기본 정보가 저장되었습니다')
       } catch (err: unknown) {
-        toast.error(`저장 실패: ${err instanceof Error ? err.message : String(err)}`)
+        const msg = err instanceof Error ? err.message : String(err)
+        console.error('[handleNext] save failed:', msg)
+        toast.error(`저장 실패: ${msg}`, { duration: 10000 })
         return
       } finally {
         setNextLoading(false)
