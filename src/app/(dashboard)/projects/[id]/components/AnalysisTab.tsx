@@ -620,15 +620,7 @@ function MapSection({
     </div>
   )
 
-  const poiSummary = SHOW_POI.map(key => {
-    const items = (poi_data?.[key] ?? []).filter(item => (item.distance_m ?? 0) <= 500)
-    const nearest = items[0]
-    return nearest ? { key, cfg: POI_CONFIG[key], nearest } : null
-  }).filter(Boolean) as { key: string; cfg: typeof POI_CONFIG[string]; nearest: POIItem }[]
-
-  const amounts = (real_price_data ?? []).map(t => t.amount).filter((a): a is number => a !== null && a > 0)
-  const avgPrice = amounts.length ? Math.round(amounts.reduce((s, a) => s + a, 0) / amounts.length) : null
-  const maxPrice = amounts.length ? Math.max(...amounts) : null
+  const hasCardFp = !!(card_data?.has_data && card_data?.floating_population?.weekday)
 
   const [popLoading, setPopLoading] = useState(false)
 
@@ -673,31 +665,61 @@ function MapSection({
         </a>
       </div>
 
-      {poiSummary.length > 0 && (
-        <div className="grid grid-cols-4 gap-1.5">
-          {poiSummary.map(({ key, cfg, nearest }) => (
-            <div key={key} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${cfg.color}`}>
-                {cfg.icon}
-              </span>
-              <div className="min-w-0">
-                <p className="text-xs text-gray-400">{cfg.label}</p>
-                <p className="text-xs font-semibold text-gray-700">{distanceLabel(nearest.distance_m)}</p>
-              </div>
-            </div>
-          ))}
+      {/* 지도 분석 가이드 */}
+      <div className="grid grid-cols-3 gap-2 text-[11px]">
+        {/* 배후 인구 */}
+        <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
+          <p className="font-bold text-gray-700 mb-1.5 flex items-center gap-1">
+            <span className="w-3 h-3 rounded-full border-2 border-dashed inline-block flex-shrink-0" style={{borderColor:'#ef4444'}} />
+            배후 인구 분석
+          </p>
+          <p className="text-[10px] text-gray-500 leading-relaxed">
+            지도 우상단 팝업에 표시.<br/>
+            SGIS 통계청 기반 500m 반경 인구밀도·총인구·가구 수
+          </p>
+          <div className="flex gap-1.5 mt-1.5">
+            <span className="flex items-center gap-0.5 text-[9px] text-gray-500"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#ef4444'}} />고밀</span>
+            <span className="flex items-center gap-0.5 text-[9px] text-gray-500"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#f97316'}} />중밀</span>
+            <span className="flex items-center gap-0.5 text-[9px] text-gray-500"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#22c55e'}} />저밀</span>
+          </div>
         </div>
-      )}
 
-      {avgPrice && (
-        <div className="flex items-center gap-2 p-2.5 bg-brand-50 rounded-lg border border-brand-100">
-          <TrendingUp size={12} className="text-brand-500 flex-shrink-0" />
-          <span className="text-xs text-gray-500">주변 시세 {amounts.length}건</span>
-          <span className="ml-auto text-sm font-bold text-brand-700">{formatAmount(avgPrice)}</span>
-          <span className="text-xs text-gray-400">·</span>
-          <span className="text-sm font-bold text-red-600">{formatAmount(maxPrice)}</span>
+        {/* 유동인구 */}
+        <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
+          <p className="font-bold text-gray-700 mb-1.5 flex items-center gap-1">
+            <span className="w-3 h-3 rounded-full border-2 inline-block flex-shrink-0" style={{borderColor: hasCardFp ? '#2563eb' : '#0891b2'}} />
+            유동인구 분석
+          </p>
+          <p className="text-[10px] text-gray-500 leading-relaxed">
+            {hasCardFp
+              ? <>💳 제주 카드 이용량 기반<br/>300m 반경 주중·주말 이용자 수</>
+              : <>🏪 소상공인 상권 유동인구<br/>300m 반경 주중 평균 유동인구</>
+            }
+          </p>
+          <div className="flex gap-1.5 mt-1.5">
+            <span className="flex items-center gap-0.5 text-[9px] text-gray-500"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#7c3aed'}} />고</span>
+            <span className="flex items-center gap-0.5 text-[9px] text-gray-500"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#2563eb'}} />중</span>
+            <span className="flex items-center gap-0.5 text-[9px] text-gray-500"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#0891b2'}} />저</span>
+          </div>
         </div>
-      )}
+
+        {/* 히트맵 */}
+        <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
+          <p className="font-bold text-gray-700 mb-1.5 flex items-center gap-1">
+            🔥 유동인구 히트맵
+          </p>
+          <p className="text-[10px] text-gray-500 leading-relaxed">
+            좌하단 버튼으로 ON/OFF.<br/>
+            지하철·마트·편의점 등 POI 집객시설 밀집도 열지도
+          </p>
+          <div className="flex gap-0.5 mt-1.5 items-center">
+            <span className="w-4 h-2.5 rounded-sm inline-block" style={{background:'rgba(239,68,68,0.85)'}} />
+            <span className="w-4 h-2.5 rounded-sm inline-block" style={{background:'rgba(234,179,8,0.7)'}} />
+            <span className="w-4 h-2.5 rounded-sm inline-block" style={{background:'rgba(59,130,246,0.5)'}} />
+            <span className="text-[9px] text-gray-400 ml-1">높음 → 낮음</span>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

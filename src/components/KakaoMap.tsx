@@ -71,7 +71,6 @@ export default function KakaoMap({
   const cardOverlayRef  = useRef<any>(null)
   const kakaoDensityRef = useRef(kakaoDensity)
   const [showHeatmap, setShowHeatmap] = useState(false)
-  const [showLegend, setShowLegend] = useState(false)
   const [mapReady, setMapReady] = useState(false)
   const appKey = process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY
 
@@ -389,9 +388,6 @@ export default function KakaoMap({
   }
 
   const hasPoi = poiData && Object.keys(poiData).length > 0
-  const hasCardFp = !!(cardData?.has_data && cardData?.floating_population?.weekday)
-  const hasCommercialFp = !!(commercialData?.floating_population?.weekday)
-  const hasFlpop = hasCardFp || hasCommercialFp
 
   return (
     <div className={`relative ${className || ''}`} style={style}>
@@ -423,91 +419,6 @@ export default function KakaoMap({
           🔥 히트맵
         </button>
       )}
-
-      {/* 하단 우측: 범례 토글 버튼 + 패널 */}
-      <div className="absolute bottom-2 right-2 z-20 flex flex-col items-end gap-1">
-        {/* 범례 패널 (토글 시 표시, 위 방향으로 펼쳐짐) */}
-        {showLegend && (
-          <div className="bg-white/97 backdrop-blur-sm px-3 py-2.5 rounded-xl shadow-lg border border-gray-200 text-[10px] text-gray-600 w-[230px]">
-            <p className="font-bold text-gray-700 mb-2 text-[11px] flex items-center gap-1">🗺 분석 데이터 가이드</p>
-
-            <div className="space-y-2">
-              {/* 업종 밀집도 */}
-              <div className="flex items-start gap-2 pb-1.5 border-b border-gray-100">
-                <span className="w-3 h-3 rounded-full border-2 flex-shrink-0 mt-0.5" style={{borderColor:'#3b82f6', background:'rgba(96,165,250,0.15)'}} />
-                <div>
-                  <p className="font-semibold text-gray-700">업종 밀집도 <span className="text-gray-400 font-normal">(500m 반경)</span></p>
-                  <p className="text-[9px] text-gray-400">카카오 카테고리 검색 기반 · 전국</p>
-                </div>
-              </div>
-
-              {/* 유동인구 */}
-              <div className="flex items-start gap-2 pb-1.5 border-b border-gray-100">
-                <span className="w-3 h-3 rounded-full border-2 flex-shrink-0 mt-0.5" style={{borderColor: hasCardFp ? '#2563eb' : '#0891b2', background: hasCardFp ? 'rgba(37,99,235,0.12)' : 'rgba(8,145,178,0.12)'}} />
-                <div>
-                  <p className="font-semibold text-gray-700">유동인구 <span className="text-gray-400 font-normal">(300m 반경)</span></p>
-                  {hasCardFp
-                    ? <p className="text-[9px] text-indigo-500 font-medium">💳 카드 이용량 기반 · 제주 전용<br/><span className="text-gray-400 font-normal">제주데이터허브 관광·상업지구 카드 실적</span></p>
-                    : <p className="text-[9px] text-gray-400">🏪 상권 유동인구 기반 · 전국<br/>소상공인진흥공단 상권정보 API</p>
-                  }
-                  <div className="flex items-center gap-1 mt-1">
-                    <span className="inline-flex items-center gap-0.5"><span className="w-2.5 h-2.5 rounded-full" style={{background:'#7c3aed'}} /><span className="text-gray-400">고</span></span>
-                    <span className="inline-flex items-center gap-0.5"><span className="w-2.5 h-2.5 rounded-full" style={{background:'#2563eb'}} /><span className="text-gray-400">중</span></span>
-                    <span className="inline-flex items-center gap-0.5"><span className="w-2.5 h-2.5 rounded-full" style={{background:'#0891b2'}} /><span className="text-gray-400">저</span></span>
-                    <span className="text-[9px] text-gray-400 ml-0.5">{hasCardFp ? '3,000 / 500명' : '10,000 / 2,000명'}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 배후 인구 */}
-              <div className="flex items-start gap-2 pb-1.5 border-b border-gray-100">
-                <span className="w-3 h-3 rounded-full border-2 border-dashed flex-shrink-0 mt-0.5" style={{borderColor:'#ef4444', background:'rgba(239,68,68,0.05)'}} />
-                <div>
-                  <p className="font-semibold text-gray-700">배후 인구 <span className="text-gray-400 font-normal">(500m 반경)</span></p>
-                  <p className="text-[9px] text-gray-400">👥 SGIS 통계청 인구밀도 기반 · 전국<br/>인구밀도 색상: 빨강(고밀) → 주황 → 초록(저밀)</p>
-                </div>
-              </div>
-
-              {/* 히트맵 */}
-              {hasPoi && (
-                <div className="flex items-start gap-2">
-                  <span className="text-orange-400 text-[11px] leading-none mt-0.5">🔥</span>
-                  <div>
-                    <p className="font-semibold text-gray-700">유동인구 히트맵</p>
-                    <p className="text-[9px] text-gray-400">지하철·마트·편의점 등 POI 집객시설<br/>밀집도 기반 열지도 (카카오 Places API)</p>
-                    <div className="flex items-center gap-1 mt-1">
-                      <span className="w-3 h-2 rounded-sm" style={{background:'rgba(239,68,68,0.85)'}} />
-                      <span className="w-3 h-2 rounded-sm" style={{background:'rgba(234,179,8,0.7)'}} />
-                      <span className="w-3 h-2 rounded-sm" style={{background:'rgba(59,130,246,0.5)'}} />
-                      <span className="text-gray-400 text-[9px]">높음 → 낮음</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* 카드 매출 데이터 안내 */}
-            <div className="mt-2 pt-2 border-t border-gray-100 text-[9px] text-gray-400 leading-relaxed">
-              💳 <span className="font-medium text-gray-500">카드 매출 오버레이</span><br/>
-              · 제주: 카드 이용자 수 + 매출 (제주데이터허브)<br/>
-              · 전국: 상권 카드 매출 (소상공인진흥공단)<br/>
-              <span className="text-[8px]">※ 상권 미등록 지역은 표시 안됨</span>
-            </div>
-          </div>
-        )}
-
-        {/* 범례 토글 버튼 */}
-        <button
-          onClick={() => setShowLegend(v => !v)}
-          className={`text-[11px] px-2.5 py-1.5 rounded-full shadow-md border font-medium transition-all ${
-            showLegend
-              ? 'bg-brand-600 text-white border-brand-500'
-              : 'bg-white/90 backdrop-blur-sm text-gray-600 border-gray-200 hover:bg-gray-50'
-          }`}
-        >
-          {showLegend ? '✕ 범례닫기' : '🗺 분석가이드'}
-        </button>
-      </div>
 
       {/* 배후 인구 분석 팝업 */}
       {populationData && (
