@@ -174,21 +174,25 @@ export default function ProjectEditForm({ project }: { project: Project }) {
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-sm">
             <tbody>
-              {/* 소재지 + 종류 */}
+              {/* 소재지 */}
               <tr>
                 <TLabel>소재지 *</TLabel>
-                <TCell colSpan={3}>
+                <TCell colSpan={5}>
                   <TInput value={form.address} onChange={v => set('address', v)} placeholder="화성시 만세구 항남읍 하길리 123" />
                 </TCell>
+              </tr>
+
+              {/* 중개대상물 종류 — 가로 탭 */}
+              <tr>
                 <TLabel>중개대상물 종류</TLabel>
-                <TCell>
-                  <div className="flex flex-wrap gap-1 py-0.5">
+                <TCell colSpan={5}>
+                  <div className="flex gap-1 py-0.5 flex-wrap">
                     {PROPERTY_TYPES.map(pt => (
                       <button
                         key={pt.value}
                         type="button"
                         onClick={() => setForm(f => ({ ...f, property_type: pt.value, property_category: pt.label }))}
-                        className={`px-2 py-0.5 rounded text-[11px] border transition-colors ${form.property_type === pt.value ? 'bg-brand-600 text-white border-brand-600' : 'border-gray-300 text-gray-500 hover:border-brand-400'}`}
+                        className={`px-3 py-1 rounded-full text-[11px] border transition-colors whitespace-nowrap ${form.property_type === pt.value ? 'bg-brand-600 text-white border-brand-600' : 'border-gray-300 text-gray-500 hover:border-brand-400'}`}
                       >
                         {pt.label}
                       </button>

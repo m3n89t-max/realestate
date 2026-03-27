@@ -395,10 +395,10 @@ export default function NewProjectPage() {
               <table className="w-full border-collapse border border-gray-400 text-xs">
                 <tbody>
 
-                  {/* Row 1: 소재지 + 중개대상물 종류 */}
+                  {/* Row 1: 소재지 */}
                   <tr>
                     <TLabel>소 재 지 *</TLabel>
-                    <TCell colSpan={3}>
+                    <TCell colSpan={5}>
                       <input
                         value={form.address}
                         onChange={e => set('address', e.target.value)}
@@ -406,15 +406,19 @@ export default function NewProjectPage() {
                         className="w-full text-sm border-0 outline-none bg-transparent px-1 py-0.5 placeholder:text-gray-300"
                       />
                     </TCell>
+                  </tr>
+
+                  {/* Row 1b: 중개대상물 종류 — 가로 탭 */}
+                  <tr>
                     <TLabel>중개대상물 종류</TLabel>
-                    <TCell>
-                      <div className="flex flex-wrap gap-1 py-0.5">
+                    <TCell colSpan={5}>
+                      <div className="flex gap-1 py-0.5 flex-wrap">
                         {PROPERTY_TYPES.map(pt => (
                           <button
                             key={pt.value}
                             type="button"
                             onClick={() => setForm(f => ({ ...f, property_type: pt.value, property_category: pt.label }))}
-                            className={`px-2 py-0.5 rounded text-[11px] border transition-colors ${form.property_type === pt.value ? 'bg-brand-600 text-white border-brand-600' : 'border-gray-300 text-gray-500 hover:border-brand-400'}`}
+                            className={`px-3 py-1 rounded-full text-[11px] border transition-colors whitespace-nowrap ${form.property_type === pt.value ? 'bg-brand-600 text-white border-brand-600' : 'border-gray-300 text-gray-500 hover:border-brand-400'}`}
                           >
                             {pt.label}
                           </button>
