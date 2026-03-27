@@ -60,9 +60,12 @@ const PROPERTY_TYPES: { value: PropertyType; label: string }[] = [
   { value: 'apartment', label: '아파트' },
   { value: 'officetel', label: '오피스텔' },
   { value: 'villa', label: '빌라/다세대' },
-  { value: 'commercial', label: '상가/사무실' },
-  { value: 'land', label: '토지' },
+  { value: 'multi_unit', label: '다가구주택' },
   { value: 'house', label: '단독주택' },
+  { value: 'commercial', label: '상가/사무실' },
+  { value: 'knowledge_industry', label: '지식산업센터' },
+  { value: 'factory', label: '공장/창고' },
+  { value: 'land', label: '토지' },
 ]
 
 const DIRECTIONS = ['남향', '남동향', '남서향', '동향', '서향', '북향', '북동향', '북서향']
@@ -429,16 +432,20 @@ export default function NewProjectPage() {
                     <TLabel>해당층/총층</TLabel>
                     <TCell>
                       <div className="flex items-center gap-1 flex-nowrap whitespace-nowrap">
-                        <TInput
+                        <input
                           value={form.whole_building ? '전체' : form.floor}
-                          onChange={v => set('floor', v)}
+                          onChange={e => set('floor', e.target.value)}
                           placeholder="1"
-                          type={form.whole_building ? 'text' : 'number'}
                           disabled={form.whole_building}
-                          className="w-10"
+                          className="w-10 text-sm border-0 outline-none bg-transparent px-1 py-0.5 placeholder:text-gray-300 disabled:text-gray-400"
                         />
                         <span className="text-gray-400">층 /</span>
-                        <TInput value={form.total_floors} onChange={v => set('total_floors', v)} placeholder="2" type="number" className="w-10" />
+                        <input
+                          value={form.total_floors}
+                          onChange={e => set('total_floors', e.target.value)}
+                          placeholder="2"
+                          className="w-10 text-sm border-0 outline-none bg-transparent px-1 py-0.5 placeholder:text-gray-300"
+                        />
                         <span className="text-gray-400">층</span>
                         <button
                           type="button"

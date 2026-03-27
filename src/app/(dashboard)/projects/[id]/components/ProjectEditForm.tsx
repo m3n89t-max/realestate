@@ -10,9 +10,12 @@ const PROPERTY_TYPES: { value: PropertyType; label: string }[] = [
   { value: 'apartment', label: '아파트' },
   { value: 'officetel', label: '오피스텔' },
   { value: 'villa', label: '빌라/다세대' },
-  { value: 'commercial', label: '상가/사무실' },
-  { value: 'land', label: '토지' },
+  { value: 'multi_unit', label: '다가구주택' },
   { value: 'house', label: '단독주택' },
+  { value: 'commercial', label: '상가/사무실' },
+  { value: 'knowledge_industry', label: '지식산업센터' },
+  { value: 'factory', label: '공장/창고' },
+  { value: 'land', label: '토지' },
 ]
 const DIRECTIONS = ['남향', '남동향', '남서향', '동향', '서향', '북향', '북동향', '북서향']
 const COMMON_FEATURES = [
@@ -203,9 +206,20 @@ export default function ProjectEditForm({ project }: { project: Project }) {
                 <TLabel>해당층/총층</TLabel>
                 <TCell>
                   <div className="flex items-center gap-1">
-                    <TInput value={form.floor} onChange={v => set('floor', v)} placeholder="1" className="w-12" disabled={form.whole_building} />
+                    <input
+                      value={form.whole_building ? '전체' : form.floor}
+                      onChange={e => set('floor', e.target.value)}
+                      placeholder="1"
+                      disabled={form.whole_building}
+                      className="w-12 text-sm border-0 outline-none bg-transparent px-1 py-0.5 placeholder:text-gray-300 disabled:text-gray-400"
+                    />
                     <span className="text-gray-400 text-xs">층 /</span>
-                    <TInput value={form.total_floors} onChange={v => set('total_floors', v)} placeholder="2" className="w-12" />
+                    <input
+                      value={form.total_floors}
+                      onChange={e => set('total_floors', e.target.value)}
+                      placeholder="2"
+                      className="w-12 text-sm border-0 outline-none bg-transparent px-1 py-0.5 placeholder:text-gray-300"
+                    />
                     <span className="text-gray-400 text-xs">층</span>
                     <label className="flex items-center gap-1 ml-2 text-xs text-gray-500 cursor-pointer whitespace-nowrap">
                       <input type="checkbox" checked={form.whole_building} onChange={toggleWholeBuilding} className="w-3.5 h-3.5" />
@@ -219,7 +233,7 @@ export default function ProjectEditForm({ project }: { project: Project }) {
                     className="w-full text-sm border-0 outline-none bg-transparent">
                     <option value="sale">매매</option>
                     <option value="lease">전세</option>
-                    <option value="rent">월세</option>
+                    <option value="rent">임대</option>
                   </select>
                 </TCell>
               </tr>

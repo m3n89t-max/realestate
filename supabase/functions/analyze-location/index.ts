@@ -193,9 +193,10 @@ Deno.serve(async (req) => {
 
     // ── 실제 수집 데이터 포맷팅 ──────────────────────────────
     const propertyType    = project.property_type ?? 'unknown'
-    const isCommercial    = propertyType === 'commercial'
-    const isResidential   = ['apartment', 'officetel', 'villa', 'house'].includes(propertyType)
+    const isCommercial    = ['commercial', 'knowledge_industry'].includes(propertyType)
+    const isResidential   = ['apartment', 'officetel', 'villa', 'multi_unit', 'house'].includes(propertyType)
     const isLand          = propertyType === 'land'
+    const isIndustrial    = propertyType === 'factory'
     const poiText         = formatPOI(poi_data)
     const realPriceText   = isCommercial
       ? formatCommercial(project.commercial_data)
@@ -233,16 +234,19 @@ Deno.serve(async (req) => {
     // ── 매물 유형별 분석 관점 설정 ──────────────────────────
     const propertyTypeLabel: Record<string, string> = {
       apartment: '아파트', officetel: '오피스텔', villa: '빌라/다세대',
-      commercial: '상가/사무실', land: '토지', house: '단독주택',
+      multi_unit: '다가구주택', house: '단독주택',
+      commercial: '상가/사무실', knowledge_industry: '지식산업센터',
+      factory: '공장/창고', land: '토지',
     }
     const ptLabel = propertyTypeLabel[propertyType] ?? '부동산'
 
     const typeGuide = isCommercial
-      ? `[상가/사무실 분석 중점 사항]
+      ? `[${ptLabel} 분석 중점 사항]
 - 유동인구·상권 등급이 핵심 — S/A/B/C 등급을 데이터 기반으로 명확히 평가
 - 음식점·카페 등 경쟁 과밀 업종과 공백 업종을 구체적으로 분석
 - 업종 추천은 현재 밀집도 데이터(부족=추천, 과밀=비추천) 기반으로 도출
 - 직장인 수요·주거 배후·학원가·관광 등 상권 유형을 명시
+${propertyType === 'knowledge_industry' ? '- 입주 기업 업종 적합성(IT·제조·물류 등), 산업단지 접근성, 주차·화물 동선 평가' : ''}
 - 임차인 유치 전략과 공실 리스크도 언급`
       : isResidential
       ? `[주거용(${ptLabel}) 분석 중점 사항]
@@ -250,6 +254,7 @@ Deno.serve(async (req) => {
 - 생활 편의: 마트·병원·약국·카페까지의 도보 접근성
 - 교통: 지하철·버스 환승 편의성, 출퇴근 편의
 - 주거 쾌적성: 공원·조용함·방향·채광 등
+${propertyType === 'multi_unit' ? '- 다가구주택 특성: 임대 수익성, 호실 구성, 공실률, 수익형 투자 관점 포함' : ''}
 - 실거래가 동향을 기반으로 시세 수준과 투자 매력도 평가
 - recommended_industries 필드는 "해당없음(주거용)" 으로 채울 것`
       : isLand
@@ -260,6 +265,14 @@ Deno.serve(async (req) => {
 - 토지 활용 방향 제안 (주거·상업·창고·농지 전용 등)
 - recommended_targets는 토지 매수 적합 실수요자/투자자 유형으로 작성
 - recommended_industries 필드는 "해당없음(토지)" 으로 채울 것`
+      : isIndustrial
+      ? `[공장/창고 분석 중점 사항]
+- 산업단지·IC·물류거점까지의 거리와 도로 접근성(진출입 동선) 평가
+- 용도지역(공업지역·준공업·자연녹지 등) 및 건폐율·용적률 규제 확인
+- 전기 용량, 하중, 층고 등 산업용 사양 관련 특이사항 메모 반영
+- 인근 동종 업체 밀집도 및 노동력 공급 환경 평가
+- recommended_targets는 입주 적합 업종·기업 유형으로 작성
+- recommended_industries 필드는 "해당없음(공장/창고)" 으로 채울 것`
       : `[일반 부동산 분석 중점 사항]
 - 교통·생활편의·교육·상권을 균형 있게 평가
 - 실거래가 동향 분석 포함`
@@ -325,6 +338,10 @@ ${typeGuide}`
       ? `- 용도지역 규제와 개발 가능성을 최우선 분석
 - 주변 개발 호재 및 지역 성장성 평가
 - 토지 활용 방향을 구체적으로 제안`
+      : isIndustrial
+      ? `- IC·물류거점·산업단지까지의 도로 접근성을 구체적으로 언급
+- 용도지역 및 산업용 건물 요건 평가
+- 입주 적합 업종·기업 유형을 데이터 기반으로 제안`
       : `- 가장 가까운 업소 이름과 거리를 구체적으로 언급
 - 상권 유형을 데이터 기반으로 판단`
 
