@@ -18,6 +18,7 @@ import ProjectActions from './components/ProjectActions'
 import PhotoGallery from './components/PhotoGallery'
 import AnalysisTab from './components/AnalysisTab'
 import PackageTab from './components/PackageTab'
+import ProjectEditForm from './components/ProjectEditForm'
 
 interface Params {
   id: string
@@ -260,6 +261,9 @@ export default async function ProjectDetailPage({
 
           {/* 하단: 업로드된 사진 전체 갤러리 */}
           <PhotoGallery assets={assets || []} />
+
+          {/* 매물 정보 수정 폼 */}
+          <ProjectEditForm project={project} />
         </div>
       )}
 
