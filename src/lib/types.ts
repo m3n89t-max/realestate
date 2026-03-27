@@ -4,7 +4,7 @@
 
 export type PlanType = 'free' | 'pro' | 'premium'
 export type UserRole = 'owner' | 'admin' | 'editor' | 'viewer'
-export type PropertyType = 'apartment' | 'officetel' | 'villa' | 'commercial' | 'land' | 'house' | 'multi_unit' | 'factory' | 'knowledge_industry'
+export type PropertyType = 'apartment' | 'officetel' | 'villa' | 'commercial' | 'land' | 'house' | 'multi_unit' | 'factory' | 'knowledge_industry' | 'mixed_use' | 'oneroom' | 'forest'
 export type ProjectStatus = 'draft' | 'active' | 'completed' | 'archived'
 export type ContentType = 'blog' | 'card_news' | 'video_script' | 'location_analysis' | 'doc_summary'
 export type BlogTone = 'professional' | 'friendly' | 'emotional' | 'intuitive'
@@ -458,6 +458,9 @@ export const PROPERTY_TYPE_LABELS: Record<PropertyType, string> = {
   multi_unit: '다가구주택',
   factory: '공장/창고',
   knowledge_industry: '지식산업센터',
+  mixed_use: '상가주택',
+  oneroom: '원룸',
+  forest: '임야',
 }
 
 export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {

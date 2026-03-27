@@ -194,8 +194,9 @@ Deno.serve(async (req) => {
     // ── 실제 수집 데이터 포맷팅 ──────────────────────────────
     const propertyType    = project.property_type ?? 'unknown'
     const isCommercial    = ['commercial', 'knowledge_industry'].includes(propertyType)
-    const isResidential   = ['apartment', 'officetel', 'villa', 'multi_unit', 'house'].includes(propertyType)
-    const isLand          = propertyType === 'land'
+    const isResidential   = ['apartment', 'officetel', 'villa', 'multi_unit', 'house', 'oneroom'].includes(propertyType)
+    const isMixedUse      = propertyType === 'mixed_use'
+    const isLand          = ['land', 'forest'].includes(propertyType)
     const isIndustrial    = propertyType === 'factory'
     const poiText         = formatPOI(poi_data)
     const realPriceText   = isCommercial
@@ -234,13 +235,21 @@ Deno.serve(async (req) => {
     // ── 매물 유형별 분석 관점 설정 ──────────────────────────
     const propertyTypeLabel: Record<string, string> = {
       apartment: '아파트', officetel: '오피스텔', villa: '빌라/다세대',
-      multi_unit: '다가구주택', house: '단독주택',
-      commercial: '상가/사무실', knowledge_industry: '지식산업센터',
-      factory: '공장/창고', land: '토지',
+      multi_unit: '다가구주택', house: '단독주택', oneroom: '원룸',
+      mixed_use: '상가주택', commercial: '상가/사무실', knowledge_industry: '지식산업센터',
+      factory: '공장/창고', land: '토지', forest: '임야',
     }
     const ptLabel = propertyTypeLabel[propertyType] ?? '부동산'
 
-    const typeGuide = isCommercial
+    const typeGuide = isMixedUse
+      ? `[상가주택 분석 중점 사항]
+- 1층 상가 상권 등급(S/A/B/C)과 유동인구를 데이터 기반으로 평가
+- 상가 임대 수익성: 업종 추천, 공실 리스크, 임대료 수준
+- 위층 주거 수익성: 원룸·다가구 임대 수요, 공실률 평가
+- 교통·생활편의(주거 관점)와 상권 접근성(상가 관점)을 동시에 분석
+- 전체 건물 수익률(상가+주거 합산) 관점에서 투자 매력도 평가
+- recommended_targets는 투자자(임대수익) + 실거주 겸용 수요자로 작성`
+      : isCommercial
       ? `[${ptLabel} 분석 중점 사항]
 - 유동인구·상권 등급이 핵심 — S/A/B/C 등급을 데이터 기반으로 명확히 평가
 - 음식점·카페 등 경쟁 과밀 업종과 공백 업종을 구체적으로 분석
@@ -255,16 +264,17 @@ ${propertyType === 'knowledge_industry' ? '- 입주 기업 업종 적합성(IT·
 - 교통: 지하철·버스 환승 편의성, 출퇴근 편의
 - 주거 쾌적성: 공원·조용함·방향·채광 등
 ${propertyType === 'multi_unit' ? '- 다가구주택 특성: 임대 수익성, 호실 구성, 공실률, 수익형 투자 관점 포함' : ''}
+${propertyType === 'oneroom' ? '- 원룸 특성: 1~2인 가구 수요, 인근 대학·직장·역세권 여부, 임대 수요 안정성' : ''}
 - 실거래가 동향을 기반으로 시세 수준과 투자 매력도 평가
 - recommended_industries 필드는 "해당없음(주거용)" 으로 채울 것`
       : isLand
-      ? `[토지 분석 중점 사항]
+      ? `[${ptLabel} 분석 중점 사항]
 - 용도지역/지구 규제와 개발 가능성을 최우선 분석
 - 접도 조건, 지형, 형상, 경사도 관련 특이사항 언급
 - 주변 개발 호재 및 지역 성장성 평가
-- 토지 활용 방향 제안 (주거·상업·창고·농지 전용 등)
-- recommended_targets는 토지 매수 적합 실수요자/투자자 유형으로 작성
-- recommended_industries 필드는 "해당없음(토지)" 으로 채울 것`
+${propertyType === 'forest' ? '- 임야 특성: 산지전용 가능 여부, 보전산지·준보전산지 구분, 개발행위허가 가능성' : '- 토지 활용 방향 제안 (주거·상업·창고·농지 전용 등)'}
+- recommended_targets는 매수 적합 실수요자/투자자 유형으로 작성
+- recommended_industries 필드는 "해당없음(토지/임야)" 으로 채울 것`
       : isIndustrial
       ? `[공장/창고 분석 중점 사항]
 - 산업단지·IC·물류거점까지의 거리와 도로 접근성(진출입 동선) 평가
@@ -323,7 +333,12 @@ ${typeGuide}`
     const priceStr = project.price ? `${Math.round(project.price / 10000)}억` : null
     const areaStr  = project.area  ? `${project.area}㎡ (약 ${Math.round(project.area / 3.3)}평)` : null
 
-    const analysisInstructions = isCommercial
+    const analysisInstructions = isMixedUse
+      ? `- 1층 상가 상권 등급(S/A/B/C) 평가 및 추천 업종 도출
+- 위층 주거 임대 수요(1~2인 가구·직장인 등) 평가
+- 상가+주거 합산 예상 임대수익률 관점에서 투자 매력도 평가
+- 카카오맵 업종 밀집도 데이터를 상가 임차인 유치 전략에 연계`
+      : isCommercial
       ? `- 상권 등급(S/A/B/C)을 위 기준에 따라 부여하고 근거 명시
 - 카카오맵 업종 밀집도 숫자(음식점 N개, 카페 N개 등)를 분석에 직접 인용
 - 현재 부족한 업종과 과밀 업종을 분석하여 추천/비추천 업종 도출

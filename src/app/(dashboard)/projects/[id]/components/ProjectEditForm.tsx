@@ -9,13 +9,16 @@ import type { Project, PropertyType } from '@/lib/types'
 const PROPERTY_TYPES: { value: PropertyType; label: string }[] = [
   { value: 'apartment', label: '아파트' },
   { value: 'officetel', label: '오피스텔' },
+  { value: 'oneroom', label: '원룸' },
   { value: 'villa', label: '빌라/다세대' },
   { value: 'multi_unit', label: '다가구주택' },
   { value: 'house', label: '단독주택' },
+  { value: 'mixed_use', label: '상가주택' },
   { value: 'commercial', label: '상가/사무실' },
   { value: 'knowledge_industry', label: '지식산업센터' },
   { value: 'factory', label: '공장/창고' },
   { value: 'land', label: '토지' },
+  { value: 'forest', label: '임야' },
 ]
 const DIRECTIONS = ['남향', '남동향', '남서향', '동향', '서향', '북향', '북동향', '북서향']
 const COMMON_FEATURES = [
