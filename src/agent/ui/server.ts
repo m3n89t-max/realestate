@@ -374,8 +374,8 @@ function getHtmlContent(creds: Record<string, any>, agentKey: string) {
                 });
                 const result = await res.json();
                 if (result.success) {
-                    showToast('저장되었습니다.');
-                    setTimeout(() => location.reload(), 1000);
+                    showToast('저장되었습니다. 창을 닫습니다...');
+                    setTimeout(() => window.close(), 1000);
                 } else {
                     showToast('저장 실패: ' + result.error, true);
                 }
