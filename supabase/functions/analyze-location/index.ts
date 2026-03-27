@@ -364,7 +364,7 @@ ${project.note || '(없음)'}
 [실제 수집된 POI 데이터]
 ${poiText}
 
-[${isCommercial ? '상권 분석 데이터' : '최근 실거래가'}]
+[${isCommercial ? '상권 분석 데이터' : isLand ? '토지 실거래가 및 공시지가 참고' : isIndustrial ? '인근 공장/창고 실거래가 참고' : '최근 실거래가'}]
 ${realPriceText}
 
 [카카오맵 업종 밀집도 - 실측 데이터, 반드시 분석에 반영]
