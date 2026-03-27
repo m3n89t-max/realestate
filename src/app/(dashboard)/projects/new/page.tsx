@@ -405,7 +405,18 @@ export default function NewProjectPage() {
                     </TCell>
                     <TLabel>중개대상물 종류</TLabel>
                     <TCell>
-                      <TInput value={form.property_category} onChange={v => set('property_category', v)} placeholder="일반상가" />
+                      <div className="flex flex-wrap gap-1 py-0.5">
+                        {PROPERTY_TYPES.map(pt => (
+                          <button
+                            key={pt.value}
+                            type="button"
+                            onClick={() => setForm(f => ({ ...f, property_type: pt.value, property_category: pt.label }))}
+                            className={`px-2 py-0.5 rounded text-[11px] border transition-colors ${form.property_type === pt.value ? 'bg-brand-600 text-white border-brand-600' : 'border-gray-300 text-gray-500 hover:border-brand-400'}`}
+                          >
+                            {pt.label}
+                          </button>
+                        ))}
+                      </div>
                     </TCell>
                   </tr>
 

@@ -192,7 +192,10 @@ Deno.serve(async (req) => {
     }
 
     // ── 실제 수집 데이터 포맷팅 ──────────────────────────────
-    const isCommercial    = project.property_type === 'commercial'
+    const propertyType    = project.property_type ?? 'unknown'
+    const isCommercial    = propertyType === 'commercial'
+    const isResidential   = ['apartment', 'officetel', 'villa', 'house'].includes(propertyType)
+    const isLand          = propertyType === 'land'
     const poiText         = formatPOI(poi_data)
     const realPriceText   = isCommercial
       ? formatCommercial(project.commercial_data)
@@ -227,7 +230,41 @@ Deno.serve(async (req) => {
       return { score, label, breakdown: { poi_score: Math.round(poiScore * 100), transit_score: Math.round(transitScore * 100), population_score: Math.round(populationScore * 100), total_poi: totalPoi, nearest_subway_m: nearestSubway < 99999 ? nearestSubway : null } }
     })()
 
-    const systemPrompt = `당신은 대한민국 부동산 상권 분석 전문가입니다. TEAM5 상권 분석 엔진으로서 실측 데이터를 기반으로 정밀한 입지·상권 분석을 수행하세요.
+    // ── 매물 유형별 분석 관점 설정 ──────────────────────────
+    const propertyTypeLabel: Record<string, string> = {
+      apartment: '아파트', officetel: '오피스텔', villa: '빌라/다세대',
+      commercial: '상가/사무실', land: '토지', house: '단독주택',
+    }
+    const ptLabel = propertyTypeLabel[propertyType] ?? '부동산'
+
+    const typeGuide = isCommercial
+      ? `[상가/사무실 분석 중점 사항]
+- 유동인구·상권 등급이 핵심 — S/A/B/C 등급을 데이터 기반으로 명확히 평가
+- 음식점·카페 등 경쟁 과밀 업종과 공백 업종을 구체적으로 분석
+- 업종 추천은 현재 밀집도 데이터(부족=추천, 과밀=비추천) 기반으로 도출
+- 직장인 수요·주거 배후·학원가·관광 등 상권 유형을 명시
+- 임차인 유치 전략과 공실 리스크도 언급`
+      : isResidential
+      ? `[주거용(${ptLabel}) 분석 중점 사항]
+- 교육 환경: 학교·학원가까지의 거리와 학군 수준 평가
+- 생활 편의: 마트·병원·약국·카페까지의 도보 접근성
+- 교통: 지하철·버스 환승 편의성, 출퇴근 편의
+- 주거 쾌적성: 공원·조용함·방향·채광 등
+- 실거래가 동향을 기반으로 시세 수준과 투자 매력도 평가
+- recommended_industries 필드는 "해당없음(주거용)" 으로 채울 것`
+      : isLand
+      ? `[토지 분석 중점 사항]
+- 용도지역/지구 규제와 개발 가능성을 최우선 분석
+- 접도 조건, 지형, 형상, 경사도 관련 특이사항 언급
+- 주변 개발 호재 및 지역 성장성 평가
+- 토지 활용 방향 제안 (주거·상업·창고·농지 전용 등)
+- recommended_targets는 토지 매수 적합 실수요자/투자자 유형으로 작성
+- recommended_industries 필드는 "해당없음(토지)" 으로 채울 것`
+      : `[일반 부동산 분석 중점 사항]
+- 교통·생활편의·교육·상권을 균형 있게 평가
+- 실거래가 동향 분석 포함`
+
+    const systemPrompt = `당신은 대한민국 부동산 입지 분석 전문가입니다. 실측 데이터를 기반으로 매물 유형에 맞는 정밀한 입지 분석을 수행하세요.
 
 [출력 형식: JSON - 모든 필드 필수]
 {
@@ -259,28 +296,43 @@ Deno.serve(async (req) => {
       {"name": "업종명", "reason": "비추천 이유"}
     ]
   },
-  "analysis_text": "종합 분석 문장 (200자 내외, 유동인구/상권등급 포함)"
+  "analysis_text": "종합 분석 문장 (200자 내외, 매물 유형에 맞는 핵심 지표 포함)"
 }
 
-[상권 등급 평가 기준]
+[상권 등급 평가 기준 — 상가/사무실 전용, 주거용은 생활편의 등급으로 전용]
 S: 유동인구 높음 + 업종밀집 300개 이상 OR 지하철 300m 이내
 A: 유동인구 보통 이상 + 업종 100개 이상
 B: 유동인구 낮음 이상 + 상권 기반 존재
 C: 고립 지역 또는 유동인구 매우 낮음
 
-[추천 업종 분석 기준]
-- 현재 부족한 업종(상권 공백) = 추천
-- 과밀 업종(경쟁 포화) = 비추천
-- 유동인구 특성(직장인/주거/학원가)에 맞는 업종 = 추천`
+${typeGuide}`
 
     const priceStr = project.price ? `${Math.round(project.price / 10000)}억` : null
     const areaStr  = project.area  ? `${project.area}㎡ (약 ${Math.round(project.area / 3.3)}평)` : null
 
-    const userPrompt = `다음 매물의 입지를 분석하세요.
+    const analysisInstructions = isCommercial
+      ? `- 상권 등급(S/A/B/C)을 위 기준에 따라 부여하고 근거 명시
+- 카카오맵 업종 밀집도 숫자(음식점 N개, 카페 N개 등)를 분석에 직접 인용
+- 현재 부족한 업종과 과밀 업종을 분석하여 추천/비추천 업종 도출
+- 상권 유형(주거형/직장인/학원/복합 등)을 데이터 기반으로 판단`
+      : isResidential
+      ? `- 학교·병원·마트 등 생활 인프라까지의 도보/차량 거리를 구체적으로 언급
+- 실거래가 동향을 기반으로 시세 수준과 투자 매력도 평가
+- 교통 접근성(지하철·버스) 및 출퇴근 편의성 평가
+- 주거 쾌적성(공원·소음·채광 등) 평가
+- commercial_grade는 생활편의 등급으로 해석하여 작성`
+      : isLand
+      ? `- 용도지역 규제와 개발 가능성을 최우선 분석
+- 주변 개발 호재 및 지역 성장성 평가
+- 토지 활용 방향을 구체적으로 제안`
+      : `- 가장 가까운 업소 이름과 거리를 구체적으로 언급
+- 상권 유형을 데이터 기반으로 판단`
+
+    const userPrompt = `다음 ${ptLabel} 매물의 입지를 분석하세요.
 
 [매물 기본 정보]
 주소: ${project.address}
-매물 유형: ${project.property_type ?? '미분류'}
+매물 유형: ${ptLabel} (${propertyType})
 ${priceStr              ? `매매가: ${priceStr}` : ''}
 ${areaStr               ? `전용면적: ${areaStr}` : ''}
 ${project.floor         ? `층수: ${project.floor}층 / 전체 ${project.total_floors ?? '?'}층` : ''}
@@ -307,12 +359,8 @@ ${kakaoDensityText}
 - 대중교통 점수: ${footTrafficLocal.breakdown.transit_score}/100 ${footTrafficLocal.breakdown.nearest_subway_m ? `(가장 가까운 지하철 ${footTrafficLocal.breakdown.nearest_subway_m}m)` : '(지하철 없음)'}
 - 배후인구 점수: ${footTrafficLocal.breakdown.population_score}/100
 
-위 실측 데이터를 종합하여 분석하세요:
-- 카카오맵 업종 밀집도 숫자(음식점 N개, 카페 N개 등)를 입지 장점/분석에 직접 인용
-- 가장 가까운 업소 이름과 거리를 구체적으로 언급
-- 상권 유형을 데이터 기반으로 판단 (주거형/직장인/학원/복합 등)
-- 현재 부족한 업종과 과밀 업종을 분석하여 추천/비추천 업종 도출
-- 상권 등급(S/A/B/C)을 위 기준에 따라 부여하고 근거 명시
+위 실측 데이터를 종합하여 ${ptLabel} 매물에 최적화된 분석을 수행하세요:
+${analysisInstructions}
 - 중개사 메모에 특이사항이 있으면 분석에 반드시 반영`
 
     const responseText = await callOpenAI(

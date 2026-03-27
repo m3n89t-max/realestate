@@ -179,15 +179,18 @@ export default function ProjectEditForm({ project }: { project: Project }) {
                 </TCell>
                 <TLabel>중개대상물 종류</TLabel>
                 <TCell>
-                  <select value={form.property_category} onChange={e => set('property_category', e.target.value)}
-                    className="w-full text-sm border-0 outline-none bg-transparent">
-                    <option value="">선택</option>
-                    <option value="일반상가">일반상가</option>
-                    <option value="집합상가">집합상가</option>
-                    <option value="오피스">오피스</option>
-                    <option value="주거용">주거용</option>
-                    <option value="토지">토지</option>
-                  </select>
+                  <div className="flex flex-wrap gap-1 py-0.5">
+                    {PROPERTY_TYPES.map(pt => (
+                      <button
+                        key={pt.value}
+                        type="button"
+                        onClick={() => setForm(f => ({ ...f, property_type: pt.value, property_category: pt.label }))}
+                        className={`px-2 py-0.5 rounded text-[11px] border transition-colors ${form.property_type === pt.value ? 'bg-brand-600 text-white border-brand-600' : 'border-gray-300 text-gray-500 hover:border-brand-400'}`}
+                      >
+                        {pt.label}
+                      </button>
+                    ))}
+                  </div>
                 </TCell>
               </tr>
 
