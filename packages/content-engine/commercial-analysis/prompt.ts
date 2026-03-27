@@ -27,12 +27,12 @@ Steps:
 - corner visibility
 
 5. Customer segments
-- residents
-- office workers
-- students
-- tourists
+- residents (family types, age groups)
+- office workers (Samsung campus workers, commuters)
+- night-shift/24h demand (if applicable)
 
-6. Recommended businesses (3~5)
+6. Recommended businesses (3~5 specific categories or franchises)
+- e.g., 24h Gukbap, bakery cafe, etc.
 
 7. Unsuitable businesses (2~3)
 
