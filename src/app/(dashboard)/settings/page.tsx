@@ -193,7 +193,7 @@ export default async function SettingsPage() {
             <p className="text-xs text-gray-400 mt-0.5">Windows 64bit · 설치 불필요 (portable)</p>
           </div>
           <a
-            href="https://github.com/m3n89t-max/realestate/releases/latest/download/RealEstateAgent.1.0.0.exe"
+            href="https://github.com/m3n89t-max/realestate/releases/latest/download/RealEstateAgent.exe"
             className="btn-primary text-xs py-1.5 px-4 inline-flex items-center gap-1.5"
           >
             다운로드

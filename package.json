@@ -76,16 +76,11 @@
       "output": "dist"
     },
     "compression": "store",
+    "artifactName": "RealEstateAgent.exe",
     "win": {
       "target": [
         {
           "target": "portable",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "zip",
           "arch": [
             "x64"
           ]
