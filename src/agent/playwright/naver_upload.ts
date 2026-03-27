@@ -95,9 +95,12 @@ export async function uploadNaverBlog(
             await page.waitForTimeout(1500 + Math.random() * 1000);
 
             // 사람처럼 클릭 후 한 글자씩 타이핑 (봇 탐지 우회)
+            // 기존 입력값 선택 후 덮어쓰기 (중복 입력 방지)
             const idField = page.locator('#id');
             await idField.click();
             await page.waitForTimeout(300 + Math.random() * 200);
+            await page.keyboard.press('Control+A');
+            await page.waitForTimeout(100);
             for (const ch of creds.id) {
                 await page.keyboard.type(ch, { delay: 80 + Math.random() * 120 });
             }
@@ -106,6 +109,8 @@ export async function uploadNaverBlog(
             const pwField = page.locator('#pw');
             await pwField.click();
             await page.waitForTimeout(300 + Math.random() * 200);
+            await page.keyboard.press('Control+A');
+            await page.waitForTimeout(100);
             for (const ch of creds.pw) {
                 await page.keyboard.type(ch, { delay: 80 + Math.random() * 120 });
             }
