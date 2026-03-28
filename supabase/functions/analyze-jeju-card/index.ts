@@ -32,8 +32,15 @@ async function fetchJeju(proxyPath: string, appKey: string, params: Record<strin
   console.log('[analyze-jeju-card] GET', url.replace(appKey, appKey.slice(0, 6) + '...'))
   try {
     const res = await fetch(url)
-    const json = await res.json()
-    return Array.isArray(json.data) ? json.data : []
+    const text = await res.text()
+    console.log('[analyze-jeju-card] HTTP', res.status, '| raw (first 300):', text.slice(0, 300))
+    const json = JSON.parse(text)
+    // 응답 구조 다중 fallback: data / result / list / items / rows / 최상위 배열
+    const arr = json.data ?? json.result ?? json.list ?? json.items ?? json.rows ?? null
+    if (Array.isArray(arr)) return arr
+    if (Array.isArray(json)) return json
+    console.warn('[analyze-jeju-card] unexpected response shape, keys:', Object.keys(json))
+    return []
   } catch (e) {
     console.error('[analyze-jeju-card] fetch error:', e)
     return []
