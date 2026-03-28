@@ -101,11 +101,13 @@ async function fetchNearbyStores(serviceKey: string, lat: number, lng: number): 
   try { return extractItems(JSON.parse(text)) } catch { return [] }
 }
 
-async function fetchFloatingPopulation(serviceKey: string, lat: number, lng: number): Promise<any | null> {
+async function fetchFloatingPopulation(serviceKey: string, lat: number, lng: number, trarNo?: string): Promise<any | null> {
   try {
+    // storeFlpopCo 는 trarNo(상권번호) 기반 API — radius 미지원
+    // trarNo 없으면 빈 결과이므로 조기 반환
+    if (!trarNo) return null
     const url = buildApiUrl('storeFlpopCo', serviceKey, {
-      pageNo: '1', numOfRows: '1', radius: '500',
-      cx: String(lng), cy: String(lat), type: 'json',
+      pageNo: '1', numOfRows: '1', trarNo, type: 'json',
     })
     const res = await fetch(url)
     const text = await res.text()
@@ -239,7 +241,7 @@ Deno.serve(async (req) => {
 
     const [stores, floating_population, sales_data] = await Promise.all([
       fetchNearbyStores(serviceKey, lat, lng),
-      fetchFloatingPopulation(serviceKey, lat, lng),
+      fetchFloatingPopulation(serviceKey, lat, lng, trarNo),
       fetchSalesData(serviceKey, lat, lng, trarNo),
     ])
 
