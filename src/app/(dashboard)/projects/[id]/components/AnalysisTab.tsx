@@ -1221,14 +1221,24 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
         if (needsTourism) {
           setAutoStep('관광 시설 데이터 수집 중...')
           const { error } = await supabase.functions.invoke('analyze-tourism', { body: { project_id: projectId } })
-          // TOUR_API_KEY 미설정 시 에러 무시
-          if (error) console.warn('[analyze-tourism] skipped:', error.message)
+          if (error) {
+            console.warn('[analyze-tourism] skipped:', error.message)
+            // 에러 시 placeholder 저장 → 무한루프 방지
+            await supabase.from('projects')
+              .update({ tourism_data: { total_count: 0, error: error.message } })
+              .eq('id', projectId)
+          }
         }
         if (needsCardData) {
           setAutoStep('카드 이용 데이터 수집 중...')
           const { error } = await supabase.functions.invoke('analyze-jeju-card', { body: { project_id: projectId } })
-          // 키 미설정 시 에러 무시 (제주 외 지역에서도 동작)
-          if (error) console.warn('[analyze-jeju-card] skipped:', error.message)
+          if (error) {
+            console.warn('[analyze-jeju-card] skipped:', error.message)
+            // 에러 시 placeholder 저장 → 무한루프 방지 (card_data가 null이면 매 reload마다 재시도)
+            await supabase.from('projects')
+              .update({ card_data: { has_data: false, error: error.message } })
+              .eq('id', projectId)
+          }
         }
         setAutoStep(null)
         window.location.reload()
