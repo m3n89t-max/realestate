@@ -134,25 +134,37 @@ async function fetchFloatingPopulation(serviceKey: string, lat: number, lng: num
   }
 }
 
-async function fetchSalesData(serviceKey: string, lat: number, lng: number): Promise<any | null> {
+async function fetchSalesData(serviceKey: string, lat: number, lng: number, trarNo?: string): Promise<any | null> {
   try {
-    const url = buildApiUrl('trdarSalersList', serviceKey, {
-      pageNo: '1', numOfRows: '5', radius: '500',
-      cx: String(lng), cy: String(lat), type: 'json',
-    })
+    // trdarSalersList 는 상권번호(trarNo) 기반 API — radius 파라미터 미지원
+    // zones 에서 상권번호를 가져온 경우에만 호출
+    const params: Record<string, string> = { pageNo: '1', numOfRows: '5', type: 'json' }
+    if (trarNo) {
+      params.trarNo = trarNo
+    } else {
+      // fallback: 반경 검색 시도 (API가 지원하지 않으면 빈 결과 반환)
+      params.radius = '500'
+      params.cx = String(lng)
+      params.cy = String(lat)
+    }
+
+    const url = buildApiUrl('trdarSalersList', serviceKey, params)
+    console.log('[analyze-commercial] sales URL:', url.replace(serviceKey, serviceKey.slice(0, 8) + '...'))
     const res = await fetch(url)
     const text = await res.text()
+    console.log('[analyze-commercial] sales raw response (first 500):', text.slice(0, 500))
     const data = JSON.parse(text)
     const items = extractItems(data)
+    console.log('[analyze-commercial] sales items count:', items.length, items[0] ? JSON.stringify(items[0]).slice(0, 200) : 'none')
     if (!items.length) return null
-    // 첫 번째 상권의 매출 요약
+    // 첫 번째 상권의 매출 요약 (필드명 다중 fallback)
     const it = items[0]
     return {
-      monthly_sales: Number(it.thmonSalesAmt ?? it.slsAmt ?? 0),
-      weekly_sales: Number(it.wkdaySlsAmt ?? 0),
-      weekend_sales: Number(it.wkndSlsAmt ?? 0),
-      top_category: it.indsLclsNm ?? null,
-      area_name: it.trdarNm ?? null,
+      monthly_sales: Number(it.thmonSalesAmt ?? it.slsAmt ?? it.trdarSalesAmt ?? it.mdIySalesAmt ?? 0),
+      weekly_sales:  Number(it.wkdaySlsAmt ?? it.mdWkDwSalesAmt ?? 0),
+      weekend_sales: Number(it.wkndSlsAmt  ?? it.mdWkndSalesAmt ?? 0),
+      top_category:  it.indsLclsNm ?? it.indsClsNm ?? null,
+      area_name:     it.trdarNm ?? it.mainTrarNm ?? null,
     }
   } catch (e) {
     console.error('[analyze-commercial] sales data fetch failed:', e)
@@ -221,11 +233,14 @@ Deno.serve(async (req) => {
 
     console.log('[analyze-commercial] lat:', lat, 'lng:', lng, 'key prefix:', serviceKey.slice(0, 8))
 
-    const [zones, stores, floating_population, sales_data] = await Promise.all([
-      fetchCommercialZones(serviceKey, lat, lng),
+    // zones 먼저 조회 → trarNo 를 sales 에 전달 (trdarSalersList 는 상권번호 필요)
+    const zones = await fetchCommercialZones(serviceKey, lat, lng)
+    const trarNo = zones[0]?.trarNo ?? undefined
+
+    const [stores, floating_population, sales_data] = await Promise.all([
       fetchNearbyStores(serviceKey, lat, lng),
       fetchFloatingPopulation(serviceKey, lat, lng),
-      fetchSalesData(serviceKey, lat, lng),
+      fetchSalesData(serviceKey, lat, lng, trarNo),
     ])
 
     console.log('[analyze-commercial] zones:', zones.length, 'stores:', stores.length,
