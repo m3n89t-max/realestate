@@ -69,6 +69,7 @@ export default function KakaoMap({
   const flpopCircleRef  = useRef<any>(null)
   const flpopLabelRef   = useRef<any>(null)
   const cardOverlayRef  = useRef<any>(null)
+  const cardNoDataRef   = useRef<any>(null)
   const kakaoDensityRef = useRef(kakaoDensity)
   const [showHeatmap, setShowHeatmap] = useState(false)
   const [mapReady, setMapReady] = useState(false)
@@ -259,20 +260,21 @@ export default function KakaoMap({
     const center = new window.kakao.maps.LatLng(lat, lng)
     const flRadius = 300
 
-    // 카드 기반 색상: 고(>3000) 보라, 중(500-3000) 파랑, 저(<500) 하늘 (카드 이용자 수는 실제 유동인구보다 적음)
-    // 상권 기반 색상: 고(>10000) 보라, 중(2000-10000) 파랑, 저(<2000) 하늘
-    const color = useCard
-      ? (weekdayCount > 3000 ? '#7c3aed' : weekdayCount > 500 ? '#2563eb' : '#0891b2')
-      : (weekdayCount > 10000 ? '#7c3aed' : weekdayCount > 2000 ? '#2563eb' : '#0891b2')
+    // 카드/상권 기반 티어별 색상 (🔥 핫 = 빨강, 🟡 보통 = 주황, 💤 한산 = 회색)
+    const isHot    = useCard ? weekdayCount > 3000  : weekdayCount > 10000
+    const isNormal = useCard ? weekdayCount > 500   : weekdayCount > 2000
+    const color        = isHot ? '#dc2626' : isNormal ? '#d97706' : '#94a3b8'
+    const strokeWeight = isHot ? 3 : isNormal ? 2 : 1.5
+    const fillOpacity  = isHot ? 0.18 : isNormal ? 0.1 : 0.04
 
     const circle = new window.kakao.maps.Circle({
       map, center, radius: flRadius,
-      strokeWeight: 2,
+      strokeWeight,
       strokeColor: color,
-      strokeOpacity: 0.9,
-      strokeStyle: 'solid',
+      strokeOpacity: 0.95,
+      strokeStyle: isHot ? 'solid' : isNormal ? 'solid' : 'dashed',
       fillColor: color,
-      fillOpacity: 0.1,
+      fillOpacity,
     })
     circle.setMap(map)
     flpopCircleRef.current = circle
@@ -303,6 +305,7 @@ export default function KakaoMap({
     if (!map || !mapReady || !window.kakao?.maps) return
 
     if (cardOverlayRef.current) { cardOverlayRef.current.setMap(null); cardOverlayRef.current = null }
+    if (cardNoDataRef.current)  { cardNoDataRef.current.setMap(null);  cardNoDataRef.current  = null }
 
     // 제주 카드 데이터
     const hasJejuCard = cardData?.has_data === true
@@ -310,13 +313,63 @@ export default function KakaoMap({
     const commercialSales = commercialData?.sales_data
     const hasCommercialSales = !!(commercialSales?.monthly_sales > 0 || commercialSales?.area_name)
 
-    if (!hasJejuCard && !hasCommercialSales) return
+    const overlayPos = new window.kakao.maps.LatLng(lat, lng + 0.003)
+
+    // ── 데이터 없음 표기
+    if (!hasJejuCard && !hasCommercialSales) {
+      // cardData가 명시적으로 조회됐으나 없는 경우 또는 commercialData가 있는데 매출 없는 경우
+      const wasQueried = cardData?.has_data === false || commercialData != null
+      if (wasQueried) {
+        const noDataOverlay = new window.kakao.maps.CustomOverlay({
+          map,
+          position: overlayPos,
+          content: `
+            <div style="background:#f9fafb;border:1.5px solid #d1d5db;border-radius:10px;padding:8px 13px;box-shadow:0 1px 6px rgba(0,0,0,0.08);min-width:160px;font-family:sans-serif;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+                <span style="font-size:11px;font-weight:700;color:#9ca3af;">💳 카드 사용량 현황</span>
+              </div>
+              <div style="text-align:center;padding:6px 0;font-size:12px;font-weight:600;color:#6b7280;">
+                📊 카드 데이터 없음
+              </div>
+              <div style="font-size:9px;color:#d1d5db;text-align:right;margin-top:4px;">해당 지역 데이터 미제공</div>
+            </div>
+          `,
+          yAnchor: 0.5,
+          xAnchor: 0,
+        })
+        noDataOverlay.setMap(map)
+        cardNoDataRef.current = noDataOverlay
+      }
+      return
+    }
+
+    // ── 티어 분류 (🔥 핫플 / 🟡 보통 / 💤 한산)
+    let tier: 'hot' | 'normal' | 'quiet' = 'normal'
+    if (hasJejuCard) {
+      const weekday = cardData.floating_population?.weekday ?? 0
+      const monthlySales = cardData.card_sales?.monthly_sales ?? 0
+      if (weekday > 3000 || monthlySales > 30_000_000) tier = 'hot'
+      else if (weekday > 500 || monthlySales > 5_000_000) tier = 'normal'
+      else tier = 'quiet'
+    } else {
+      const monthly = commercialSales?.monthly_sales ?? 0
+      const weekdaySales = commercialSales?.weekly_sales ?? 0
+      if (monthly > 50_000_000 || weekdaySales > 12_000_000) tier = 'hot'
+      else if (monthly > 10_000_000 || weekdaySales > 3_000_000) tier = 'normal'
+      else tier = 'quiet'
+    }
+
+    const TIER = {
+      hot:    { label: '🔥 핫플', color: '#dc2626', bg: '#fef2f2', border: '#fca5a5', headerColor: '#b91c1c' },
+      normal: { label: '🟡 보통', color: '#d97706', bg: '#fffbeb', border: '#fcd34d', headerColor: '#92400e' },
+      quiet:  { label: '💤 한산', color: '#6b7280', bg: '#f3f4f6', border: '#d1d5db', headerColor: '#374151' },
+    }
+    const tc = TIER[tier]
 
     let rows = ''
     let source = ''
 
     if (hasJejuCard) {
-      // ── 제주 카드 데이터 행
       const fp = cardData.floating_population
       const cs = cardData.card_sales
       const weekday: number = fp?.weekday ?? 0
@@ -335,13 +388,12 @@ export default function KakaoMap({
           <span style="font-weight:600;color:#1e293b;">${weekend.toLocaleString()}명</span>
         </div>
         ${peakTime ? `<div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px;"><span style="color:#6b7280;">피크 시간대</span><span style="font-weight:600;color:#7c3aed;">${peakTime}</span></div>` : ''}
-        ${monthlySales > 0 ? `<div style="display:flex;justify-content:space-between;font-size:10px;margin-top:4px;padding-top:4px;border-top:1px dashed #e0e7ff;"><span style="color:#6b7280;">${latestMonth} 이용금액</span><span style="font-weight:700;color:#059669;">${Math.round(monthlySales / 10000).toLocaleString()}만원</span></div>` : ''}
+        ${monthlySales > 0 ? `<div style="display:flex;justify-content:space-between;font-size:10px;margin-top:4px;padding-top:4px;border-top:1px dashed #e5e7eb;"><span style="color:#6b7280;">${latestMonth} 이용금액</span><span style="font-weight:700;color:#059669;">${Math.round(monthlySales / 10000).toLocaleString()}만원</span></div>` : ''}
       `
       source += '제주데이터허브'
     }
 
     if (hasCommercialSales) {
-      // ── 전국 상권 카드 매출 행
       const sd = commercialSales
       const monthly = sd.monthly_sales ?? 0
       const weekdaySales = sd.weekly_sales ?? 0
@@ -360,14 +412,16 @@ export default function KakaoMap({
     }
 
     const content = `
-      <div style="background:#fff;border:1.5px solid #6366f1;border-radius:12px;padding:10px 13px;box-shadow:0 2px 10px rgba(0,0,0,0.13);min-width:170px;font-family:sans-serif;">
-        <div style="font-size:11px;font-weight:700;color:#4f46e5;margin-bottom:6px;border-bottom:1px solid #e0e7ff;padding-bottom:4px;">💳 카드 사용량 현황</div>
+      <div style="background:#fff;border:2px solid ${tc.border};border-radius:12px;padding:10px 13px;box-shadow:0 2px 12px rgba(0,0,0,0.13);min-width:175px;font-family:sans-serif;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;border-bottom:1px solid #f3f4f6;padding-bottom:5px;">
+          <span style="font-size:11px;font-weight:700;color:#4f46e5;">💳 카드 사용량 현황</span>
+          <span style="font-size:10px;font-weight:700;color:${tc.color};background:${tc.bg};padding:2px 8px;border-radius:99px;border:1px solid ${tc.border};">${tc.label}</span>
+        </div>
         ${rows}
         <div style="font-size:9px;color:#9ca3af;text-align:right;margin-top:6px;">${source}</div>
       </div>
     `
 
-    const overlayPos = new window.kakao.maps.LatLng(lat, lng + 0.003)
     const overlay = new window.kakao.maps.CustomOverlay({
       map,
       position: overlayPos,

@@ -3,13 +3,16 @@
     "allow": [
       "Bash(npx supabase db execute --sql \"ALTER TABLE generated_contents ADD COLUMN IF NOT EXISTS titles text[] DEFAULT ''{}'';\")",
       "Bash(git pull)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)",
       "Bash(npm run type-check)",
       "Bash(npm run build)",
       "Bash(grep -l \"direction\\\\|note\\\\|jibun_address\" c:/Users/SAERON02/Desktop/realestate/supabase/migrations/*.sql)",
       "Bash(grep -n \"transaction_type.*CHECK\\\\|CHECK.*transaction\" c:/Users/SAERON02/Desktop/realestate/supabase/migrations/*.sql)",
       "Bash(grep -rn \"price\\\\|deposit\\\\|monthly_rent\\\\|key_money\" c:/Users/SAERON02/Desktop/realestate/src/app/\\\\\\(dashboard\\\\\\)/projects/[id]/page.tsx)",
       "Bash(grep -n \"formatPrice\\\\|price\\\\|deposit\\\\|key_money\\\\|monthly_rent\" c:/Users/SAERON02/Desktop/realestate/src/app/\\\\\\(dashboard\\\\\\)/projects/[id]/page.tsx)",
-      "Bash(wc -l \"c:\\\\Users\\\\SAERON02\\\\Desktop\\\\realestate\\\\src\\\\app\\\\\\(dashboard\\)\\\\projects\\\\[id]\\\\components\\\\AnalysisTab.tsx\")"
+      "Bash(wc -l \"c:\\\\Users\\\\SAERON02\\\\Desktop\\\\realestate\\\\src\\\\app\\\\\\(dashboard\\)\\\\projects\\\\[id]\\\\components\\\\AnalysisTab.tsx\")",
+      "Bash(git add:*)"
     ]
   }
 }
