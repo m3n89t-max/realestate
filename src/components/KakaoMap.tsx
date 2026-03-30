@@ -315,31 +315,42 @@ export default function KakaoMap({
 
     const overlayPos = new window.kakao.maps.LatLng(lat, lng + 0.003)
 
+    // ── 전국 상권 유동인구 (소상공인 API — 카드 대체)
+    const commercialFp = commercialData?.floating_population
+    const hasCommercialFp = !!(commercialFp?.weekday > 0)
+
     // ── 데이터 없음 표기
     if (!hasJejuCard && !hasCommercialSales) {
-      // cardData가 명시적으로 조회됐으나 없는 경우 또는 commercialData가 있는데 매출 없는 경우
-      const wasQueried = cardData?.has_data === false || commercialData != null
-      if (wasQueried) {
-        const noDataOverlay = new window.kakao.maps.CustomOverlay({
+      if (hasCommercialFp) {
+        // 상권 유동인구 데이터로 대체 표시
+        const weekday: number = commercialFp.weekday ?? 0
+        const weekend: number = commercialFp.weekend ?? 0
+        const fpOverlay = new window.kakao.maps.CustomOverlay({
           map,
           position: overlayPos,
           content: `
-            <div style="background:#f9fafb;border:1.5px solid #d1d5db;border-radius:10px;padding:8px 13px;box-shadow:0 1px 6px rgba(0,0,0,0.08);min-width:160px;font-family:sans-serif;">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
-                <span style="font-size:11px;font-weight:700;color:#9ca3af;">💳 카드 사용량 현황</span>
+            <div style="background:#fff;border:2px solid #a5b4fc;border-radius:12px;padding:10px 13px;box-shadow:0 2px 12px rgba(0,0,0,0.13);min-width:175px;font-family:sans-serif;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;border-bottom:1px solid #f3f4f6;padding-bottom:5px;">
+                <span style="font-size:11px;font-weight:700;color:#4f46e5;">🚶 유동인구 현황</span>
               </div>
-              <div style="text-align:center;padding:6px 0;font-size:12px;font-weight:600;color:#6b7280;">
-                📊 카드 데이터 없음
+              <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px;">
+                <span style="color:#6b7280;">주중 유동인구</span>
+                <span style="font-weight:600;color:#1e293b;">${weekday.toLocaleString()}명</span>
               </div>
-              <div style="font-size:9px;color:#d1d5db;text-align:right;margin-top:4px;">해당 지역 데이터 미제공</div>
+              <div style="display:flex;justify-content:space-between;font-size:10px;">
+                <span style="color:#6b7280;">주말 유동인구</span>
+                <span style="font-weight:600;color:#1e293b;">${weekend.toLocaleString()}명</span>
+              </div>
+              <div style="font-size:9px;color:#9ca3af;text-align:right;margin-top:6px;">소상공인진흥공단</div>
             </div>
           `,
           yAnchor: 0.5,
           xAnchor: 0,
         })
-        noDataOverlay.setMap(map)
-        cardNoDataRef.current = noDataOverlay
+        fpOverlay.setMap(map)
+        cardNoDataRef.current = fpOverlay
       }
+      // 데이터가 없으면 overlay 표시하지 않음 (혼란 방지)
       return
     }
 
@@ -486,6 +497,12 @@ export default function KakaoMap({
               : '시군구 행정구역 기준'}
           </p>
           <div className="space-y-2">
+            {populationData.radius_500m_estimated != null && (
+              <div className="flex justify-between items-center text-[11px]">
+                <span className="text-gray-500">반경 500m 추정</span>
+                <span className="font-bold text-brand-700">{populationData.radius_500m_estimated.toLocaleString()}명</span>
+              </div>
+            )}
             <div className="flex justify-between items-center text-[11px]">
               <span className="text-gray-500">인구 밀도</span>
               <span className="font-semibold text-brand-600">{populationData.density?.toLocaleString()}명/㎢</span>

@@ -48,19 +48,26 @@ export async function POST(req: NextRequest) {
 
         const yearsToTry = ['2023', '2022', '2021', '2020'];
 
-        // Try 읍면동 level first (most granular)
-        if (emdCd && emdCd.length >= 8) {
-            for (const y of yearsToTry) {
-                try {
-                    const stats = await sgis.getPopulationStat(y, emdCd);
-                    if (stats && stats[0]) {
-                        popData = stats[0];
-                        targetYear = y;
-                        usedAdmCd = emdCd;
-                        break;
+        // SGIS rgeocode adm_cd는 10자리(리 단위)를 반환하지만
+        // population.json API는 읍면동 8자리 코드를 요구함 → 8자리로 잘라 시도
+        const emdCd8 = emdCd && emdCd.length >= 8 ? emdCd.substring(0, 8) : emdCd;
+
+        // Try 읍면동 level first (most granular) — 8자리 우선, 실패시 원본 코드도 시도
+        const emdCodesToTry = [...new Set([emdCd8, emdCd].filter(Boolean))] as string[];
+        if (emdCodesToTry.length > 0) {
+            outer: for (const cd of emdCodesToTry) {
+                for (const y of yearsToTry) {
+                    try {
+                        const stats = await sgis.getPopulationStat(y, cd);
+                        if (stats && stats[0]) {
+                            popData = stats[0];
+                            targetYear = y;
+                            usedAdmCd = cd;
+                            break outer;
+                        }
+                    } catch (e: any) {
+                        console.log(`[population] emd (${cd}) year ${y} failed:`, e.message);
                     }
-                } catch (e: any) {
-                    console.log(`[population] emd (${emdCd}) year ${y} failed:`, e.message);
                 }
             }
         } else {
@@ -115,10 +122,14 @@ export async function POST(req: NextRequest) {
         }
 
         // Calculate metrics
-        // "aged_child_idx", "avg_age", "ppltn_dnsty", "tot_family", "tot_house", "tot_ppltn", "oldage_suprt_per", "juv_suprt_per", "avg_fmember_cnt"
         const adm_level = usedAdmCd.length >= 8 ? '읍면동' : usedAdmCd.length >= 5 ? '시군구' : '시도';
+        const density = parseFloat(popData.ppltn_dnsty || '0');
+
+        // 반경 500m 추정 인구 = 인구밀도(명/㎢) × π × (0.5km)²
+        const radius_500m_estimated = density > 0 ? Math.round(density * Math.PI * 0.25) : null;
+
         const population_data = {
-            density: parseFloat(popData.ppltn_dnsty || '0'),
+            density,
             total_population: parseInt(popData.tot_ppltn || '0', 10),
             total_households: parseInt(popData.tot_family || '0', 10),
             single_households,
@@ -126,6 +137,7 @@ export async function POST(req: NextRequest) {
             avg_age: parseFloat(popData.avg_age || '0'),
             adm_nm: popData.adm_nm || admNm,
             adm_level,
+            radius_500m_estimated,
             collected_at: new Date().toISOString()
         }
 
