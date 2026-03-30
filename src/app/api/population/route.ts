@@ -125,8 +125,29 @@ export async function POST(req: NextRequest) {
         const adm_level = usedAdmCd.length >= 8 ? '읍면동' : usedAdmCd.length >= 5 ? '시군구' : '시도';
         const density = parseFloat(popData.ppltn_dnsty || '0');
 
-        // 반경 500m 추정 인구 = 인구밀도(명/㎢) × π × (0.5km)²
-        const radius_500m_estimated = density > 0 ? Math.round(density * Math.PI * 0.25) : null;
+        // 집계구 레벨 중간값 밀도로 반경 500m 추정인구 계산
+        // 읍면동 low_search=1 → 집계구 목록 → 밀도 중간값 × π × 0.5²
+        let radius_500m_estimated: number | null = null;
+        if (usedAdmCd.length >= 8) {
+            try {
+                const censusStats = await sgis.getPopulationStat(targetYear, usedAdmCd, '1');
+                if (censusStats && censusStats.length > 0) {
+                    const densities = censusStats
+                        .map((r: any) => parseFloat(r.ppltn_dnsty || '0'))
+                        .filter((d: number) => d > 0)
+                        .sort((a: number, b: number) => a - b);
+                    if (densities.length > 0) {
+                        const mid = Math.floor(densities.length / 2);
+                        const medianDensity = densities.length % 2 === 0
+                            ? (densities[mid - 1] + densities[mid]) / 2
+                            : densities[mid];
+                        radius_500m_estimated = Math.round(medianDensity * Math.PI * 0.25);
+                    }
+                }
+            } catch (e) {
+                console.log('[population] census block density fetch failed, skipping 500m estimate');
+            }
+        }
 
         const population_data = {
             density,
