@@ -667,54 +667,102 @@ function MapSection({
 
       {/* 지도 분석 가이드 */}
       <div className="grid grid-cols-3 gap-2 text-[11px]">
-        {/* 배후 인구 */}
-        <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
-          <p className="font-bold text-gray-700 mb-1.5 flex items-center gap-1">
+
+        {/* ① 배후인구 산정방식 */}
+        <div className="bg-white border border-blue-100 rounded-xl p-3 shadow-sm">
+          <p className="font-bold text-blue-700 mb-2 flex items-center gap-1">
             <span className="w-3 h-3 rounded-full border-2 border-dashed inline-block flex-shrink-0" style={{borderColor:'#ef4444'}} />
-            배후 인구 분석
+            배후인구 산정방식
           </p>
-          <p className="text-[10px] text-gray-500 leading-relaxed">
-            지도 우상단 팝업에 표시.<br/>
-            SGIS 통계청 기반 500m 반경 인구밀도·총인구·가구 수
-          </p>
-          <div className="flex gap-1.5 mt-1.5">
-            <span className="flex items-center gap-0.5 text-[9px] text-gray-500"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#ef4444'}} />고밀</span>
-            <span className="flex items-center gap-0.5 text-[9px] text-gray-500"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#f97316'}} />중밀</span>
-            <span className="flex items-center gap-0.5 text-[9px] text-gray-500"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#22c55e'}} />저밀</span>
+          {/* 공식 박스 */}
+          <div className="bg-blue-50 rounded-lg px-2.5 py-2 text-[10px] leading-relaxed text-blue-800 font-mono mb-2">
+            <div>통계청 집계구 밀도 (중간값)</div>
+            <div className="pl-2">× π × 0.5² <span className="text-blue-400">(= 0.785㎢)</span></div>
+            <div className="pl-2">× 장벽 보정계수</div>
+            <div className="border-t border-blue-200 mt-1 pt-1 font-bold">= 추정 배후인구</div>
+          </div>
+          {/* 실제 값 표시 */}
+          {population_data?.radius_500m_estimated != null && (
+            <div className="text-[10px] text-gray-600 space-y-0.5">
+              <div className="flex justify-between">
+                <span className="text-gray-400">추정 결과</span>
+                <span className="font-bold text-blue-700">약 {population_data.radius_500m_estimated.toLocaleString()}명</span>
+              </div>
+              {population_data.barrier_coefficient != null && population_data.barrier_coefficient < 100 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-400">장벽 보정</span>
+                  <span className="text-orange-600 font-medium">×{(population_data.barrier_coefficient / 100).toFixed(2)}</span>
+                </div>
+              )}
+            </div>
+          )}
+          <div className="flex gap-1.5 mt-2 pt-1.5 border-t border-gray-100">
+            <span className="flex items-center gap-0.5 text-[9px] text-gray-400"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#ef4444'}} />고밀</span>
+            <span className="flex items-center gap-0.5 text-[9px] text-gray-400"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#f97316'}} />중밀</span>
+            <span className="flex items-center gap-0.5 text-[9px] text-gray-400"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#22c55e'}} />저밀</span>
+            <span className="text-[9px] text-gray-300 ml-auto">SGIS 2022</span>
           </div>
         </div>
 
-        {/* 유동인구 */}
+        {/* ② 장벽 보정 설명 */}
+        <div className="bg-white border border-orange-100 rounded-xl p-3 shadow-sm">
+          <p className="font-bold text-orange-700 mb-2 flex items-center gap-1">
+            🚧 장벽 보정 (대로·강·철도)
+          </p>
+          <p className="text-[10px] text-gray-500 leading-relaxed mb-2">
+            반경 500m 원 안에 대로·하천이 있으면 실제 도달 가능한 면적이 줄어듭니다. 장벽까지 거리에 따라 잘려나간 원형 면적 비율만큼 배후인구를 차감합니다.
+          </p>
+          <div className="bg-orange-50 rounded-lg px-2.5 py-1.5 text-[10px] text-orange-700 mb-2">
+            <div className="font-semibold mb-0.5">차감 기준</div>
+            <div className="space-y-0.5 text-[9px]">
+              <div>• 장벽이 중심 통과 → <span className="font-bold">50% 차감</span></div>
+              <div>• 장벽이 100m 거리 → <span className="font-bold">약 23% 차감</span></div>
+              <div>• 장벽이 300m 거리 → <span className="font-bold">약 3% 차감</span></div>
+              <div>• 복수 장벽 → <span className="font-bold">곱연산 중첩 적용</span></div>
+            </div>
+          </div>
+          {/* 실제 감지된 장벽 표시 */}
+          {population_data?.barrier_names?.length > 0 ? (
+            <div className="text-[9px] bg-red-50 rounded px-2 py-1 text-red-600">
+              <span className="font-semibold">감지된 장벽: </span>
+              {population_data.barrier_names.join(', ')}
+            </div>
+          ) : population_data?.radius_500m_estimated != null ? (
+            <div className="text-[9px] bg-green-50 rounded px-2 py-1 text-green-600">
+              ✅ 주요 장벽 없음 (보정 미적용)
+            </div>
+          ) : null}
+          <p className="text-[9px] text-gray-300 mt-1.5 text-right">OpenStreetMap 기반</p>
+        </div>
+
+        {/* ③ 유동인구 + 히트맵 */}
         <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
-          <p className="font-bold text-gray-700 mb-1.5 flex items-center gap-1">
+          <p className="font-bold text-gray-700 mb-2 flex items-center gap-1">
             <span className="w-3 h-3 rounded-full border-2 inline-block flex-shrink-0" style={{borderColor:'#2563eb'}} />
             유동인구 추정
           </p>
-          <p className="text-[10px] text-gray-500 leading-relaxed">
-            💳 주중·주말 카드 사용량 기반 유동인구 추정 (전국)
-            {hasCardFp && <><br/><span className="text-indigo-500 font-medium">제주: 카드이용자 수 직접 반영</span></>}
+          <p className="text-[10px] text-gray-500 leading-relaxed mb-2">
+            💳 <span className="font-medium">카드 사용량 기반</span> 유동인구 추정 (전국 적용)<br/>
+            {hasCardFp
+              ? <span className="text-indigo-500 font-medium">제주: 카드이용자 수 직접 반영</span>
+              : <span>주중·주말 소비패턴으로 실제 유동규모 추정</span>}
           </p>
-          <div className="flex gap-1.5 mt-1.5">
-            <span className="flex items-center gap-0.5 text-[9px] text-gray-500"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#7c3aed'}} />고</span>
-            <span className="flex items-center gap-0.5 text-[9px] text-gray-500"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#2563eb'}} />중</span>
-            <span className="flex items-center gap-0.5 text-[9px] text-gray-500"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#0891b2'}} />저</span>
+          <div className="flex gap-1.5 mb-3">
+            <span className="flex items-center gap-0.5 text-[9px] text-gray-400"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#7c3aed'}} />고</span>
+            <span className="flex items-center gap-0.5 text-[9px] text-gray-400"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#2563eb'}} />중</span>
+            <span className="flex items-center gap-0.5 text-[9px] text-gray-400"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#0891b2'}} />저</span>
           </div>
-        </div>
-
-        {/* 히트맵 */}
-        <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
-          <p className="font-bold text-gray-700 mb-1.5 flex items-center gap-1">
-            🔥 유동인구 히트맵
-          </p>
-          <p className="text-[10px] text-gray-500 leading-relaxed">
-            좌하단 버튼으로 ON/OFF.<br/>
-            지하철·마트·편의점 등 POI 집객시설 밀집도 열지도
-          </p>
-          <div className="flex gap-0.5 mt-1.5 items-center">
-            <span className="w-4 h-2.5 rounded-sm inline-block" style={{background:'rgba(239,68,68,0.85)'}} />
-            <span className="w-4 h-2.5 rounded-sm inline-block" style={{background:'rgba(234,179,8,0.7)'}} />
-            <span className="w-4 h-2.5 rounded-sm inline-block" style={{background:'rgba(59,130,246,0.5)'}} />
-            <span className="text-[9px] text-gray-400 ml-1">높음 → 낮음</span>
+          <div className="border-t border-gray-100 pt-2">
+            <p className="font-semibold text-gray-600 mb-1 flex items-center gap-1">🔥 히트맵</p>
+            <p className="text-[10px] text-gray-400 leading-relaxed">
+              좌하단 버튼 ON/OFF.<br/>지하철·마트·편의점 등 집객시설 밀집도
+            </p>
+            <div className="flex gap-0.5 mt-1.5 items-center">
+              <span className="w-5 h-2 rounded-sm inline-block" style={{background:'rgba(239,68,68,0.85)'}} />
+              <span className="w-5 h-2 rounded-sm inline-block" style={{background:'rgba(234,179,8,0.7)'}} />
+              <span className="w-5 h-2 rounded-sm inline-block" style={{background:'rgba(59,130,246,0.5)'}} />
+              <span className="text-[9px] text-gray-300 ml-1">높음 → 낮음</span>
+            </div>
           </div>
         </div>
       </div>
