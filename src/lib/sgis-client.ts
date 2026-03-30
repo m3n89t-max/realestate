@@ -117,11 +117,14 @@ export class SGISClient {
         }
 
         const regionInfo = rgeoData.result[0];
-        const sido = regionInfo.sido_cd;
-        const sgg = regionInfo.sgg_cd;
-        // 읍면동 코드: adm_cd 전체(8자리) 또는 emd_cd 필드
-        const emd = regionInfo.adm_cd || regionInfo.emd_cd || '';
-        const adm_nm = regionInfo.adm_nm || '';
+        const sido = regionInfo.sido_cd;  // 2자리 시도코드 (예: "31")
+        const sgg = regionInfo.sgg_cd;   // 3자리 시군구 suffix (예: "240") → sido+sgg = 5자리
+        // 읍면동 8자리 코드: sido_cd(2) + sgg_cd(3) + emdong_cd(3)
+        // rgeocode 응답에 adm_cd 필드가 없으므로 직접 조합
+        const emd = regionInfo.emdong_cd
+            ? `${sido}${sgg}${regionInfo.emdong_cd}`
+            : (regionInfo.adm_cd || regionInfo.emd_cd || '');
+        const adm_nm = regionInfo.emdong_nm || regionInfo.adm_nm || '';
 
         if (!sido) {
             throw new Error("SGIS RGeocode did not return sido_cd");
