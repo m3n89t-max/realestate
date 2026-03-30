@@ -709,13 +709,20 @@ function MapSection({
           <p className="font-bold text-orange-700 mb-2 flex items-center gap-1">
             🚧 장벽 보정 (대로·강·철도)
           </p>
-          <p className="text-[10px] text-gray-500 leading-relaxed mb-2">
-            반경 500m 원 안에 대로·하천이 있으면 실제 도달 가능한 면적이 줄어듭니다. 장벽까지 거리에 따라 잘려나간 원형 면적 비율만큼 배후인구를 차감합니다.
-          </p>
+          {/* 장벽 개념 설명 */}
+          <div className="bg-gray-50 rounded-lg px-2.5 py-1.5 text-[10px] text-gray-600 leading-relaxed mb-2">
+            <span className="font-semibold text-gray-700">장벽이란?</span> 사람들이 걸어서 넘기 어려운 물리적 경계입니다. 왕복 4차선+ 대로, 하천·강은 장벽으로 작용해 반경 500m 안에 있어도 실제 배후인구에서 제외해야 합니다.
+            <div className="mt-1 space-y-0.5 text-[9px] text-gray-500">
+              <div>🚗 왕복 4차선+ 대로 — 신호 없이 횡단 어려움</div>
+              <div>🌊 하천·강·운하 — 교량 없으면 완전 차단</div>
+              <div>🚃 지상 철도·선로 — 건널목 외 통행 불가</div>
+              <div className="text-gray-300 pt-0.5">※ 이면도로·골목은 장벽 아님</div>
+            </div>
+          </div>
           <div className="bg-orange-50 rounded-lg px-2.5 py-1.5 text-[10px] text-orange-700 mb-2">
-            <div className="font-semibold mb-0.5">차감 기준</div>
+            <div className="font-semibold mb-0.5">차감 기준 (원형 세그먼트 공식)</div>
             <div className="space-y-0.5 text-[9px]">
-              <div>• 장벽이 중심 통과 → <span className="font-bold">50% 차감</span></div>
+              <div>• 장벽이 매물 바로 옆 → <span className="font-bold">50% 차감</span></div>
               <div>• 장벽이 100m 거리 → <span className="font-bold">약 23% 차감</span></div>
               <div>• 장벽이 300m 거리 → <span className="font-bold">약 3% 차감</span></div>
               <div>• 복수 장벽 → <span className="font-bold">곱연산 중첩 적용</span></div>
