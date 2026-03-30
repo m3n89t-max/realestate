@@ -500,7 +500,16 @@ export default function KakaoMap({
                 <span className="text-[11px] text-blue-700">추정 배후인구</span>
                 <span className="text-[13px] font-bold text-blue-800">약 {populationData.radius_500m_estimated.toLocaleString()}명</span>
               </div>
-              <p className="text-[8px] text-gray-400 mt-0.5 text-right">집계구 밀도 기반 추정치</p>
+              {populationData.barrier_names?.length > 0 && (
+                <div className="flex justify-between items-center text-[10px] mt-1">
+                  <span className="text-orange-500">장벽 보정</span>
+                  <span className="text-orange-600 font-medium">
+                    ×{(populationData.barrier_coefficient / 100).toFixed(2)}
+                    <span className="text-gray-400 ml-1">({populationData.barrier_names.join(', ')})</span>
+                  </span>
+                </div>
+              )}
+              <p className="text-[8px] text-gray-400 mt-0.5 text-right">집계구 밀도 × 장벽 보정</p>
             </div>
           )}
 

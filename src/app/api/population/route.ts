@@ -2,6 +2,91 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { SGISClient } from '@/lib/sgis-client'
 
+// ── 장벽 감지 헬퍼 ────────────────────────────────────────────────────────────
+
+/** 점(lat,lng)에서 폴리라인까지 최소 거리(미터) */
+function minDistToPolylineM(
+    lat: number, lng: number,
+    geom: { lat: number; lon: number }[]
+): number {
+    const cosLat = Math.cos(lat * Math.PI / 180)
+    const R = 6371000
+    const px = lng * R * cosLat * Math.PI / 180
+    const py = lat * R * Math.PI / 180
+    let minDist = Infinity
+    for (let i = 0; i < geom.length - 1; i++) {
+        const ax = geom[i].lon * R * cosLat * Math.PI / 180
+        const ay = geom[i].lat * R * Math.PI / 180
+        const bx = geom[i + 1].lon * R * cosLat * Math.PI / 180
+        const by = geom[i + 1].lat * R * Math.PI / 180
+        const dx = bx - ax, dy = by - ay
+        const lenSq = dx * dx + dy * dy
+        const t = lenSq === 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq))
+        const nx = ax + t * dx - px, ny = ay + t * dy - py
+        minDist = Math.min(minDist, Math.sqrt(nx * nx + ny * ny))
+    }
+    return minDist
+}
+
+/**
+ * 원(반지름 r) 중심에서 거리 d인 장벽 직선이 잘라낼 때
+ * 장벽 너머(멀리) 쪽을 제외한 가까운 쪽 면적 비율
+ * d=0 → 0.5 (정중앙 통과), d≥r → 1.0 (원 밖)
+ */
+function accessibleRatio(d: number, r: number): number {
+    if (d >= r) return 1.0
+    const x = d / r
+    return 0.5 + Math.acos(x) / Math.PI - (x * Math.sqrt(1 - x * x)) / Math.PI
+}
+
+/** Overpass API로 반경 내 대로·하천 감지 → 보정계수 반환 */
+async function detectBarriers(
+    lat: number, lng: number, radiusM: number
+): Promise<{ coeff: number; barriers: string[] }> {
+    const query = `[out:json][timeout:10];
+(
+  way["highway"~"^(motorway|trunk|primary|secondary)$"](around:${radiusM},${lat},${lng});
+  way["waterway"~"^(river|canal)$"](around:${radiusM},${lat},${lng});
+);
+out geom;`
+
+    const res = await fetch('https://overpass-api.de/api/interpreter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `data=${encodeURIComponent(query)}`,
+        signal: AbortSignal.timeout(12000),
+    })
+    const data = await res.json()
+
+    // 도로명 기준 중복 제거: 같은 이름 도로는 가장 가까운 거리만 사용
+    const roadMap = new Map<string, { dist: number; label: string }>()
+    for (const way of (data.elements || []) as any[]) {
+        if (!way.geometry || way.geometry.length < 2) continue
+        const dist = minDistToPolylineM(lat, lng, way.geometry)
+        if (dist >= radiusM) continue
+        const hw = way.tags?.highway
+        const ww = way.tags?.waterway
+        const label = way.tags?.name ||
+            (ww ? '하천' : hw === 'motorway' ? '고속화도로' : hw === 'trunk' ? '간선도로' : '대로')
+        const key = way.tags?.name || `${hw || ww}_${Math.round(dist)}`
+        if (!roadMap.has(key) || roadMap.get(key)!.dist > dist) {
+            roadMap.set(key, { dist, label })
+        }
+    }
+
+    let coeff = 1.0
+    const barriers: string[] = []
+    for (const { dist, label } of roadMap.values()) {
+        const ratio = accessibleRatio(dist, radiusM)
+        if (ratio < 0.99) {
+            coeff *= ratio
+            barriers.push(label)
+        }
+    }
+
+    return { coeff: Math.max(0.25, coeff), barriers }
+}
+
 export async function POST(req: NextRequest) {
     try {
         const supabase = await createClient()
@@ -128,6 +213,9 @@ export async function POST(req: NextRequest) {
         // 집계구 레벨 중간값 밀도로 반경 500m 추정인구 계산
         // 읍면동 low_search=1 → 집계구 목록 → 밀도 중간값 × π × 0.5²
         let radius_500m_estimated: number | null = null;
+        let barrier_coefficient = 1.0;
+        let barrier_names: string[] = [];
+
         if (usedAdmCd.length >= 8) {
             try {
                 const censusStats = await sgis.getPopulationStat(targetYear, usedAdmCd, '1');
@@ -141,7 +229,17 @@ export async function POST(req: NextRequest) {
                         const medianDensity = densities.length % 2 === 0
                             ? (densities[mid - 1] + densities[mid]) / 2
                             : densities[mid];
-                        radius_500m_estimated = Math.round(medianDensity * Math.PI * 0.25);
+
+                        // 대로·하천 장벽 감지 (Overpass API)
+                        try {
+                            const barrier = await detectBarriers(project.lat, project.lng, 500);
+                            barrier_coefficient = barrier.coeff;
+                            barrier_names = barrier.barriers;
+                        } catch (e) {
+                            console.log('[population] barrier detection failed, coeff=1.0');
+                        }
+
+                        radius_500m_estimated = Math.round(medianDensity * Math.PI * 0.25 * barrier_coefficient);
                     }
                 }
             } catch (e) {
@@ -159,6 +257,8 @@ export async function POST(req: NextRequest) {
             adm_nm: popData.adm_nm || admNm,
             adm_level,
             radius_500m_estimated,
+            barrier_coefficient: Math.round(barrier_coefficient * 100), // 0~100%
+            barrier_names,
             collected_at: new Date().toISOString()
         }
 
