@@ -228,7 +228,7 @@ export default function KakaoMap({
     const label = new window.kakao.maps.CustomOverlay({
       map,
       position: labelPos,
-      content: `<div style="background:${color};color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:99px;white-space:nowrap;opacity:0.9;">👥 ${(populationData.total_population / 10000).toFixed(1)}만명</div>`,
+      content: `<div style="background:${color};color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:99px;white-space:nowrap;opacity:0.9;">👥 ${populationData.radius_500m_estimated != null ? `약 ${populationData.radius_500m_estimated.toLocaleString()}명` : `${(populationData.total_population / 10000).toFixed(1)}만명`}</div>`,
       yAnchor: 1,
     })
     label.setMap(map)
