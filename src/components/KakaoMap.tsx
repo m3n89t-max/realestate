@@ -497,12 +497,7 @@ export default function KakaoMap({
               : '시군구 행정구역 기준'}
           </p>
           <div className="space-y-2">
-            {populationData.radius_500m_estimated != null && (
-              <div className="flex justify-between items-center text-[11px]">
-                <span className="text-gray-500">반경 500m 추정</span>
-                <span className="font-bold text-brand-700">{populationData.radius_500m_estimated.toLocaleString()}명</span>
-              </div>
-            )}
+
             <div className="flex justify-between items-center text-[11px]">
               <span className="text-gray-500">인구 밀도</span>
               <span className="font-semibold text-brand-600">{populationData.density?.toLocaleString()}명/㎢</span>
