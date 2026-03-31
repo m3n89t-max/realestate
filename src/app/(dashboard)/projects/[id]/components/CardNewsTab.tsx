@@ -103,7 +103,7 @@ function CoverCard({ card, theme, photo, filterCss, ds }: { card: CardSlide; the
     const LA = '#d4a843'
     return (
       <div className="relative aspect-square overflow-hidden shadow-2xl" style={{ borderRadius: 16, background: '#040100' }}>
-        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(0.3) sepia(0.15)' }} />}
+        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(0.45) sepia(0.1)' }} />}
         <div className="absolute inset-0" style={{ background: 'linear-gradient(to top,rgba(0,0,0,0.98) 0%,rgba(0,0,0,0.55) 55%,rgba(0,0,0,0.25) 100%)' }} />
         <div className="absolute top-0 left-0 right-0 h-[1.5px]" style={{ background: LA }} />
         <div className="absolute top-0 bottom-0 left-4 flex flex-col items-center justify-center gap-1">
@@ -229,7 +229,7 @@ function LocationCard({ card, theme, photo, filterCss, ds }: { card: CardSlide; 
     const LA = '#d4a843'
     return (
       <div className="relative aspect-square overflow-hidden shadow-2xl" style={{ borderRadius: 16, background: '#040100' }}>
-        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(0.28) sepia(0.1)' }} />}
+        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(0.45) sepia(0.05)' }} />}
         <div className="absolute inset-0" style={{ background: 'linear-gradient(to top,rgba(0,0,0,0.97) 0%,rgba(0,0,0,0.4) 100%)' }} />
         <div className="absolute top-0 left-0 right-0 px-5 py-3.5" style={{ background: 'rgba(5,2,0,0.92)', borderBottom: `1px solid ${LA}44` }}>
           <div className="flex items-center justify-between">
@@ -511,7 +511,7 @@ function InvestmentCard({ card, theme, photo, filterCss, ds }: { card: CardSlide
     const LA = '#d4a843'
     return (
       <div className="relative aspect-square overflow-hidden shadow-2xl" style={{ borderRadius: 16, background: '#040100' }}>
-        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(0.25) sepia(0.1)' }} />}
+        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(0.45) sepia(0.05)' }} />}
         <div className="absolute inset-0" style={{ background: 'linear-gradient(to top,rgba(0,0,0,0.98) 0%,rgba(0,0,0,0.45) 100%)' }} />
         <div className="absolute top-0 left-0 right-0 px-5 py-3.5" style={{ background: 'rgba(5,2,0,0.9)', borderBottom: `1px solid ${LA}44` }}>
           <div className="flex items-center justify-between">
@@ -645,7 +645,7 @@ function InteriorCard({ card, theme, photo, filterCss, ds }: { card: CardSlide; 
     const LA = '#d4a843'
     return (
       <div className="relative aspect-square overflow-hidden shadow-2xl" style={{ borderRadius: 16, background: '#040100' }}>
-        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(0.3)' }} />}
+        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(0.45)' }} />}
         <div className="absolute inset-0" style={{ background: 'linear-gradient(to top,rgba(0,0,0,0.97) 0%,rgba(0,0,0,0.15) 100%)' }} />
         <div className="absolute top-0 left-0 right-0 h-[1.5px]" style={{ background: LA }} />
         <div className="absolute top-4 left-5 flex items-center gap-2">
@@ -764,7 +764,7 @@ function CtaCard({ card, theme, photo, filterCss, ds }: { card: CardSlide; theme
     const LA = '#d4a843'
     return (
       <div className="relative aspect-square overflow-hidden shadow-2xl" style={{ borderRadius: 16, background: '#040100' }}>
-        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(0.2) sepia(0.15)' }} />}
+        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(0.4) sepia(0.1)' }} />}
         <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom,rgba(0,0,0,0.6) 0%,rgba(0,0,0,0.98) 100%)' }} />
         <div className="absolute top-0 left-0 right-0 h-[1.5px]" style={{ background: LA }} />
         <div className="absolute top-3 right-4 text-[9px] tracking-widest font-medium" style={{ color: `${LA}60` }}>06 / 06</div>
@@ -854,7 +854,7 @@ function CtaCard({ card, theme, photo, filterCss, ds }: { card: CardSlide; theme
     <div className="relative aspect-square rounded-[32px] overflow-hidden shadow-2xl">
       {photo ? <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={filterCss ? { filter: filterCss } : undefined} />
         : <div className="absolute inset-0" style={{ background: `linear-gradient(135deg,${theme.dark},${theme.accent})` }} />}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/95 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/95" />
       <div className="absolute top-0 left-0 right-0 h-1.5" style={{ background: theme.accent }} />
       <div className="absolute top-3 right-3 text-white/50 text-[10px]">6 / 6</div>
       <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-white">
@@ -1047,6 +1047,7 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
   const [aiPhotos, setAiPhotos] = useState<Record<number, string>>({})
   const [aiLoading, setAiLoading] = useState<Record<number, boolean>>({})
   const [activeSlide, setActiveSlide] = useState(0)
+  const [cardPhotos, setCardPhotos] = useState<Record<number, string>>({})
   const [copied, setCopied] = useState(false)
   const [editedCards, setEditedCards] = useState<Record<number, Partial<CardSlide>>>({})
   const [customInstructions, setCustomInstructions] = useState('')
@@ -1395,23 +1396,45 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
         <div className="grid grid-cols-1 xl:grid-cols-[260px_1fr] gap-5">
           {/* ── 좌측 패널 ── */}
           <div className="space-y-4">
-            {/* 매물 사진 */}
+            {/* 매물 사진 + 카드별 설정 */}
             {assets.length > 0 && (
               <div className="card p-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
                   <ImageIcon size={14} />
                   매물 사진 ({assets.length}장)
                 </h3>
-                <div className="grid grid-cols-3 gap-1">
+                <div className="grid grid-cols-3 gap-1 mb-3">
                   {assets.slice(0, 6).map((a: any, i) => (
                     <img key={i} src={a.file_url} alt="" className="aspect-square rounded-lg object-cover" />
                   ))}
                 </div>
-                {platform === 'instagram' && (
-                  <p className="text-[11px] text-gray-400 mt-2 leading-snug">
-                    카드별 자동 배치됨<br />
-                    <span className="text-purple-500">✦ 카드 위에 마우스 올려 AI 배경 생성</span>
-                  </p>
+                {platform === 'instagram' && slides.length > 0 && (
+                  <>
+                    <p className="text-[11px] font-semibold text-gray-600 mb-2">카드별 사진 설정</p>
+                    <div className="space-y-2">
+                      {slides.map((card, i) => (
+                        <div key={card.order} className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold text-gray-400 w-7 flex-shrink-0 text-center">{SLIDE_LABELS[i] ?? `${i+1}`}</span>
+                          <div className="flex gap-1 overflow-x-auto flex-1">
+                            {assets.map((a: any) => (
+                              <button
+                                key={a.id ?? a.file_url}
+                                onClick={() => setCardPhotos(prev => ({ ...prev, [card.order]: a.file_url }))}
+                                className={cn(
+                                  'w-8 h-8 rounded-md flex-shrink-0 overflow-hidden border-2 transition-all',
+                                  (cardPhotos[card.order] ?? assignPhoto(card.order, assets)) === a.file_url
+                                    ? 'border-brand-500 scale-110' : 'border-transparent hover:border-gray-300'
+                                )}
+                              >
+                                <img src={a.file_url} alt="" className="w-full h-full object-cover" />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-purple-500 mt-2">✦ 카드 위에 마우스 올려 AI 배경 생성</p>
+                  </>
                 )}
               </div>
             )}
@@ -1496,7 +1519,7 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
                   <CardPreview
                     card={mergeCard(slides[activeSlide])}
                     theme={theme}
-                    photo={assignPhoto(slides[activeSlide].order, assets)}
+                    photo={cardPhotos[slides[activeSlide].order] ?? assignPhoto(slides[activeSlide].order, assets)}
                     aiPhoto={aiPhotos[slides[activeSlide].order]}
                     platform={platform}
                     onGenerateAI={platform === 'instagram' ? () => handleGenerateAI(slides[activeSlide]) : undefined}
@@ -1612,7 +1635,7 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
                     <CardPreview
                       card={mergeCard(card)}
                       theme={theme}
-                      photo={assignPhoto(card.order, assets)}
+                      photo={cardPhotos[card.order] ?? assignPhoto(card.order, assets)}
                       aiPhoto={aiPhotos[card.order]}
                       filterCss={filterCss}
                       platform={platform}
