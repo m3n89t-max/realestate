@@ -200,7 +200,7 @@ function CoverCard({ card, theme, photo, filterCss, ds }: { card: CardSlide; the
     <div className="relative aspect-square rounded-[32px] overflow-hidden shadow-2xl">
       {photo ? <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={filterCss ? { filter: filterCss } : undefined} />
         : <div className="absolute inset-0" style={{ background: `linear-gradient(135deg,${theme.dark},${theme.accent})` }} />}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/10 backdrop-blur-[2px]" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/88 via-black/20 to-transparent" />
       <div className="absolute top-0 left-0 right-0 h-1.5" style={{ background: theme.accent }} />
       <div className="absolute top-4 left-4 px-2.5 py-1 rounded-full text-[10px] font-bold" style={{ background: `${theme.accent}cc`, color: '#fff' }}>1 / 6</div>
       <div className="absolute inset-x-0 bottom-0 p-5 text-white">
@@ -244,7 +244,7 @@ function LocationCard({ card, theme, photo, filterCss, ds }: { card: CardSlide; 
         <div className="absolute inset-x-0 bottom-0 p-5">
           {card.checkpoints && card.checkpoints.length > 0 && (
             <div className="space-y-3">
-              {card.checkpoints.map((pt, i) => (
+              {card.checkpoints.slice(0, 4).map((pt, i) => (
                 <div key={i} className="flex items-start gap-3">
                   <div className="w-5 h-5 rounded-sm flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: `${LA}22`, border: `1px solid ${LA}55` }}>
                     <span className="text-[9px] font-bold" style={{ color: LA }}>{i + 1}</span>
@@ -308,7 +308,7 @@ function LocationCard({ card, theme, photo, filterCss, ds }: { card: CardSlide; 
         <div className="absolute inset-x-0 bottom-0 p-4 text-white">
           {card.checkpoints && card.checkpoints.length > 0 && (
             <div className="space-y-2">
-              {card.checkpoints.map((pt, i) => (
+              {card.checkpoints.slice(0, 4).map((pt, i) => (
                 <div key={i} className="flex items-start gap-2.5">
                   <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 bg-white/20 backdrop-blur-sm">
                     <span className="text-white text-[9px] font-black">✓</span>
@@ -327,8 +327,8 @@ function LocationCard({ card, theme, photo, filterCss, ds }: { card: CardSlide; 
     <div className="relative aspect-square rounded-[32px] overflow-hidden shadow-2xl">
       {photo ? <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={filterCss ? { filter: filterCss } : undefined} />
         : <div className="absolute inset-0" style={{ background: `linear-gradient(135deg,${theme.dark},${theme.accent})` }} />}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/30 to-black/80 backdrop-blur-[2px]" />
-      <div className="absolute top-0 left-0 right-0 p-5" style={{ background: `${theme.accent}dd`, backdropFilter: 'blur(8px)' }}>
+      <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/30 to-black/80" />
+      <div className="absolute top-0 left-0 right-0 p-5" style={{ background: `${theme.accent}dd` }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-white">
             <MapPin size={16} /><span className="font-display font-medium text-[15px]">{card.title}</span>
@@ -340,7 +340,7 @@ function LocationCard({ card, theme, photo, filterCss, ds }: { card: CardSlide; 
       <div className="absolute inset-x-0 bottom-0 p-4 text-white">
         {card.checkpoints && card.checkpoints.length > 0 && (
           <div className="space-y-2.5">
-            {card.checkpoints.map((pt, i) => (
+            {card.checkpoints.slice(0, 4).map((pt, i) => (
               <div key={i} className="flex items-start gap-2.5">
                 <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 shadow" style={{ background: theme.accent }}>
                   <span className="text-white text-[9px] font-black">✓</span>
@@ -356,7 +356,7 @@ function LocationCard({ card, theme, photo, filterCss, ds }: { card: CardSlide; 
   )
 }
 
-function CompositionCard({ card, theme, photo, ds }: { card: CardSlide; theme: Theme; photo?: string; ds: DesignStyle }) {
+function CompositionCard({ card, theme, photo, filterCss, ds }: { card: CardSlide; theme: Theme; photo?: string; filterCss?: string; ds: DesignStyle }) {
   const specs = card.spec_grid ?? []
   if (ds === 'luxury') {
     const LA = '#d4a843'
@@ -469,10 +469,11 @@ function CompositionCard({ card, theme, photo, ds }: { card: CardSlide; theme: T
   }
   // modern
   return (
-    <div className="relative aspect-square rounded-[32px] overflow-hidden shadow-2xl" style={{ background: theme.light }}>
-      {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover opacity-[0.08]" />}
-      <div className="absolute inset-0" style={{ background: `linear-gradient(160deg,${theme.accent}18 0%,transparent 50%)` }} />
-      <div className="absolute top-0 left-0 right-0 p-4 z-10" style={{ background: theme.accent }}>
+    <div className="relative aspect-square rounded-[32px] overflow-hidden shadow-2xl">
+      {photo ? <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={filterCss ? { filter: filterCss } : undefined} />
+        : <div className="absolute inset-0" style={{ background: `linear-gradient(135deg,${theme.dark},${theme.accent})` }} />}
+      <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.68)' }} />
+      <div className="absolute top-0 left-0 right-0 p-4 z-10" style={{ background: `${theme.accent}ee` }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-white">
             <Building2 size={15} /><span className="font-display font-medium text-[15px]">{card.title}</span>
@@ -484,18 +485,18 @@ function CompositionCard({ card, theme, photo, ds }: { card: CardSlide; theme: T
         {specs.length > 0 ? (
           <div className={`grid gap-2 h-full ${specs.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
             {specs.slice(0, 6).map((spec, i) => (
-              <div key={i} className="rounded-xl p-2.5 flex flex-col justify-center shadow-sm" style={{ background: i % 2 === 0 ? `${theme.accent}22` : `${theme.mid}14` }}>
+              <div key={i} className="rounded-xl p-2.5 flex flex-col justify-center shadow-sm" style={{ background: 'rgba(255,255,255,0.12)', border: `1px solid ${theme.accent}55` }}>
                 <p className="text-[10px] font-black mb-1 uppercase tracking-wide" style={{ color: theme.accent }}>{spec.label}</p>
-                <p className="text-[12px] font-bold leading-snug whitespace-pre-line" style={{ color: theme.dark }}>{spec.value}</p>
+                <p className="text-[12px] font-bold leading-snug whitespace-pre-line text-white">{spec.value}</p>
               </div>
             ))}
           </div>
         ) : card.points && card.points.length > 0 ? (
           <div className="mt-1 space-y-2">
             {card.points.slice(0, 5).map((pt, i) => (
-              <div key={i} className="flex items-start gap-2 p-2.5 rounded-xl" style={{ background: `${theme.accent}18` }}>
+              <div key={i} className="flex items-start gap-2 p-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.12)', border: `1px solid ${theme.accent}44` }}>
                 <span style={{ color: theme.accent }} className="flex-shrink-0 font-black text-[13px]">●</span>
-                <span className="text-[11px] leading-snug" style={{ color: theme.dark }}>{pt}</span>
+                <span className="text-[11px] leading-snug text-white/90">{pt}</span>
               </div>
             ))}
           </div>
@@ -609,8 +610,8 @@ function InvestmentCard({ card, theme, photo, filterCss, ds }: { card: CardSlide
     <div className="relative aspect-square rounded-[32px] overflow-hidden shadow-2xl">
       {photo ? <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={filterCss ? { filter: filterCss } : undefined} />
         : <div className="absolute inset-0" style={{ background: `linear-gradient(135deg,${theme.dark},${theme.mid})` }} />}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/92 via-black/30 to-black/60 backdrop-blur-[2px]" />
-      <div className="absolute top-0 left-0 right-0 p-4" style={{ background: `${theme.dark}dd`, backdropFilter: 'blur(8px)' }}>
+      <div className="absolute inset-0 bg-gradient-to-t from-black/92 via-black/30 to-black/60" />
+      <div className="absolute top-0 left-0 right-0 p-4" style={{ background: `${theme.dark}dd` }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-white">
             <TrendingUp size={15} style={{ color: theme.accent }} />
