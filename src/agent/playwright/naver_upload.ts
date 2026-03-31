@@ -215,41 +215,50 @@ export async function uploadNaverBlog(
             await page.waitForTimeout(2000);
         };
 
-        // HTML 표 등 구조화된 콘텐츠를 복사-붙여넣기 형태로 삽입하는 헬퍼
-        const insertHtmlAtCursor = async (htmlStr: string) => {
-            await page.bringToFront();
-            
-            // 1. 실제 OS 클립보드에 HTML 데이터 쓰기
-            const useClipboard = await page.evaluate(async (html) => {
-                try {
-                    const blobHtml = new Blob([html], { type: 'text/html' });
-                    const blobText = new Blob(['[매물개요 표]'], { type: 'text/plain' });
-                    const ClipboardItemConstructor = (window as any).ClipboardItem;
-                    const item = new ClipboardItemConstructor({
-                        'text/html': blobHtml,
-                        'text/plain': blobText
-                    });
-                    await navigator.clipboard.write([item]);
-                    return true;
-                } catch (err) {
-                    console.warn('Clipboard write failed, attempting fallback...', err);
-                    // Fallback to execCommand if clipboard API fails due to focus
-                    const activeEl = document.activeElement as HTMLElement;
-                    if (activeEl && activeEl.isContentEditable) {
-                        document.execCommand('insertHTML', false, html);
-                    }
-                    return false;
-                }
-            }, htmlStr);
-            
-            await page.waitForTimeout(300);
-            
-            if (useClipboard) {
-                // 2. Ctrl+V (붙여넣기) 단축키 전송 (실제 유저 액션 시뮬레이션)
-                await page.keyboard.press('Control+V');
-                await page.waitForTimeout(1500); // 에디터 렌더링 대기
-            } else {
-                await page.waitForTimeout(500);
+        // HTML 표 등 구조화된 콘텐츠를 이미지로 렌더링하고 사진으로 삽입하는 헬퍼
+        // 네이버 에디터의 강력한 HTML 필터링을 완벽히 우회하여 예쁜 서식을 유지합니다.
+        const insertHtmlAsImage = async (htmlStr: string, idx: number) => {
+            const renderPage = await context.newPage();
+            try {
+                const fullHtml = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <style>
+                        body { 
+                            font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+                            background: white; 
+                            margin: 0; 
+                            padding: 20px; 
+                        }
+                        #table-container {
+                            display: inline-block;
+                            background: white;
+                            min-width: 600px;
+                            max-width: 800px;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div id="table-container">
+                        ${htmlStr}
+                    </div>
+                </body>
+                </html>
+                `;
+                await renderPage.setContent(fullHtml, { waitUntil: 'load' });
+                
+                const tableEl = renderPage.locator('#table-container');
+                const imgPath = join(tmpdir(), `naver_table_${Date.now()}_${idx}.png`);
+                await tableEl.screenshot({ path: imgPath, type: 'png', omitBackground: true });
+                
+                await page.bringToFront();
+                await insertImageAtCursor(imgPath);
+            } catch (err) {
+                console.error('[NaverUpload] 표 이미지 변환 실패:', err);
+            } finally {
+                await renderPage.close();
             }
         };
 
@@ -283,7 +292,7 @@ export async function uploadNaverBlog(
 
             for (let pIdx = 0; pIdx < parts.length; pIdx++) {
                 if (pIdx % 2 === 1) {
-                    await insertHtmlAtCursor(parts[pIdx]);
+                    await insertHtmlAsImage(parts[pIdx], pIdx);
                     await page.keyboard.press('Enter');
                     continue;
                 }
@@ -316,7 +325,7 @@ export async function uploadNaverBlog(
 
             for (let pIdx = 0; pIdx < parts.length; pIdx++) {
                 if (pIdx % 2 === 1) {
-                    await insertHtmlAtCursor(parts[pIdx]);
+                    await insertHtmlAsImage(parts[pIdx], pIdx);
                     await page.keyboard.press('Enter');
                     continue;
                 }
