@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { toPng } from 'html-to-image'
 import {
   Wand2, Download, Image as ImageIcon, Sparkles, Loader2,
@@ -11,6 +11,8 @@ import { createClient } from '@/lib/supabase/client'
 import type { GeneratedContent } from '@/lib/types'
 import toast from 'react-hot-toast'
 import { cn } from '@/lib/utils'
+import { TemplateGallery, BUILTIN_TEMPLATES } from './TemplateGallery'
+import type { CanvaTemplateSet } from './TemplateGallery'
 
 interface CardNewsTabProps {
   projectId: string
@@ -1055,7 +1057,20 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
   const [canvaLoading, setCanvaLoading] = useState(false)
   const [canvaResult, setCanvaResult] = useState<{ design_id: string; edit_url: string; png_url?: string } | null>(null)
   const [designStyle, setDesignStyle] = useState<DesignStyle>('modern')
+  const [selectedTemplateId, setSelectedTemplateId] = useState('modern-emerald')
+  const [showGallery, setShowGallery] = useState(false)
+  const [canvaTemplates, setCanvaTemplates] = useState<CanvaTemplateSet[]>([])
+  const [canvaTemplatesLoading, setCanvaTemplatesLoading] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    setCanvaTemplatesLoading(true)
+    fetch('/api/canva/templates')
+      .then(r => r.json())
+      .then(d => setCanvaTemplates(d.templates ?? []))
+      .catch(() => {})
+      .finally(() => setCanvaTemplatesLoading(false))
+  }, [])
 
   const selected = contents.find(c => c.id === selectedId)
   const rawContent = selected?.content ? JSON.parse(selected.content) : null
@@ -1235,45 +1250,6 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
 
   return (
     <div className="space-y-5">
-      {/* ── 디자인 스타일 선택 ── */}
-      {platform === 'instagram' && (
-        <div className="card p-4">
-          <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-3">디자인 스타일</p>
-          <div className="grid grid-cols-4 gap-2.5">
-            {DESIGN_STYLE_LIST.map(s => (
-              <button
-                key={s.id}
-                onClick={() => setDesignStyle(s.id)}
-                className={cn(
-                  'relative rounded-xl overflow-hidden border-2 transition-all text-left',
-                  designStyle === s.id ? 'border-brand-500 shadow-md scale-[1.02]' : 'border-transparent hover:border-gray-200'
-                )}
-              >
-                {/* 미리보기 */}
-                <div className="h-14 relative" style={{ background: s.gradient }}>
-                  <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-0.5 p-1 opacity-60">
-                    {s.preview.map((c, i) => (
-                      <div key={i} className="rounded-sm" style={{ background: c }} />
-                    ))}
-                  </div>
-                  {designStyle === s.id && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-lg">
-                        <Check size={11} className="text-brand-600" />
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <div className="px-2 py-1.5 bg-white">
-                  <p className="text-[11px] font-bold text-gray-800 truncate">{s.label}</p>
-                  <p className="text-[9px] text-gray-400 truncate">{s.desc}</p>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* ── 상단 컨트롤 바 ── */}
       <div className="card p-4">
         <div className="flex flex-wrap items-center gap-3">
@@ -1310,21 +1286,6 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
                 >
                   {f.label}
                 </button>
-              ))}
-            </div>
-          )}
-
-          {/* 색상 테마 (인스타만) */}
-          {platform === 'instagram' && (
-            <div className="flex gap-1.5">
-              {COLOR_THEMES.map(t => (
-                <button
-                  key={t.id}
-                  onClick={() => setColorTheme(t.id)}
-                  title={t.label}
-                  className={cn('w-6 h-6 rounded-full border-2 transition-all', colorTheme === t.id ? 'border-gray-800 scale-125' : 'border-transparent')}
-                  style={{ background: `linear-gradient(135deg, ${t.dark}, ${t.accent})` }}
-                />
               ))}
             </div>
           )}
@@ -1396,6 +1357,47 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
         <div className="grid grid-cols-1 xl:grid-cols-[260px_1fr] gap-5">
           {/* ── 좌측 패널 ── */}
           <div className="space-y-4">
+            {/* 현재 템플릿 표시 + 변경 버튼 (인스타만) */}
+            {platform === 'instagram' && (() => {
+              const cur = BUILTIN_TEMPLATES.find(t => t.id === selectedTemplateId)
+              const isCanva = selectedTemplateId.startsWith('canva-')
+              const curCanva = isCanva ? canvaTemplates.find(t => `canva-${t.id}` === selectedTemplateId) : null
+              return (
+                <div className="card p-3">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">디자인 템플릿</p>
+                  <div className="flex items-center gap-2.5">
+                    {/* Thumbnail */}
+                    <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 shadow-sm relative">
+                      {assets[0]?.file_url && (
+                        <img src={assets[0].file_url} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                      )}
+                      <div
+                        className="absolute inset-0"
+                        style={{
+                          background: isCanva
+                            ? (curCanva?.gradient ?? 'linear-gradient(135deg,#8B5CF6,#4F46E5)')
+                            : (assets[0]?.file_url ? (cur?.overlay ?? '') : (cur?.gradient ?? ''))
+                        }}
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-800 text-[12px] truncate">
+                        {isCanva ? (curCanva?.name ?? 'Canva') : (cur?.label ?? '미선택')}
+                      </p>
+                      <p className="text-[10px] text-gray-400 truncate">
+                        {isCanva ? 'Canva 템플릿' : (cur?.desc ?? '')}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowGallery(true)}
+                      className="flex-shrink-0 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border border-brand-200 text-brand-600 hover:bg-brand-50 transition-colors"
+                    >
+                      변경
+                    </button>
+                  </div>
+                </div>
+              )
+            })()}
             {/* 매물 사진 + 카드별 설정 */}
             {assets.length > 0 && (
               <div className="card p-4">
@@ -1694,6 +1696,25 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
             </div>
           </div>
         </div>
+      )}
+      {/* ── 템플릿 갤러리 모달 ── */}
+      {showGallery && (
+        <TemplateGallery
+          open={showGallery}
+          onClose={() => setShowGallery(false)}
+          currentId={selectedTemplateId}
+          firstPhotoUrl={assets[0]?.file_url}
+          canvaTemplates={canvaTemplates}
+          canvaLoading={canvaTemplatesLoading}
+          onSelectBuiltin={(ds, colorId, templateId) => {
+            setDesignStyle(ds)
+            setColorTheme(colorId)
+            setSelectedTemplateId(templateId)
+          }}
+          onSelectCanva={(tmpl) => {
+            setSelectedTemplateId(`canva-${tmpl.id}`)
+          }}
+        />
       )}
     </div>
   )
