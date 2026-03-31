@@ -70,7 +70,7 @@ const KAKAO_LIGHT = '#FFFDE7'
 const SLIDE_LABELS = ['커버', '입지', '구성', '투자', '내부', 'CTA']
 const KAKAO_ICONS: Record<number, string> = { 1: '🏠', 2: '📍', 3: '🏢', 4: '📈', 5: '👥', 6: '📞' }
 
-type DesignStyle = 'modern' | 'luxury' | 'minimal' | 'vivid'
+type DesignStyle = 'modern' | 'luxury' | 'minimal' | 'vivid' | 'photo' | 'split'
 const DESIGN_STYLE_LIST = [
   { id: 'modern'  as DesignStyle, label: '모던 다크',   desc: '강렬하고 세련된',    gradient: 'linear-gradient(135deg,#1e1b4b,#4338ca)', preview: ['#1e1b4b','#4338ca','#6366f1','#818cf8'] },
   { id: 'luxury'  as DesignStyle, label: '럭셔리 골드', desc: '고급스럽고 프리미엄', gradient: 'linear-gradient(135deg,#0a0500,#2a1a00)', preview: ['#0a0500','#2a1a00','#d4a843','#f5e6c8'] },
@@ -105,7 +105,7 @@ function CoverCard({ card, theme, photo, filterCss, ds }: { card: CardSlide; the
     const LA = '#d4a843'
     return (
       <div className="relative aspect-square overflow-hidden shadow-2xl" style={{ borderRadius: 16, background: '#040100' }}>
-        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(0.45) sepia(0.1)' }} />}
+        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(0.62) sepia(0.1)' }} />}
         <div className="absolute inset-0" style={{ background: 'linear-gradient(to top,rgba(0,0,0,0.98) 0%,rgba(0,0,0,0.55) 55%,rgba(0,0,0,0.25) 100%)' }} />
         <div className="absolute top-0 left-0 right-0 h-[1.5px]" style={{ background: LA }} />
         <div className="absolute top-0 bottom-0 left-4 flex flex-col items-center justify-center gap-1">
@@ -197,6 +197,63 @@ function CoverCard({ card, theme, photo, filterCss, ds }: { card: CardSlide; the
       </div>
     )
   }
+  if (ds === 'photo') {
+    return (
+      <div className="relative aspect-square rounded-[28px] overflow-hidden shadow-2xl">
+        {photo ? (
+          <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover"
+            style={filterCss ? { filter: filterCss } : undefined} />
+        ) : (
+          <div className="absolute inset-0" style={{ background: `linear-gradient(160deg,${theme.dark},${theme.accent})` }} />
+        )}
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(to top,rgba(0,0,0,0.58) 0%,rgba(0,0,0,0.08) 42%,transparent 65%)' }} />
+        <div className="absolute top-3.5 left-3.5">
+          <div className="px-2.5 py-1 rounded-full text-[10px] font-bold text-white" style={{ background: `${theme.accent}dd` }}>1 / 6</div>
+        </div>
+        <div className="absolute inset-x-3 bottom-3 rounded-2xl px-4 py-3.5" style={{ background: 'rgba(0,0,0,0.32)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.14)' }}>
+          <h2 className="font-display font-bold text-[22px] leading-tight whitespace-pre-line text-white mb-2">{card.title}</h2>
+          {card.subtitle && <p className="text-[11px] text-white/70 mb-1.5">{card.subtitle}</p>}
+          {card.price_badge && (
+            <div className="inline-block text-[12px] font-black px-3 py-1 rounded-full text-white" style={{ background: theme.accent }}>{card.price_badge}</div>
+          )}
+        </div>
+      </div>
+    )
+  }
+  if (ds === 'split') {
+    return (
+      <div className="relative aspect-square overflow-hidden shadow-xl" style={{ borderRadius: 24, background: '#fff' }}>
+        <div className="absolute top-0 left-0 right-0 h-[58%] overflow-hidden">
+          {photo ? (
+            <img src={photo} alt="" className="w-full h-full object-cover"
+              style={filterCss ? { filter: filterCss } : undefined} />
+          ) : (
+            <div className="w-full h-full" style={{ background: `linear-gradient(135deg,${theme.accent},${theme.dark})` }} />
+          )}
+        </div>
+        <div className="absolute left-0 right-0 h-1" style={{ top: 'calc(58% - 1px)', background: theme.accent }} />
+        <div className="absolute bottom-0 left-0 right-0 bg-white px-5 pt-3 pb-4" style={{ top: '58%' }}>
+          <div className="flex items-center justify-between mb-1.5">
+            {card.price_badge && (
+              <div className="inline-block text-[11px] font-black px-2.5 py-0.5 rounded-md" style={{ background: `${theme.accent}18`, color: theme.accent }}>{card.price_badge}</div>
+            )}
+            <span className="text-[10px] text-gray-300 ml-auto">1 / 6</span>
+          </div>
+          <h2 className="font-display font-bold text-[20px] leading-tight whitespace-pre-line text-gray-900 mb-1">{card.title}</h2>
+          {card.subtitle && <p className="text-[11px] text-gray-500 mb-1">{card.subtitle}</p>}
+          {card.checkpoints && card.checkpoints.length > 0 && (
+            <div className="space-y-0.5 mt-1">
+              {card.checkpoints.slice(0, 2).map((pt, i) => (
+                <div key={i} className="flex items-center gap-1.5 text-[10px] text-gray-600">
+                  <span className="font-bold flex-shrink-0" style={{ color: theme.accent }}>✓</span>{pt}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
   // modern (default)
   return (
     <div className="relative aspect-square rounded-[32px] overflow-hidden shadow-2xl">
@@ -231,7 +288,7 @@ function LocationCard({ card, theme, photo, filterCss, ds }: { card: CardSlide; 
     const LA = '#d4a843'
     return (
       <div className="relative aspect-square overflow-hidden shadow-2xl" style={{ borderRadius: 16, background: '#040100' }}>
-        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(0.45) sepia(0.05)' }} />}
+        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(0.62) sepia(0.05)' }} />}
         <div className="absolute inset-0" style={{ background: 'linear-gradient(to top,rgba(0,0,0,0.97) 0%,rgba(0,0,0,0.4) 100%)' }} />
         <div className="absolute top-0 left-0 right-0 px-5 py-3.5" style={{ background: 'rgba(5,2,0,0.92)', borderBottom: `1px solid ${LA}44` }}>
           <div className="flex items-center justify-between">
@@ -316,6 +373,71 @@ function LocationCard({ card, theme, photo, filterCss, ds }: { card: CardSlide; 
                     <span className="text-white text-[9px] font-black">✓</span>
                   </div>
                   <span className="text-[12px] leading-snug opacity-95">{pt}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+  if (ds === 'photo') {
+    return (
+      <div className="relative aspect-square rounded-[28px] overflow-hidden shadow-2xl">
+        {photo ? (
+          <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover"
+            style={filterCss ? { filter: filterCss } : undefined} />
+        ) : (
+          <div className="absolute inset-0" style={{ background: `linear-gradient(160deg,${theme.dark},${theme.accent})` }} />
+        )}
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(to top,rgba(0,0,0,0.65) 0%,rgba(0,0,0,0.1) 45%,transparent 68%)' }} />
+        <div className="absolute top-3.5 left-3.5 right-3.5 flex items-center justify-between">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.15)' }}>
+            <MapPin size={11} style={{ color: theme.accent }} />
+            <span className="text-[11px] font-bold text-white">{card.title}</span>
+          </div>
+          <span className="text-white/60 text-[10px]">2 / 6</span>
+        </div>
+        <div className="absolute inset-x-3 bottom-3 rounded-2xl px-3.5 py-3" style={{ background: 'rgba(0,0,0,0.32)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.12)' }}>
+          {card.checkpoints && card.checkpoints.length > 0 && (
+            <div className="space-y-1.5">
+              {card.checkpoints.slice(0, 4).map((pt, i) => (
+                <div key={i} className="flex items-center gap-2 text-[11px] text-white">
+                  <span className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 text-[8px] font-black" style={{ background: theme.accent }}>{i+1}</span>
+                  <span className="leading-snug opacity-90">{pt}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+  if (ds === 'split') {
+    return (
+      <div className="relative aspect-square overflow-hidden shadow-xl" style={{ borderRadius: 24, background: '#fff' }}>
+        <div className="absolute top-0 left-0 right-0 h-[50%] overflow-hidden">
+          {photo ? (
+            <img src={photo} alt="" className="w-full h-full object-cover"
+              style={filterCss ? { filter: filterCss } : undefined} />
+          ) : (
+            <div className="w-full h-full" style={{ background: `linear-gradient(135deg,${theme.accent},${theme.dark})` }} />
+          )}
+        </div>
+        <div className="absolute left-0 right-0 h-1" style={{ top: 'calc(50% - 1px)', background: theme.accent }} />
+        <div className="absolute bottom-0 left-0 right-0 bg-white px-4 pt-3 pb-4" style={{ top: '50%' }}>
+          <div className="flex items-center gap-1.5 mb-2">
+            <MapPin size={13} style={{ color: theme.accent }} />
+            <span className="font-bold text-[14px] text-gray-900">{card.title}</span>
+            <span className="text-[10px] text-gray-300 ml-auto">2 / 6</span>
+          </div>
+          {card.address && <p className="text-[10px] text-gray-400 mb-2">{card.address}</p>}
+          {card.checkpoints && card.checkpoints.length > 0 && (
+            <div className="space-y-1.5">
+              {card.checkpoints.slice(0, 3).map((pt, i) => (
+                <div key={i} className="flex items-start gap-2 px-2.5 py-1.5 rounded-lg" style={{ background: `${theme.accent}0d` }}>
+                  <span className="font-bold text-[11px] flex-shrink-0" style={{ color: theme.accent }}>✓</span>
+                  <span className="text-[11px] leading-snug text-gray-700">{pt}</span>
                 </div>
               ))}
             </div>
@@ -469,6 +591,79 @@ function CompositionCard({ card, theme, photo, filterCss, ds }: { card: CardSlid
       </div>
     )
   }
+  if (ds === 'photo') {
+    return (
+      <div className="relative aspect-square rounded-[28px] overflow-hidden shadow-2xl">
+        {photo ? (
+          <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover opacity-20" />
+        ) : null}
+        <div className="absolute inset-0" style={{ background: `linear-gradient(160deg,${theme.dark}f0,${theme.accent}88)` }} />
+        <div className="absolute top-0 left-0 right-0 px-5 py-3.5 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-white">
+            <Building2 size={14} style={{ color: theme.accent }} />
+            <span className="font-bold text-[14px]">{card.title}</span>
+          </div>
+          <span className="text-white/50 text-[10px]">3 / 6</span>
+        </div>
+        <div className="absolute top-[50px] inset-x-3 bottom-3">
+          {specs.length > 0 ? (
+            <div className={`grid gap-2 h-full ${specs.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+              {specs.slice(0, 6).map((spec, i) => (
+                <div key={i} className="rounded-xl p-2.5 flex flex-col justify-center" style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.18)' }}>
+                  <p className="text-[9px] font-bold mb-1 uppercase tracking-wide" style={{ color: theme.accent }}>{spec.label}</p>
+                  <p className="text-[12px] font-bold leading-snug text-white">{spec.value}</p>
+                </div>
+              ))}
+            </div>
+          ) : card.points && card.points.length > 0 ? (
+            <div className="mt-1 space-y-2">
+              {card.points.slice(0, 5).map((pt, i) => (
+                <div key={i} className="flex items-start gap-2 p-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(8px)' }}>
+                  <span style={{ color: theme.accent }} className="flex-shrink-0 font-black text-[11px] mt-0.5">●</span>
+                  <span className="text-[11px] leading-snug text-white/90">{pt}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    )
+  }
+  if (ds === 'split') {
+    return (
+      <div className="relative aspect-square overflow-hidden shadow-xl" style={{ borderRadius: 24, background: '#fff' }}>
+        <div className="absolute top-0 left-0 right-0 px-5 py-3" style={{ background: theme.accent }}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-white">
+              <Building2 size={14} /><span className="font-bold text-[14px]">{card.title}</span>
+            </div>
+            <span className="text-white/70 text-[10px]">3/6</span>
+          </div>
+        </div>
+        <div className="absolute top-[46px] inset-x-3 bottom-3">
+          {specs.length > 0 ? (
+            <div className={`grid gap-2 h-full ${specs.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+              {specs.slice(0, 6).map((spec, i) => (
+                <div key={i} className="rounded-xl p-2.5 flex flex-col justify-center border" style={{ background: '#fafafa', borderColor: `${theme.accent}22` }}>
+                  <p className="text-[9px] font-bold mb-1 uppercase tracking-wide" style={{ color: theme.accent }}>{spec.label}</p>
+                  <p className="text-[12px] font-bold leading-snug text-gray-900">{spec.value}</p>
+                </div>
+              ))}
+            </div>
+          ) : card.points && card.points.length > 0 ? (
+            <div className="mt-1 space-y-2">
+              {card.points.slice(0, 5).map((pt, i) => (
+                <div key={i} className="flex items-start gap-2 p-2.5 rounded-xl border" style={{ borderColor: `${theme.accent}20` }}>
+                  <span style={{ color: theme.accent }} className="flex-shrink-0 font-black text-[11px] mt-0.5">●</span>
+                  <span className="text-[11px] leading-snug text-gray-700">{pt}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    )
+  }
   // modern
   return (
     <div className="relative aspect-square rounded-[32px] overflow-hidden shadow-2xl">
@@ -513,7 +708,7 @@ function InvestmentCard({ card, theme, photo, filterCss, ds }: { card: CardSlide
     const LA = '#d4a843'
     return (
       <div className="relative aspect-square overflow-hidden shadow-2xl" style={{ borderRadius: 16, background: '#040100' }}>
-        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(0.45) sepia(0.05)' }} />}
+        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(0.62) sepia(0.05)' }} />}
         <div className="absolute inset-0" style={{ background: 'linear-gradient(to top,rgba(0,0,0,0.98) 0%,rgba(0,0,0,0.45) 100%)' }} />
         <div className="absolute top-0 left-0 right-0 px-5 py-3.5" style={{ background: 'rgba(5,2,0,0.9)', borderBottom: `1px solid ${LA}44` }}>
           <div className="flex items-center justify-between">
@@ -607,6 +802,77 @@ function InvestmentCard({ card, theme, photo, filterCss, ds }: { card: CardSlide
       </div>
     )
   }
+  if (ds === 'photo') {
+    return (
+      <div className="relative aspect-square rounded-[28px] overflow-hidden shadow-2xl">
+        {photo ? (
+          <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover"
+            style={filterCss ? { filter: filterCss } : undefined} />
+        ) : (
+          <div className="absolute inset-0" style={{ background: `linear-gradient(160deg,${theme.dark},${theme.accent})` }} />
+        )}
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(to top,rgba(0,0,0,0.68) 0%,rgba(0,0,0,0.12) 50%,rgba(0,0,0,0.3) 100%)' }} />
+        <div className="absolute top-3.5 left-3.5 right-3.5 flex items-center justify-between">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-white" style={{ background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.15)' }}>
+            <TrendingUp size={11} style={{ color: theme.accent }} />
+            <span className="text-[11px] font-bold">{card.title}</span>
+          </div>
+          <span className="text-white/60 text-[10px]">4 / 6</span>
+        </div>
+        <div className="absolute inset-x-3 bottom-3 rounded-2xl px-4 py-3.5" style={{ background: 'rgba(0,0,0,0.32)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.14)' }}>
+          {card.highlight && (
+            <div className="inline-block px-3 py-1 rounded-full text-[11px] font-black text-white mb-2" style={{ background: theme.accent }}>{card.highlight}</div>
+          )}
+          {card.body && <p className="text-[12px] text-white/85 mb-2 leading-snug">{card.body}</p>}
+          {card.points && card.points.length > 0 && (
+            <div className="space-y-1.5">
+              {card.points.slice(0, 3).map((pt, i) => (
+                <div key={i} className="flex items-start gap-2 text-[11px] text-white/80">
+                  <span style={{ color: theme.accent }} className="flex-shrink-0 font-bold mt-0.5">▶</span>
+                  <span className="leading-snug">{pt}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+  if (ds === 'split') {
+    return (
+      <div className="relative aspect-square overflow-hidden shadow-xl" style={{ borderRadius: 24, background: '#fff' }}>
+        <div className="absolute top-0 left-0 right-0 h-[48%] overflow-hidden">
+          {photo ? (
+            <img src={photo} alt="" className="w-full h-full object-cover"
+              style={filterCss ? { filter: filterCss } : undefined} />
+          ) : (
+            <div className="w-full h-full" style={{ background: `linear-gradient(135deg,${theme.accent},${theme.dark})` }} />
+          )}
+        </div>
+        <div className="absolute left-0 right-0 h-1" style={{ top: 'calc(48% - 1px)', background: theme.accent }} />
+        <div className="absolute bottom-0 left-0 right-0 bg-white px-4 pt-3 pb-4" style={{ top: '48%' }}>
+          <div className="flex items-center gap-1.5 mb-2">
+            <TrendingUp size={13} style={{ color: theme.accent }} />
+            <span className="font-bold text-[14px] text-gray-900">{card.title}</span>
+            <span className="text-[10px] text-gray-300 ml-auto">4 / 6</span>
+          </div>
+          {card.highlight && (
+            <div className="inline-block text-[11px] font-bold px-2.5 py-0.5 rounded-md mb-2" style={{ background: `${theme.accent}18`, color: theme.accent }}>{card.highlight}</div>
+          )}
+          {card.body && <p className="text-[11px] text-gray-600 mb-1.5 leading-snug">{card.body}</p>}
+          {card.points && card.points.length > 0 && (
+            <div className="space-y-1">
+              {card.points.slice(0, 3).map((pt, i) => (
+                <div key={i} className="flex items-start gap-1.5 text-[10px] text-gray-600">
+                  <span style={{ color: theme.accent }} className="font-bold flex-shrink-0 mt-0.5">▶</span><span>{pt}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
   // modern
   return (
     <div className="relative aspect-square rounded-[32px] overflow-hidden shadow-2xl">
@@ -647,7 +913,7 @@ function InteriorCard({ card, theme, photo, filterCss, ds }: { card: CardSlide; 
     const LA = '#d4a843'
     return (
       <div className="relative aspect-square overflow-hidden shadow-2xl" style={{ borderRadius: 16, background: '#040100' }}>
-        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(0.45)' }} />}
+        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(0.62)' }} />}
         <div className="absolute inset-0" style={{ background: 'linear-gradient(to top,rgba(0,0,0,0.97) 0%,rgba(0,0,0,0.15) 100%)' }} />
         <div className="absolute top-0 left-0 right-0 h-[1.5px]" style={{ background: LA }} />
         <div className="absolute top-4 left-5 flex items-center gap-2">
@@ -731,6 +997,70 @@ function InteriorCard({ card, theme, photo, filterCss, ds }: { card: CardSlide; 
       </div>
     )
   }
+  if (ds === 'photo') {
+    return (
+      <div className="relative aspect-square rounded-[28px] overflow-hidden shadow-2xl">
+        {photo ? (
+          <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover"
+            style={filterCss ? { filter: filterCss } : undefined} />
+        ) : (
+          <div className="absolute inset-0" style={{ background: `linear-gradient(160deg,${theme.dark},${theme.accent})` }} />
+        )}
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(to top,rgba(0,0,0,0.60) 0%,rgba(0,0,0,0.05) 40%,transparent 62%)' }} />
+        <div className="absolute top-3.5 left-3.5 flex items-center gap-1.5">
+          <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: `${theme.accent}dd` }}>
+            <Home size={13} className="text-white" />
+          </div>
+          <span className="text-white/60 text-[10px]">5 / 6</span>
+        </div>
+        <div className="absolute inset-x-3 bottom-3 rounded-2xl px-4 py-3.5" style={{ background: 'rgba(0,0,0,0.30)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.14)' }}>
+          <h3 className="font-display font-bold text-[20px] text-white mb-2">{card.title}</h3>
+          {card.checkpoints && card.checkpoints.length > 0 && (
+            <div className="space-y-1.5">
+              {card.checkpoints.slice(0, 4).map((pt, i) => (
+                <div key={i} className="flex items-start gap-2 text-[11px] text-white/85">
+                  <span className="font-bold flex-shrink-0 mt-0.5" style={{ color: theme.accent }}>✓</span>
+                  <span className="leading-snug">{pt}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+  if (ds === 'split') {
+    return (
+      <div className="relative aspect-square overflow-hidden shadow-xl" style={{ borderRadius: 24, background: '#fff' }}>
+        <div className="absolute top-0 left-0 right-0 h-[56%] overflow-hidden">
+          {photo ? (
+            <img src={photo} alt="" className="w-full h-full object-cover"
+              style={filterCss ? { filter: filterCss } : undefined} />
+          ) : (
+            <div className="w-full h-full" style={{ background: `linear-gradient(135deg,${theme.accent},${theme.dark})` }} />
+          )}
+        </div>
+        <div className="absolute left-0 right-0 h-1" style={{ top: 'calc(56% - 1px)', background: theme.accent }} />
+        <div className="absolute bottom-0 left-0 right-0 bg-white px-5 pt-3 pb-4" style={{ top: '56%' }}>
+          <div className="flex items-center gap-1.5 mb-2">
+            <Home size={13} style={{ color: theme.accent }} />
+            <span className="font-bold text-[15px] text-gray-900">{card.title}</span>
+            <span className="text-[10px] text-gray-300 ml-auto">5 / 6</span>
+          </div>
+          {card.checkpoints && card.checkpoints.length > 0 && (
+            <div className="space-y-1.5">
+              {card.checkpoints.slice(0, 4).map((pt, i) => (
+                <div key={i} className="flex items-start gap-2 p-1.5 rounded-lg" style={{ background: `${theme.accent}0d` }}>
+                  <span style={{ color: theme.accent }} className="font-bold text-[11px] flex-shrink-0 mt-0.5">✓</span>
+                  <span className="text-[11px] leading-snug text-gray-700">{pt}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
   // modern
   return (
     <div className="relative aspect-square rounded-[32px] overflow-hidden shadow-2xl">
@@ -766,7 +1096,7 @@ function CtaCard({ card, theme, photo, filterCss, ds }: { card: CardSlide; theme
     const LA = '#d4a843'
     return (
       <div className="relative aspect-square overflow-hidden shadow-2xl" style={{ borderRadius: 16, background: '#040100' }}>
-        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(0.4) sepia(0.1)' }} />}
+        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(0.62) sepia(0.1)' }} />}
         <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom,rgba(0,0,0,0.6) 0%,rgba(0,0,0,0.98) 100%)' }} />
         <div className="absolute top-0 left-0 right-0 h-[1.5px]" style={{ background: LA }} />
         <div className="absolute top-3 right-4 text-[9px] tracking-widest font-medium" style={{ color: `${LA}60` }}>06 / 06</div>
@@ -844,6 +1174,68 @@ function CtaCard({ card, theme, photo, filterCss, ds }: { card: CardSlide; theme
             <div className="flex flex-wrap gap-x-1.5 gap-y-0.5 justify-center">
               {card.hashtags.slice(0, 12).map((t, i) => (
                 <span key={i} className="text-[9px] opacity-45">{t.startsWith('#') ? t : `#${t}`}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+  if (ds === 'photo') {
+    return (
+      <div className="relative aspect-square rounded-[28px] overflow-hidden shadow-2xl">
+        {photo ? (
+          <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover"
+            style={filterCss ? { filter: filterCss } : undefined} />
+        ) : (
+          <div className="absolute inset-0" style={{ background: `linear-gradient(160deg,${theme.dark},${theme.accent})` }} />
+        )}
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom,rgba(0,0,0,0.35) 0%,rgba(0,0,0,0.55) 100%)' }} />
+        <div className="absolute top-3 right-3.5 text-white/50 text-[10px]">6 / 6</div>
+        <div className="absolute inset-x-4 bottom-4 top-8 flex flex-col items-center justify-center">
+          <div className="w-full rounded-2xl px-5 py-5 flex flex-col items-center text-center" style={{ background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.16)' }}>
+            <div className="w-10 h-10 rounded-full flex items-center justify-center mb-3" style={{ background: `${theme.accent}dd` }}>
+              <Phone size={18} className="text-white" />
+            </div>
+            <h2 className="font-display font-bold text-[22px] leading-tight whitespace-pre-line text-white mb-3">{card.title}</h2>
+            {card.price_badge && (
+              <div className="inline-block text-[12px] font-black px-4 py-1.5 rounded-full text-white mb-2.5" style={{ background: theme.accent }}>{card.price_badge}</div>
+            )}
+            {card.cta && (
+              <div className="w-full text-[12px] font-bold py-2.5 rounded-xl border border-white/40 text-white/90 mb-2">{card.cta}</div>
+            )}
+            {card.hashtags && card.hashtags.length > 0 && (
+              <div className="flex flex-wrap gap-x-1.5 gap-y-0.5 justify-center">
+                {card.hashtags.slice(0, 10).map((t, i) => (
+                  <span key={i} className="text-[9px] text-white/40">{t.startsWith('#') ? t : `#${t}`}</span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+  if (ds === 'split') {
+    return (
+      <div className="relative aspect-square overflow-hidden shadow-xl" style={{ borderRadius: 24, background: '#fff' }}>
+        <div className="absolute top-0 left-0 right-0 h-4" style={{ background: theme.accent }} />
+        <div className="absolute top-3 right-3.5 text-white text-[10px] font-bold">6 / 6</div>
+        <div className="absolute inset-0 flex flex-col items-center justify-center px-6 pt-8 pb-5 text-center">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3 shadow-md" style={{ background: `${theme.accent}18` }}>
+            <Phone size={22} style={{ color: theme.accent }} />
+          </div>
+          <h2 className="font-display font-bold text-[22px] leading-tight whitespace-pre-line text-gray-900 mb-3">{card.title}</h2>
+          {card.price_badge && (
+            <div className="inline-block text-[12px] font-bold px-4 py-1.5 rounded-full mb-3" style={{ background: `${theme.accent}18`, color: theme.accent }}>{card.price_badge}</div>
+          )}
+          {card.cta && (
+            <div className="w-full text-[13px] font-bold py-2.5 rounded-xl mb-3 text-white shadow-md" style={{ background: theme.accent }}>{card.cta}</div>
+          )}
+          {card.hashtags && card.hashtags.length > 0 && (
+            <div className="flex flex-wrap gap-x-1.5 gap-y-0.5 justify-center">
+              {card.hashtags.slice(0, 10).map((t, i) => (
+                <span key={i} className="text-[9px]" style={{ color: `${theme.accent}77` }}>{t.startsWith('#') ? t : `#${t}`}</span>
               ))}
             </div>
           )}

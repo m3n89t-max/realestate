@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { X, Check, Sparkles, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-type DesignStyle = 'modern' | 'luxury' | 'minimal' | 'vivid'
+type DesignStyle = 'modern' | 'luxury' | 'minimal' | 'vivid' | 'photo' | 'split'
 
 export interface BuiltinTemplate {
   id: string
@@ -16,7 +16,7 @@ export interface BuiltinTemplate {
   gradient: string
   overlay: string
   accentColor: string
-  category: 'modern' | 'luxury' | 'minimal' | 'vivid'
+  category: 'modern' | 'luxury' | 'minimal' | 'vivid' | 'photo' | 'split'
 }
 
 export interface CanvaTemplateSet {
@@ -136,10 +136,54 @@ export const BUILTIN_TEMPLATES: BuiltinTemplate[] = [
     overlay: 'linear-gradient(135deg,rgba(249,115,22,0.75) 0%,transparent 40%,rgba(0,0,0,0.88) 100%)',
     accentColor: '#f97316',
   },
+  {
+    id: 'photo-blue', ds: 'photo', colorId: 'blue', category: 'photo',
+    label: '포토 블루', desc: '사진이 살아있는 스타일', tag: '사진강조',
+    gradient: 'linear-gradient(160deg,#1e3a8a 0%,#3b82f6 100%)',
+    overlay: 'linear-gradient(to top,rgba(0,0,0,0.58) 0%,transparent 65%)',
+    accentColor: '#3b82f6',
+  },
+  {
+    id: 'photo-emerald', ds: 'photo', colorId: 'emerald', category: 'photo',
+    label: '포토 그린', desc: '자연스럽고 선명한',
+    gradient: 'linear-gradient(160deg,#064e3b 0%,#10b981 100%)',
+    overlay: 'linear-gradient(to top,rgba(0,0,0,0.58) 0%,transparent 65%)',
+    accentColor: '#10b981',
+  },
+  {
+    id: 'photo-rose', ds: 'photo', colorId: 'rose', category: 'photo',
+    label: '포토 레드', desc: '강렬하고 임팩트 있는',
+    gradient: 'linear-gradient(160deg,#881337 0%,#f43f5e 100%)',
+    overlay: 'linear-gradient(to top,rgba(0,0,0,0.58) 0%,transparent 65%)',
+    accentColor: '#f43f5e',
+  },
+  {
+    id: 'split-blue', ds: 'split', colorId: 'blue', category: 'split',
+    label: '분할 블루', desc: '깔끔한 매거진 스타일', tag: '신규',
+    gradient: 'linear-gradient(160deg,#1e3a8a 0%,#3b82f6 100%)',
+    overlay: 'linear-gradient(to bottom,transparent 45%,rgba(255,255,255,1) 100%)',
+    accentColor: '#3b82f6',
+  },
+  {
+    id: 'split-emerald', ds: 'split', colorId: 'emerald', category: 'split',
+    label: '분할 그린', desc: '사진+텍스트 반반',
+    gradient: 'linear-gradient(160deg,#064e3b 0%,#10b981 100%)',
+    overlay: 'linear-gradient(to bottom,transparent 45%,rgba(255,255,255,1) 100%)',
+    accentColor: '#10b981',
+  },
+  {
+    id: 'split-purple', ds: 'split', colorId: 'purple', category: 'split',
+    label: '분할 퍼플', desc: '세련된 리스팅 카드',
+    gradient: 'linear-gradient(160deg,#3b0764 0%,#a855f7 100%)',
+    overlay: 'linear-gradient(to bottom,transparent 45%,rgba(255,255,255,1) 100%)',
+    accentColor: '#a855f7',
+  },
 ]
 
 const FILTER_TABS = [
   { id: 'all', label: '전체' },
+  { id: 'photo', label: '사진강조' },
+  { id: 'split', label: '분할' },
   { id: 'modern', label: '모던' },
   { id: 'luxury', label: '럭셔리' },
   { id: 'minimal', label: '미니멀' },
