@@ -47,6 +47,7 @@ export async function uploadNaverBlog(
     const context = await chromium.launchPersistentContext(agentProfileDir, {
         channel: 'msedge',
         headless: false,
+        permissions: ['clipboard-read', 'clipboard-write'],
         args: [
             '--start-maximized',
             '--disable-blink-features=AutomationControlled',
@@ -216,19 +217,40 @@ export async function uploadNaverBlog(
 
         // HTML 표 등 구조화된 콘텐츠를 복사-붙여넣기 형태로 삽입하는 헬퍼
         const insertHtmlAtCursor = async (htmlStr: string) => {
-            await mainFrame.evaluate(async (html) => {
-                const activeEl = document.activeElement || document.body;
-                const dt = new DataTransfer();
-                dt.setData('text/html', html);
-                dt.setData('text/plain', 'html-table');
-                const event = new ClipboardEvent('paste', {
-                    clipboardData: dt,
-                    bubbles: true,
-                    cancelable: true
-                });
-                activeEl.dispatchEvent(event);
+            await page.bringToFront();
+            
+            // 1. 실제 OS 클립보드에 HTML 데이터 쓰기
+            const useClipboard = await page.evaluate(async (html) => {
+                try {
+                    const blobHtml = new Blob([html], { type: 'text/html' });
+                    const blobText = new Blob(['[매물개요 표]'], { type: 'text/plain' });
+                    const ClipboardItemConstructor = (window as any).ClipboardItem;
+                    const item = new ClipboardItemConstructor({
+                        'text/html': blobHtml,
+                        'text/plain': blobText
+                    });
+                    await navigator.clipboard.write([item]);
+                    return true;
+                } catch (err) {
+                    console.warn('Clipboard write failed, attempting fallback...', err);
+                    // Fallback to execCommand if clipboard API fails due to focus
+                    const activeEl = document.activeElement as HTMLElement;
+                    if (activeEl && activeEl.isContentEditable) {
+                        document.execCommand('insertHTML', false, html);
+                    }
+                    return false;
+                }
             }, htmlStr);
-            await page.waitForTimeout(1000);
+            
+            await page.waitForTimeout(300);
+            
+            if (useClipboard) {
+                // 2. Ctrl+V (붙여넣기) 단축키 전송 (실제 유저 액션 시뮬레이션)
+                await page.keyboard.press('Control+V');
+                await page.waitForTimeout(1500); // 에디터 렌더링 대기
+            } else {
+                await page.waitForTimeout(500);
+            }
         };
 
         // 7. 본문 입력
