@@ -214,6 +214,23 @@ export async function uploadNaverBlog(
             await page.waitForTimeout(2000);
         };
 
+        // HTML 표 등 구조화된 콘텐츠를 복사-붙여넣기 형태로 삽입하는 헬퍼
+        const insertHtmlAtCursor = async (htmlStr: string) => {
+            await mainFrame.evaluate(async (html) => {
+                const activeEl = document.activeElement || document.body;
+                const dt = new DataTransfer();
+                dt.setData('text/html', html);
+                dt.setData('text/plain', 'html-table');
+                const event = new ClipboardEvent('paste', {
+                    clipboardData: dt,
+                    bubbles: true,
+                    cancelable: true
+                });
+                activeEl.dispatchEvent(event);
+            }, htmlStr);
+            await page.waitForTimeout(1000);
+        };
+
         // 7. 본문 입력
         await progress(config, task.id, `본문 입력 중... (사진 ${photoPosition === 'inline' ? '인라인' : '일괄'} 모드)`, 55);
         await mainFrame.waitForSelector('.se-section-text', { timeout: 10_000 });
@@ -228,7 +245,8 @@ export async function uploadNaverBlog(
                     const res = await fetch(imgUrl);
                     if (!res.ok) return null;
                     const buf = await res.arrayBuffer();
-                    const ext = (imgUrl.split('.').pop() ?? 'jpg').split('?')[0].substring(0, 4);
+                    const matchExt = imgUrl.match(/\.([a-zA-Z0-9]+)(?:[\?#]|$)/);
+                    const ext = matchExt ? matchExt[1] : 'jpg';
                     const tmpPath = join(tmpdir(), `naver_inline_${Date.now()}_${idx}.${ext}`);
                     writeFileSync(tmpPath, Buffer.from(buf));
                     return tmpPath;
@@ -238,48 +256,75 @@ export async function uploadNaverBlog(
                 }
             };
 
-            const rawLines = (content.content || '').split('\n');
+            const parts = (content.content || '').split(/(<table[\s\S]*?<\/table>)/i);
             let imgIdx = 0;
-            for (const line of rawLines) {
-                const imgMatch = line.match(/!\[([^\]]*)\]\(([^)]+)\)/);
-                if (imgMatch) {
-                    // 이미지 라인 → URL에서 직접 다운로드 후 삽입
-                    const tmpPath = await downloadImage(imgMatch[2], imgIdx++);
-                    if (tmpPath) {
-                        await insertImageAtCursor(tmpPath);
+
+            for (let pIdx = 0; pIdx < parts.length; pIdx++) {
+                if (pIdx % 2 === 1) {
+                    await insertHtmlAtCursor(parts[pIdx]);
+                    await page.keyboard.press('Enter');
+                    continue;
+                }
+
+                const rawLines = parts[pIdx].split('\n');
+                for (const line of rawLines) {
+                    const imgMatch = line.match(/!\[([^\]]*)\]\(([^)]+)\)/);
+                    if (imgMatch) {
+                        // 이미지 라인 → URL에서 직접 다운로드 후 삽입
+                        const tmpPath = await downloadImage(imgMatch[2], imgIdx++);
+                        if (tmpPath) {
+                            await insertImageAtCursor(tmpPath);
+                            await page.keyboard.press('Enter');
+                        }
+                    } else if (line.match(/^\*▲/)) {
+                        // 캡션 라인 — 건너뜀
+                    } else {
+                        const stripped = stripLine(line);
+                        if (stripped.trim()) {
+                            await mainFrame.locator('.se-section-text').first().pressSequentially(stripped, { delay: 20 });
+                        }
                         await page.keyboard.press('Enter');
                     }
-                } else if (line.match(/^\*▲/)) {
-                    // 캡션 라인 — 건너뜀
-                } else {
-                    const stripped = stripLine(line);
-                    if (stripped.trim()) {
-                        await mainFrame.locator('.se-section-text').first().pressSequentially(stripped, { delay: 20 });
-                    }
-                    await page.keyboard.press('Enter');
+                    await page.waitForTimeout(80);
                 }
-                await page.waitForTimeout(80);
             }
         } else {
             // ── 일괄 모드: 텍스트 전체 입력 후 이미지 마지막에 삽입 ─────────────────
-            const plainBody = (content.content || '')
-                .replace(/!\[.*?\]\(.*?\)/g, '')
-                .replace(/\*▲.*?\*/g, '')
-                .replace(/<[^>]+>/g, '')
-                .replace(/^#{1,6}\s+/gm, '')
-                .replace(/\*\*([^*]+)\*\*/g, '$1')
-                .replace(/\*([^*]+)\*/g, '$1')
-                .replace(/^[-*]\s/gm, '• ')
-                .replace(/\n{3,}/g, '\n\n')
-                .trim();
+            const parts = (content.content || '').split(/(<table[\s\S]*?<\/table>)/i);
 
-            const lines = plainBody.split('\n');
-            for (let i = 0; i < lines.length; i++) {
-                if (lines[i].trim()) {
-                    await mainFrame.locator('.se-section-text').first().pressSequentially(lines[i], { delay: 20 });
+            for (let pIdx = 0; pIdx < parts.length; pIdx++) {
+                if (pIdx % 2 === 1) {
+                    await insertHtmlAtCursor(parts[pIdx]);
+                    await page.keyboard.press('Enter');
+                    continue;
                 }
-                if (i < lines.length - 1) await page.keyboard.press('Enter');
-                await page.waitForTimeout(80);
+
+                const plainBody = parts[pIdx]
+                    .replace(/!\[.*?\]\(.*?\)/g, '')
+                    .replace(/\*▲.*?\*/g, '')
+                    .replace(/<[^>]+>/g, '')  // table은 이미 parts 홀수 인덱스로 빠졌으므로 안전함
+                    .replace(/^#{1,6}\s+/gm, '')
+                    .replace(/\*\*([^*]+)\*\*/g, '$1')
+                    .replace(/\*([^*]+)\*/g, '$1')
+                    .replace(/^[-*]\s/gm, '• ')
+                    .replace(/\n{3,}/g, '\n\n')
+                    .trim();
+
+                if (!plainBody) continue;
+
+                const lines = plainBody.split('\n');
+                for (let i = 0; i < lines.length; i++) {
+                    if (lines[i].trim()) {
+                        await mainFrame.locator('.se-section-text').first().pressSequentially(lines[i], { delay: 20 });
+                    }
+                    if (i < lines.length - 1) await page.keyboard.press('Enter');
+                    await page.waitForTimeout(80);
+                }
+                
+                // 마지막 파트가 아니면 들여쓰기/여백 추가
+                if (pIdx < parts.length - 1) {
+                    await page.keyboard.press('Enter');
+                }
             }
 
             // 이미지 일괄 업로드 (본문 마지막)
@@ -293,7 +338,8 @@ export async function uploadNaverBlog(
                     try {
                         const res = await fetch(assets[i].file_url);
                         const buf = await res.arrayBuffer();
-                        const ext = (assets[i].file_url.split('.').pop() ?? 'jpg').split('?')[0];
+                        const matchExt = assets[i].file_url.match(/\.([a-zA-Z0-9]+)(?:[\?#]|$)/);
+                        const ext = matchExt ? matchExt[1] : 'jpg';
                         const tmpPath = join(tmpdir(), `naver_bulk_${Date.now()}_${i}.${ext}`);
                         writeFileSync(tmpPath, Buffer.from(buf));
                         tempPaths.push(tmpPath);
