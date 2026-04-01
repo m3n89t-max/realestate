@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Wand2, Copy, Check, ChevronDown, ChevronUp, AlertCircle, Upload, Loader2, PlayCircle, Save, CreditCard, Star } from 'lucide-react'
+import { Wand2, Copy, Check, ChevronDown, ChevronUp, AlertCircle, Upload, Loader2, PlayCircle, Save, CreditCard, Star, XCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { GeneratedContent, SeoScore } from '@/lib/types'
 import toast from 'react-hot-toast'
@@ -105,6 +105,7 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
   const [namecardUrl, setNamecardUrl] = useState('')
   const [namecardFileName, setNamecardFileName] = useState('')
   const [coverImageUrl, setCoverImageUrl] = useState<string>('')
+  const [uploadTasks, setUploadTasks] = useState<{ id: string; status: string; created_at: string }[]>([])
   const [namecardUploading, setNamecardUploading] = useState(false)
 
   // localStorage에서 초기값 로드
@@ -145,6 +146,40 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
       localStorage.setItem('realestate_blog_opts', JSON.stringify({ style, tone, format, focus, photoLayout, photoPosition }))
     } catch {}
   }, [style, tone, format, focus, photoLayout, photoPosition])
+
+  // 업로드 작업 목록 로드 + Realtime 구독
+  useEffect(() => {
+    const fetchTasks = async () => {
+      const { data } = await supabase
+        .from('tasks')
+        .select('id, status, created_at')
+        .eq('project_id', projectId)
+        .eq('type', 'upload_naver_blog')
+        .in('status', ['pending', 'in_progress'])
+        .order('created_at', { ascending: false })
+      if (data) setUploadTasks(data)
+    }
+    fetchTasks()
+
+    const channel = supabase
+      .channel(`blog-tasks-${projectId}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'tasks',
+        filter: `project_id=eq.${projectId}`,
+      }, () => { fetchTasks() })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [projectId, supabase])
+
+  const handleCancelTask = async (taskId: string) => {
+    const { error } = await supabase
+      .from('tasks')
+      .update({ status: 'cancelled' })
+      .eq('id', taskId)
+    if (error) toast.error('취소 실패')
+    else toast.success('업로드 작업이 취소되었습니다')
+  }
 
   const selected = contents.find(c => c.id === selectedId)
 
@@ -252,6 +287,10 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
   const handleNaverUpload = async () => {
     if (!selectedId || !selected) {
       toast.error('업로드할 블로그 글을 먼저 생성해주세요')
+      return
+    }
+    if (uploadTasks.length > 0) {
+      toast.error('이미 대기 중인 업로드 작업이 있습니다. 작업을 취소한 후 다시 시도하세요.')
       return
     }
     setUploading(true)
@@ -627,16 +666,47 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
 
             <button
               onClick={handleNaverUpload}
-              disabled={uploading}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm bg-green-600 hover:bg-green-700 text-white disabled:opacity-60 transition-colors shadow-sm"
+              disabled={uploading || uploadTasks.length > 0}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
             >
               {uploading
                 ? <><Loader2 size={15} className="animate-spin" /> 업로드 등록 중...</>
                 : <><Upload size={15} /> 📤 네이버 블로그 자동 업로드</>
               }
             </button>
-            {!uploading && (
+            {!uploading && uploadTasks.length === 0 && (
               <p className="text-[11px] text-gray-400 text-center mt-1">로컬 에이전트가 자동으로 업로드합니다</p>
+            )}
+
+            {/* 진행 중인 업로드 작업 목록 */}
+            {uploadTasks.length > 0 && (
+              <div className="mt-2 space-y-1.5">
+                {uploadTasks.map(task => (
+                  <div key={task.id} className={cn(
+                    'flex items-center gap-2 px-3 py-2 rounded-lg border text-xs',
+                    task.status === 'in_progress'
+                      ? 'bg-blue-50 border-blue-200'
+                      : 'bg-amber-50 border-amber-200'
+                  )}>
+                    <Loader2 size={12} className={cn(
+                      'flex-shrink-0',
+                      task.status === 'in_progress' ? 'animate-spin text-blue-500' : 'text-amber-500'
+                    )} />
+                    <span className={cn(
+                      'flex-1 font-medium',
+                      task.status === 'in_progress' ? 'text-blue-700' : 'text-amber-700'
+                    )}>
+                      {task.status === 'in_progress' ? '업로드 진행 중...' : '업로드 대기 중'}
+                    </span>
+                    <button
+                      onClick={() => handleCancelTask(task.id)}
+                      className="flex items-center gap-1 text-red-500 hover:text-red-700 transition-colors font-semibold flex-shrink-0"
+                    >
+                      <XCircle size={13} /> 중지
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
             {selected?.is_published && selected.published_url && (
               <a
