@@ -286,6 +286,26 @@ export async function uploadNaverBlog(
         // 없으면 DB에서 가져온 content.content 사용
         const bodyText: string = task.payload?.content_body || content.content || '';
 
+        // 대표이미지 — 본문 최상단에 먼저 삽입 (네이버 썸네일 자동 설정)
+        const coverImageUrl: string | undefined = task.payload?.cover_image_url;
+        if (coverImageUrl) {
+            await progress(config, task.id, '대표이미지 삽입 중...', 57);
+            try {
+                const matchExt = coverImageUrl.match(/\.([a-zA-Z0-9]+)(?:[\?#]|$)/);
+                const ext = (matchExt ? matchExt[1] : 'jpg').toLowerCase();
+                const res = await fetch(coverImageUrl);
+                if (res.ok) {
+                    const buf = await res.arrayBuffer();
+                    const coverPath = join(tmpdir(), `naver_cover_${Date.now()}.${ext}`);
+                    writeFileSync(coverPath, Buffer.from(buf));
+                    await insertImageAtCursor(coverPath);
+                    await page.keyboard.press('Enter');
+                }
+            } catch (e) {
+                console.warn('[NaverUpload] 대표이미지 삽입 실패:', e);
+            }
+        }
+
         if (photoPosition === 'inline') {
             // ── 인라인 모드: 텍스트 중간에 이미지 삽입 ─────────────────────────────
             // 마크다운 이미지 URL에서 직접 다운로드 (URL 매칭 불필요)

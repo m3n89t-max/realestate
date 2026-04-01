@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Wand2, Copy, Check, ChevronDown, ChevronUp, AlertCircle, Upload, Loader2, PlayCircle, Save, CreditCard } from 'lucide-react'
+import { Wand2, Copy, Check, ChevronDown, ChevronUp, AlertCircle, Upload, Loader2, PlayCircle, Save, CreditCard, Star } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { GeneratedContent, SeoScore } from '@/lib/types'
 import toast from 'react-hot-toast'
@@ -104,6 +104,7 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
   const [realtorGreeting, setRealtorGreeting] = useState('')
   const [namecardUrl, setNamecardUrl] = useState('')
   const [namecardFileName, setNamecardFileName] = useState('')
+  const [coverImageUrl, setCoverImageUrl] = useState<string>('')
   const [namecardUploading, setNamecardUploading] = useState(false)
 
   // localStorage에서 초기값 로드
@@ -133,8 +134,10 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
         if (n.url) setNamecardUrl(n.url)
         if (n.fileName) setNamecardFileName(n.fileName)
       }
+      const cover = localStorage.getItem(`realestate_cover_${projectId}`)
+      if (cover) setCoverImageUrl(cover)
     } catch {}
-  }, [])
+  }, [projectId])
 
   // 블로그 옵션 변경 시 자동 저장
   useEffect(() => {
@@ -267,6 +270,7 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
           content_tags: selected.tags ?? [],
           photo_layout: photoLayout,
           photo_position: photoPosition,
+          cover_image_url: coverImageUrl || undefined,
         },
       })
       if (error) throw error
@@ -681,7 +685,7 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
 
         {/* 사진 라이브러리 */}
         <div className="card p-4">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-1">
             <h3 className="text-sm font-semibold text-gray-700">사진/동영상 라이브러리</h3>
             <button
               onClick={() => setShowPhotoLibrary(!showPhotoLibrary)}
@@ -690,32 +694,83 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
               {showPhotoLibrary ? '접기' : '모두 보기'}
             </button>
           </div>
+          <p className="text-[11px] text-gray-400 mb-2.5">
+            <Star size={10} className="inline mr-0.5 text-amber-400" />
+            별 아이콘 클릭 → 대표이미지 설정 (업로드 시 첫 번째로 삽입)
+          </p>
+
+          {coverImageUrl && (
+            <div className="mb-2 flex items-center gap-2 px-2 py-1.5 rounded-lg bg-amber-50 border border-amber-200">
+              <img src={coverImageUrl} alt="대표이미지" className="w-8 h-8 rounded object-cover flex-shrink-0" />
+              <span className="text-[11px] text-amber-700 font-medium flex-1 truncate">대표이미지 선택됨</span>
+              <button
+                onClick={() => {
+                  setCoverImageUrl('')
+                  localStorage.removeItem(`realestate_cover_${projectId}`)
+                }}
+                className="text-[10px] text-gray-400 hover:text-gray-600 flex-shrink-0"
+              >✕</button>
+            </div>
+          )}
 
           <div className={cn(
             "grid grid-cols-3 gap-2",
-            !showPhotoLibrary && "max-h-32 overflow-hidden relative"
+            !showPhotoLibrary && "max-h-36 overflow-hidden relative"
           )}>
-            {assets.slice(0, showPhotoLibrary ? undefined : 6).map((asset, i) => (
-              <button
-                key={i}
-                onClick={() => insertImage(asset.file_url, asset.alt_text || asset.category || '매물사진')}
-                className="relative aspect-square rounded-lg overflow-hidden border border-gray-100 hover:border-brand-500 transition-colors group"
-              >
-                {asset.type === 'video' ? (
-                  <>
-                    <video src={asset.file_url} className="object-cover w-full h-full" preload="metadata" />
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <PlayCircle className="text-white w-6 h-6 opacity-80 drop-shadow-md" />
+            {assets.slice(0, showPhotoLibrary ? undefined : 6).map((asset, i) => {
+              const isCover = coverImageUrl === asset.file_url
+              return (
+                <div key={i} className="relative aspect-square group">
+                  <button
+                    onClick={() => insertImage(asset.file_url, asset.alt_text || asset.category || '매물사진')}
+                    className={cn(
+                      'absolute inset-0 rounded-lg overflow-hidden border transition-colors',
+                      isCover ? 'border-amber-400 ring-2 ring-amber-300' : 'border-gray-100 hover:border-brand-500'
+                    )}
+                  >
+                    {asset.type === 'video' ? (
+                      <>
+                        <video src={asset.file_url} className="object-cover w-full h-full" preload="metadata" />
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <PlayCircle className="text-white w-6 h-6 opacity-80 drop-shadow-md" />
+                        </div>
+                      </>
+                    ) : (
+                      <img src={asset.file_url} alt="" className="object-cover w-full h-full" />
+                    )}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                      <span className="text-[10px] text-white font-medium">삽입</span>
                     </div>
-                  </>
-                ) : (
-                  <img src={asset.file_url} alt="" className="object-cover w-full h-full" />
-                )}
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                  <span className="text-[10px] text-white font-medium">삽입</span>
+                  </button>
+                  {/* 대표이미지 선택 버튼 */}
+                  {asset.type !== 'video' && (
+                    <button
+                      onClick={e => {
+                        e.stopPropagation()
+                        const url = isCover ? '' : asset.file_url
+                        setCoverImageUrl(url)
+                        if (url) localStorage.setItem(`realestate_cover_${projectId}`, url)
+                        else localStorage.removeItem(`realestate_cover_${projectId}`)
+                        toast.success(url ? '대표이미지로 설정되었습니다' : '대표이미지 해제')
+                      }}
+                      className={cn(
+                        'absolute top-1 left-1 w-5 h-5 rounded-full flex items-center justify-center shadow transition-all z-10',
+                        isCover
+                          ? 'bg-amber-400 text-white opacity-100'
+                          : 'bg-black/50 text-white opacity-0 group-hover:opacity-100'
+                      )}
+                    >
+                      <Star size={10} className={isCover ? 'fill-white' : ''} />
+                    </button>
+                  )}
+                  {isCover && (
+                    <div className="absolute bottom-0 inset-x-0 py-0.5 text-center rounded-b-lg" style={{ background: 'rgba(217,119,6,0.85)' }}>
+                      <span className="text-[9px] font-bold text-white">대표</span>
+                    </div>
+                  )}
                 </div>
-              </button>
-            ))}
+              )
+            })}
             {!showPhotoLibrary && assets.length > 6 && (
               <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white to-transparent pointer-events-none" />
             )}
