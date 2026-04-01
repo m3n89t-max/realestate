@@ -105,8 +105,8 @@ function CoverCard({ card, theme, photo, filterCss, ds }: { card: CardSlide; the
     const LA = '#d4a843'
     return (
       <div className="relative aspect-square overflow-hidden shadow-2xl" style={{ borderRadius: 16, background: '#040100' }}>
-        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(0.62) sepia(0.1)' }} />}
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(to top,rgba(0,0,0,0.98) 0%,rgba(0,0,0,0.55) 55%,rgba(0,0,0,0.25) 100%)' }} />
+        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(0.82) sepia(0.08)' }} />}
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(to top,rgba(0,0,0,0.78) 0%,rgba(0,0,0,0.28) 55%,rgba(0,0,0,0.08) 100%)' }} />
         <div className="absolute top-0 left-0 right-0 h-[1.5px]" style={{ background: LA }} />
         <div className="absolute top-0 bottom-0 left-4 flex flex-col items-center justify-center gap-1">
           <div className="flex-1 w-px" style={{ background: `${LA}35` }} />
@@ -288,9 +288,9 @@ function LocationCard({ card, theme, photo, filterCss, ds }: { card: CardSlide; 
     const LA = '#d4a843'
     return (
       <div className="relative aspect-square overflow-hidden shadow-2xl" style={{ borderRadius: 16, background: '#040100' }}>
-        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(0.62) sepia(0.05)' }} />}
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(to top,rgba(0,0,0,0.97) 0%,rgba(0,0,0,0.4) 100%)' }} />
-        <div className="absolute top-0 left-0 right-0 px-5 py-3.5" style={{ background: 'rgba(5,2,0,0.92)', borderBottom: `1px solid ${LA}44` }}>
+        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(0.82) sepia(0.05)' }} />}
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(to top,rgba(0,0,0,0.72) 0%,rgba(0,0,0,0.12) 100%)' }} />
+        <div className="absolute top-0 left-0 right-0 px-5 py-3.5" style={{ background: 'rgba(5,2,0,0.80)', borderBottom: `1px solid ${LA}44` }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2" style={{ color: LA }}>
               <MapPin size={14} />
@@ -486,7 +486,7 @@ function CompositionCard({ card, theme, photo, filterCss, ds }: { card: CardSlid
     const LA = '#d4a843'
     return (
       <div className="relative aspect-square overflow-hidden shadow-2xl" style={{ borderRadius: 16, background: '#050200' }}>
-        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover opacity-[0.06]" />}
+        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30" />}
         <div className="absolute top-0 left-0 right-0 px-5 py-3.5" style={{ background: 'rgba(5,2,0,0.95)', borderBottom: `1px solid ${LA}44` }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2" style={{ color: LA }}>
@@ -708,8 +708,8 @@ function InvestmentCard({ card, theme, photo, filterCss, ds }: { card: CardSlide
     const LA = '#d4a843'
     return (
       <div className="relative aspect-square overflow-hidden shadow-2xl" style={{ borderRadius: 16, background: '#040100' }}>
-        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(0.62) sepia(0.05)' }} />}
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(to top,rgba(0,0,0,0.98) 0%,rgba(0,0,0,0.45) 100%)' }} />
+        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(0.82) sepia(0.05)' }} />}
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(to top,rgba(0,0,0,0.75) 0%,rgba(0,0,0,0.12) 100%)' }} />
         <div className="absolute top-0 left-0 right-0 px-5 py-3.5" style={{ background: 'rgba(5,2,0,0.9)', borderBottom: `1px solid ${LA}44` }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2" style={{ color: LA }}>
@@ -913,8 +913,8 @@ function InteriorCard({ card, theme, photo, filterCss, ds }: { card: CardSlide; 
     const LA = '#d4a843'
     return (
       <div className="relative aspect-square overflow-hidden shadow-2xl" style={{ borderRadius: 16, background: '#040100' }}>
-        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(0.62)' }} />}
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(to top,rgba(0,0,0,0.97) 0%,rgba(0,0,0,0.15) 100%)' }} />
+        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(0.82)' }} />}
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(to top,rgba(0,0,0,0.72) 0%,rgba(0,0,0,0.05) 100%)' }} />
         <div className="absolute top-0 left-0 right-0 h-[1.5px]" style={{ background: LA }} />
         <div className="absolute top-4 left-5 flex items-center gap-2">
           <div className="w-6 h-6 rounded-none flex items-center justify-center" style={{ border: `1px solid ${LA}`, background: 'transparent' }}>
@@ -1096,8 +1096,8 @@ function CtaCard({ card, theme, photo, filterCss, ds }: { card: CardSlide; theme
     const LA = '#d4a843'
     return (
       <div className="relative aspect-square overflow-hidden shadow-2xl" style={{ borderRadius: 16, background: '#040100' }}>
-        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(0.62) sepia(0.1)' }} />}
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom,rgba(0,0,0,0.6) 0%,rgba(0,0,0,0.98) 100%)' }} />
+        {photo && <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(0.82) sepia(0.08)' }} />}
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom,rgba(0,0,0,0.30) 0%,rgba(0,0,0,0.78) 100%)' }} />
         <div className="absolute top-0 left-0 right-0 h-[1.5px]" style={{ background: LA }} />
         <div className="absolute top-3 right-4 text-[9px] tracking-widest font-medium" style={{ color: `${LA}60` }}>06 / 06</div>
         <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
