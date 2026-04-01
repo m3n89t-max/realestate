@@ -669,7 +669,7 @@ function CompositionCard({ card, theme, photo, filterCss, ds }: { card: CardSlid
     <div className="relative aspect-square rounded-[32px] overflow-hidden shadow-2xl">
       {photo ? <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" style={filterCss ? { filter: filterCss } : undefined} />
         : <div className="absolute inset-0" style={{ background: `linear-gradient(135deg,${theme.dark},${theme.accent})` }} />}
-      <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.68)' }} />
+      <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.42)' }} />
       <div className="absolute top-0 left-0 right-0 p-4 z-10" style={{ background: `${theme.accent}ee` }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-white">
@@ -2024,17 +2024,22 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
                   <button
                     key={card.order}
                     onClick={() => setActiveSlide(i)}
-                    className={cn('rounded-xl overflow-hidden transition-all', activeSlide === i ? 'ring-2 ring-brand-500 ring-offset-2 scale-105' : 'opacity-70 hover:opacity-100')}
+                    className={cn('rounded-xl overflow-hidden transition-all aspect-square relative', activeSlide === i ? 'ring-2 ring-brand-500 ring-offset-2 scale-105' : 'opacity-70 hover:opacity-100')}
                   >
-                    <CardPreview
-                      card={mergeCard(card)}
-                      theme={theme}
-                      photo={cardPhotos[card.order] ?? assignPhoto(card.order, assets)}
-                      aiPhoto={aiPhotos[card.order]}
-                      filterCss={filterCss}
-                      platform={platform}
-                      ds={designStyle}
-                    />
+                    {/* 카드를 4배 크기로 렌더링 후 0.25로 축소 → 글씨·레이아웃 정상 비율 유지 */}
+                    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                      <div style={{ transform: 'scale(0.25)', transformOrigin: 'top left', width: '400%', height: '400%' }}>
+                        <CardPreview
+                          card={mergeCard(card)}
+                          theme={theme}
+                          photo={cardPhotos[card.order] ?? assignPhoto(card.order, assets)}
+                          aiPhoto={aiPhotos[card.order]}
+                          filterCss={filterCss}
+                          platform={platform}
+                          ds={designStyle}
+                        />
+                      </div>
+                    </div>
                   </button>
                 ))}
               </div>
