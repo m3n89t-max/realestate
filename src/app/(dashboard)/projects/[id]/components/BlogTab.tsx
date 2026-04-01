@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Wand2, Copy, Check, ChevronDown, ChevronUp, AlertCircle, Upload, Loader2, PlayCircle } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Wand2, Copy, Check, ChevronDown, ChevronUp, AlertCircle, Upload, Loader2, PlayCircle, Save, CreditCard } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { GeneratedContent, SeoScore } from '@/lib/types'
 import toast from 'react-hot-toast'
@@ -101,12 +101,89 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
   const [realtorName, setRealtorName] = useState('')
   const [realtorAddress, setRealtorAddress] = useState('')
   const [realtorPhone, setRealtorPhone] = useState('')
+  const [realtorGreeting, setRealtorGreeting] = useState('')
+  const [namecardUrl, setNamecardUrl] = useState('')
+  const [namecardFileName, setNamecardFileName] = useState('')
+  const [namecardUploading, setNamecardUploading] = useState(false)
+
+  // localStorage에서 초기값 로드
+  useEffect(() => {
+    try {
+      const opts = localStorage.getItem('realestate_blog_opts')
+      if (opts) {
+        const o = JSON.parse(opts)
+        if (o.style) setStyle(o.style)
+        if (o.tone) setTone(o.tone)
+        if (o.format) setFormat(o.format)
+        if (o.focus) setFocus(o.focus)
+        if (o.photoLayout) setPhotoLayout(o.photoLayout)
+        if (o.photoPosition) setPhotoPosition(o.photoPosition)
+      }
+      const realtor = localStorage.getItem('realestate_realtor')
+      if (realtor) {
+        const r = JSON.parse(realtor)
+        if (r.name) setRealtorName(r.name)
+        if (r.address) setRealtorAddress(r.address)
+        if (r.phone) setRealtorPhone(r.phone)
+        if (r.greeting) setRealtorGreeting(r.greeting)
+      }
+      const namecard = localStorage.getItem('realestate_namecard')
+      if (namecard) {
+        const n = JSON.parse(namecard)
+        if (n.url) setNamecardUrl(n.url)
+        if (n.fileName) setNamecardFileName(n.fileName)
+      }
+    } catch {}
+  }, [])
+
+  // 블로그 옵션 변경 시 자동 저장
+  useEffect(() => {
+    try {
+      localStorage.setItem('realestate_blog_opts', JSON.stringify({ style, tone, format, focus, photoLayout, photoPosition }))
+    } catch {}
+  }, [style, tone, format, focus, photoLayout, photoPosition])
 
   const selected = contents.find(c => c.id === selectedId)
 
+  const saveRealtorInfo = () => {
+    try {
+      localStorage.setItem('realestate_realtor', JSON.stringify({
+        name: realtorName, address: realtorAddress, phone: realtorPhone, greeting: realtorGreeting,
+      }))
+      toast.success('공인중개사 정보가 저장되었습니다')
+    } catch { toast.error('저장 실패') }
+  }
+
+  const handleNamecardUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setNamecardUploading(true)
+    try {
+      const ext = file.name.split('.').pop()
+      const filePath = `${orgId}/namecard/namecard_${Date.now()}.${ext}`
+      const { error } = await supabase.storage.from('project-assets').upload(filePath, file, { upsert: true })
+      if (error) throw error
+      const { data: { publicUrl } } = supabase.storage.from('project-assets').getPublicUrl(filePath)
+      setNamecardUrl(publicUrl)
+      setNamecardFileName(file.name)
+      localStorage.setItem('realestate_namecard', JSON.stringify({ url: publicUrl, fileName: file.name }))
+      toast.success('명함 이미지가 저장되었습니다')
+    } catch { toast.error('업로드 실패') } finally { setNamecardUploading(false) }
+  }
+
   const buildContactFooter = () => {
-    if (!realtorName && !realtorAddress && !realtorPhone) return ''
-    return `\n\n---\n\n## 📞 문의 안내\n\n이 매물에 관심이 있으신 분들은 언제든지 연락 주세요.\n\n${realtorName ? `- **공인중개사:** ${realtorName}\n` : ''}${realtorAddress ? `- **사무소 주소:** ${realtorAddress}\n` : ''}${realtorPhone ? `- **연락처:** ${realtorPhone}\n` : ''}\n신뢰할 수 있는 부동산 전문가와 함께 최선의 매물을 찾아드립니다. 언제든지 편하게 문의해 주세요! 😊`
+    const hasInfo = realtorName || realtorAddress || realtorPhone
+    const hasGreeting = realtorGreeting.trim()
+    const hasNamecard = namecardUrl
+    if (!hasInfo && !hasGreeting && !hasNamecard) return ''
+    let footer = '\n\n---\n\n## 📞 문의 안내\n\n'
+    if (hasGreeting) footer += `${realtorGreeting}\n\n`
+    if (hasInfo) {
+      footer += `${realtorName ? `- **공인중개사:** ${realtorName}\n` : ''}${realtorAddress ? `- **사무소 주소:** ${realtorAddress}\n` : ''}${realtorPhone ? `- **연락처:** ${realtorPhone}\n` : ''}\n`
+      footer += '신뢰할 수 있는 부동산 전문가와 함께 최선의 매물을 찾아드립니다. 언제든지 편하게 문의해 주세요! 😊\n'
+    }
+    if (hasNamecard) footer += `\n![공인중개사 명함](${namecardUrl})\n`
+    return footer
   }
 
   const handleRegenerateTitles = async () => {
@@ -453,31 +530,85 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
               로컬 에이전트가 실행 중이어야 합니다
             </p>
 
-            {/* 공인중개사 연락처 */}
-            <div className="mb-3 border-t border-gray-100 pt-3">
-              <label className="text-xs text-gray-500 mb-1.5 block font-medium">공인중개사 정보 (하단 자동 삽입)</label>
-              <div className="space-y-1.5">
-                <input
-                  type="text"
-                  placeholder="이름 (예: 홍길동 공인중개사)"
-                  value={realtorName}
-                  onChange={e => setRealtorName(e.target.value)}
-                  className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400"
+            {/* 공인중개사 정보 */}
+            <div className="mb-3 border-t border-gray-100 pt-3 space-y-3">
+              {/* 인사말 */}
+              <div>
+                <label className="text-xs text-gray-500 mb-1.5 block font-medium">인사말 (블로그 하단 자동 삽입)</label>
+                <textarea
+                  placeholder={"예: 안녕하세요! 10년 경력의 홍길동 공인중개사입니다.\n부동산 관련 궁금하신 점은 언제든지 연락 주세요."}
+                  value={realtorGreeting}
+                  onChange={e => setRealtorGreeting(e.target.value)}
+                  rows={3}
+                  className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400 resize-none"
                 />
-                <input
-                  type="text"
-                  placeholder="사무소 주소"
-                  value={realtorAddress}
-                  onChange={e => setRealtorAddress(e.target.value)}
-                  className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400"
-                />
-                <input
-                  type="text"
-                  placeholder="연락처 (예: 010-1234-5678)"
-                  value={realtorPhone}
-                  onChange={e => setRealtorPhone(e.target.value)}
-                  className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400"
-                />
+              </div>
+
+              {/* 공인중개사 연락처 */}
+              <div>
+                <label className="text-xs text-gray-500 mb-1.5 block font-medium">공인중개사 정보</label>
+                <div className="space-y-1.5">
+                  <input
+                    type="text"
+                    placeholder="이름 (예: 홍길동 공인중개사)"
+                    value={realtorName}
+                    onChange={e => setRealtorName(e.target.value)}
+                    className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400"
+                  />
+                  <input
+                    type="text"
+                    placeholder="사무소 주소"
+                    value={realtorAddress}
+                    onChange={e => setRealtorAddress(e.target.value)}
+                    className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400"
+                  />
+                  <input
+                    type="text"
+                    placeholder="연락처 (예: 010-1234-5678)"
+                    value={realtorPhone}
+                    onChange={e => setRealtorPhone(e.target.value)}
+                    className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400"
+                  />
+                </div>
+              </div>
+
+              {/* 저장 버튼 */}
+              <button
+                onClick={saveRealtorInfo}
+                className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-lg border border-green-200 text-green-700 hover:bg-green-50 transition-colors"
+              >
+                <Save size={12} /> 인사말 + 정보 저장
+              </button>
+
+              {/* 명함 이미지 */}
+              <div>
+                <label className="text-xs text-gray-500 mb-1.5 flex items-center gap-1 font-medium">
+                  <CreditCard size={11} /> 명함/네임카드 (블로그 마지막 삽입)
+                </label>
+                {namecardUrl ? (
+                  <div className="relative rounded-lg overflow-hidden border border-gray-200 mb-1.5">
+                    <img src={namecardUrl} alt="명함" className="w-full object-contain max-h-24 bg-gray-50" />
+                    <button
+                      onClick={() => {
+                        setNamecardUrl('')
+                        setNamecardFileName('')
+                        localStorage.removeItem('realestate_namecard')
+                      }}
+                      className="absolute top-1 right-1 w-5 h-5 bg-black/50 text-white rounded-full text-[10px] flex items-center justify-center hover:bg-black/70"
+                    >✕</button>
+                  </div>
+                ) : null}
+                <label className={cn(
+                  'flex items-center justify-center gap-1.5 w-full py-1.5 text-xs font-medium rounded-lg border cursor-pointer transition-colors',
+                  namecardUploading ? 'opacity-50 pointer-events-none' : 'border-dashed border-gray-300 text-gray-500 hover:border-green-400 hover:text-green-600'
+                )}>
+                  {namecardUploading
+                    ? <><Loader2 size={11} className="animate-spin" /> 업로드 중...</>
+                    : <><Upload size={11} /> {namecardUrl ? '명함 교체' : '명함 이미지 업로드'}</>
+                  }
+                  <input type="file" className="hidden" accept="image/*" onChange={handleNamecardUpload} disabled={namecardUploading} />
+                </label>
+                {namecardFileName && <p className="text-[10px] text-gray-400 mt-1 truncate">{namecardFileName}</p>}
               </div>
             </div>
 
