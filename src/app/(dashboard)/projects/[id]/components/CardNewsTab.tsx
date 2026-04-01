@@ -1453,6 +1453,7 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
   const [showGallery, setShowGallery] = useState(false)
   const [canvaTemplates, setCanvaTemplates] = useState<CanvaTemplateSet[]>([])
   const [canvaTemplatesLoading, setCanvaTemplatesLoading] = useState(false)
+  const [photoPickerSlot, setPhotoPickerSlot] = useState<number | null>(null)
   const cardRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -2016,33 +2017,83 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
               )
             })()}
 
-            {/* 썸네일 스트립 */}
-            <div>
-              <p className="text-xs text-gray-400 mb-2">모든 카드 ({slides.length}장)</p>
+            {/* 사진 배정 패널 */}
+            <div className="card p-3">
+              <p className="text-xs font-semibold text-gray-600 mb-2.5">카드별 사진 배정</p>
               <div className="grid grid-cols-6 gap-2">
-                {slides.map((card, i) => (
-                  <button
-                    key={card.order}
-                    onClick={() => setActiveSlide(i)}
-                    className={cn('rounded-xl overflow-hidden transition-all aspect-square relative', activeSlide === i ? 'ring-2 ring-brand-500 ring-offset-2 scale-105' : 'opacity-70 hover:opacity-100')}
-                  >
-                    {/* 카드를 4배 크기로 렌더링 후 0.25로 축소 → 글씨·레이아웃 정상 비율 유지 */}
-                    <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                      <div style={{ transform: 'scale(0.25)', transformOrigin: 'top left', width: '400%', height: '400%' }}>
-                        <CardPreview
-                          card={mergeCard(card)}
-                          theme={theme}
-                          photo={cardPhotos[card.order] ?? assignPhoto(card.order, assets)}
-                          aiPhoto={aiPhotos[card.order]}
-                          filterCss={filterCss}
-                          platform={platform}
-                          ds={designStyle}
-                        />
-                      </div>
+                {SLIDE_LABELS.map((label, idx) => {
+                  const order = idx + 1
+                  const currentPhoto = cardPhotos[order] ?? assignPhoto(order, assets)
+                  const isActive = activeSlide === idx
+                  const isPickerOpen = photoPickerSlot === order
+                  return (
+                    <div key={order} className="flex flex-col gap-1">
+                      {/* 카드 슬롯 썸네일 */}
+                      <button
+                        onClick={() => { setActiveSlide(idx); setPhotoPickerSlot(isPickerOpen ? null : order) }}
+                        className={cn(
+                          'relative aspect-square rounded-xl overflow-hidden border-2 transition-all',
+                          isActive ? 'border-brand-500 shadow-md' : 'border-gray-200 hover:border-gray-400',
+                          isPickerOpen ? 'ring-2 ring-brand-400 ring-offset-1' : ''
+                        )}
+                      >
+                        {currentPhoto
+                          ? <img src={currentPhoto} alt={label} className="absolute inset-0 w-full h-full object-cover" />
+                          : <div className="absolute inset-0 bg-gray-100 flex items-center justify-center"><ImageIcon size={14} className="text-gray-300" /></div>
+                        }
+                        <div className="absolute inset-x-0 bottom-0 py-1 text-center" style={{ background: 'rgba(0,0,0,0.55)' }}>
+                          <span className="text-[9px] font-bold text-white">{label}</span>
+                        </div>
+                        {isPickerOpen && (
+                          <div className="absolute inset-0 bg-brand-500/20 flex items-center justify-center">
+                            <div className="w-4 h-4 rounded-full bg-brand-500 flex items-center justify-center">
+                              <Check size={9} className="text-white" />
+                            </div>
+                          </div>
+                        )}
+                      </button>
                     </div>
-                  </button>
-                ))}
+                  )
+                })}
               </div>
+
+              {/* 사진 선택 패널 (슬롯 클릭 시 확장) */}
+              {photoPickerSlot !== null && assets.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  <p className="text-[11px] text-gray-500 mb-2">
+                    <span className="font-semibold text-brand-600">{SLIDE_LABELS[(photoPickerSlot - 1)]}</span> 카드에 배정할 사진을 선택하세요
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {assets.map((asset, ai) => {
+                      const isAssigned = (cardPhotos[photoPickerSlot] ?? assignPhoto(photoPickerSlot, assets)) === asset.file_url
+                      return (
+                        <button
+                          key={asset.id ?? ai}
+                          onClick={() => {
+                            setCardPhotos(prev => ({ ...prev, [photoPickerSlot]: asset.file_url }))
+                            setPhotoPickerSlot(null)
+                          }}
+                          className={cn(
+                            'relative rounded-lg overflow-hidden transition-all',
+                            'w-14 h-14 flex-shrink-0',
+                            isAssigned ? 'ring-2 ring-brand-500 ring-offset-1' : 'opacity-80 hover:opacity-100 hover:ring-2 hover:ring-gray-300'
+                          )}
+                        >
+                          <img src={asset.file_url} alt={`사진 ${ai + 1}`} className="w-full h-full object-cover" />
+                          {isAssigned && (
+                            <div className="absolute inset-0 bg-brand-500/20 flex items-center justify-center">
+                              <Check size={14} className="text-brand-600 drop-shadow" />
+                            </div>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+              {photoPickerSlot !== null && assets.length === 0 && (
+                <div className="mt-2 text-xs text-gray-400">등록된 매물 사진이 없습니다.</div>
+              )}
             </div>
 
             {/* Canva 결과 */}
