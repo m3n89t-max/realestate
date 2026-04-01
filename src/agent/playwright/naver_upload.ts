@@ -271,13 +271,19 @@ export async function uploadNaverBlog(
         if (photoPosition === 'inline') {
             // ── 인라인 모드: 텍스트 중간에 이미지 삽입 ─────────────────────────────
             // 마크다운 이미지 URL에서 직접 다운로드 (URL 매칭 불필요)
+            const IMAGE_EXTS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp']);
             const downloadImage = async (imgUrl: string, idx: number): Promise<string | null> => {
                 try {
+                    const matchExt = imgUrl.match(/\.([a-zA-Z0-9]+)(?:[\?#]|$)/);
+                    const ext = (matchExt ? matchExt[1] : 'jpg').toLowerCase();
+                    // 이미지 형식이 아니면 건너뜀 (mp4, mov 등 동영상 파일 제외)
+                    if (!IMAGE_EXTS.has(ext)) {
+                        console.warn(`[NaverUpload] 이미지 아닌 파일 건너뜀: ${imgUrl}`);
+                        return null;
+                    }
                     const res = await fetch(imgUrl);
                     if (!res.ok) return null;
                     const buf = await res.arrayBuffer();
-                    const matchExt = imgUrl.match(/\.([a-zA-Z0-9]+)(?:[\?#]|$)/);
-                    const ext = matchExt ? matchExt[1] : 'jpg';
                     const tmpPath = join(tmpdir(), `naver_inline_${Date.now()}_${idx}.${ext}`);
                     writeFileSync(tmpPath, Buffer.from(buf));
                     return tmpPath;
@@ -364,13 +370,18 @@ export async function uploadNaverBlog(
                 await page.keyboard.press('Control+End');
                 await page.keyboard.press('Enter');
 
+                const BULK_IMAGE_EXTS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp']);
                 const tempPaths: string[] = [];
                 for (let i = 0; i < assets.length; i++) {
                     try {
+                        const matchExt = assets[i].file_url.match(/\.([a-zA-Z0-9]+)(?:[\?#]|$)/);
+                        const ext = (matchExt ? matchExt[1] : 'jpg').toLowerCase();
+                        if (!BULK_IMAGE_EXTS.has(ext)) {
+                            console.warn(`[NaverUpload] 이미지 아닌 파일 건너뜀: ${assets[i].file_url}`);
+                            continue;
+                        }
                         const res = await fetch(assets[i].file_url);
                         const buf = await res.arrayBuffer();
-                        const matchExt = assets[i].file_url.match(/\.([a-zA-Z0-9]+)(?:[\?#]|$)/);
-                        const ext = matchExt ? matchExt[1] : 'jpg';
                         const tmpPath = join(tmpdir(), `naver_bulk_${Date.now()}_${i}.${ext}`);
                         writeFileSync(tmpPath, Buffer.from(buf));
                         tempPaths.push(tmpPath);
