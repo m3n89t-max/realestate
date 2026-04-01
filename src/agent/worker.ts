@@ -339,9 +339,15 @@ class LocalAgent {
                     break;
 
                 case 'naver_upload':
-                case 'upload_naver_blog':
-                    result = await uploadNaverBlog(task, this.config);
+                case 'upload_naver_blog': {
+                    const checkCancelled = async () => {
+                        const { data } = await this.supabase
+                            .from('tasks').select('status').eq('id', task.id).single();
+                        return data?.status === 'cancelled';
+                    };
+                    result = await uploadNaverBlog(task, this.config, checkCancelled);
                     break;
+                }
 
                 case 'youtube_upload':
                 case 'upload_youtube':
@@ -401,23 +407,31 @@ class LocalAgent {
             console.log(`[Agent] ✅ 작업 완료: ${task.type}`);
 
         } catch (err: any) {
-            console.error(`[Agent] ❌ 작업 실패: ${err.message}`);
-
             const errorCode = this.classifyError(err);
 
-            if (this.config.agent_key) {
-                const shouldRetry = errorCode !== 'CONFIG_MISSING' && errorCode !== 'LOGIN_FAILED' && errorCode !== 'SEARCH_NOT_FOUND';
-                await sendTaskFailed(this.config, task.id, errorCode, err.message, shouldRetry);
-            } else {
+            // 사용자 취소 — failed 아닌 cancelled로 처리
+            if (errorCode === 'TASK_CANCELLED') {
+                console.log(`[Agent] 🚫 작업 취소됨: ${task.type}`);
                 await this.supabase
                     .from('tasks')
-                    .update({
-                        status: 'failed',
-                        error_code: errorCode,
-                        error_message: err.message,
-                        completed_at: new Date().toISOString(),
-                    })
+                    .update({ status: 'cancelled', completed_at: new Date().toISOString() })
                     .eq('id', task.id);
+            } else {
+                console.error(`[Agent] ❌ 작업 실패: ${err.message}`);
+                if (this.config.agent_key) {
+                    const shouldRetry = errorCode !== 'CONFIG_MISSING' && errorCode !== 'LOGIN_FAILED' && errorCode !== 'SEARCH_NOT_FOUND';
+                    await sendTaskFailed(this.config, task.id, errorCode, err.message, shouldRetry);
+                } else {
+                    await this.supabase
+                        .from('tasks')
+                        .update({
+                            status: 'failed',
+                            error_code: errorCode,
+                            error_message: err.message,
+                            completed_at: new Date().toISOString(),
+                        })
+                        .eq('id', task.id);
+                }
             }
         } finally {
             this.isProcessing = false;
@@ -461,6 +475,7 @@ class LocalAgent {
     // ============================================================
     private classifyError(err: any): string {
         const msg = (err.message || '').toLowerCase();
+        if (msg.includes('task_cancelled') || msg.includes('취소했습니다')) return 'TASK_CANCELLED';
         if (msg.includes('config_missing') || msg.includes('설정되지 않았습니다') || msg.includes('api_key')) return 'CONFIG_MISSING';
         if (msg.includes('login') || msg.includes('로그인')) return 'LOGIN_FAILED';
         if (msg.includes('captcha')) return 'CAPTCHA_TIMEOUT';

@@ -21,12 +21,19 @@ const SESSION_DIR = path.join(
 // ============================================================
 export async function uploadNaverBlog(
     task: any,
-    config: AgentConfig
+    config: AgentConfig,
+    checkCancelled?: () => Promise<boolean>
 ): Promise<Record<string, unknown>> {
     const projectId = task.payload?.project_id || task.project_id;
     const contentId = task.payload?.content_id;
     const photoLayout: 'individual' | 'collage' | 'slideshow' = task.payload?.photo_layout ?? 'individual';
     const photoPosition: 'inline' | 'bulk' = task.payload?.photo_position ?? 'bulk';
+
+    const assertNotCancelled = async () => {
+        if (checkCancelled && await checkCancelled()) {
+            throw new Error('[TASK_CANCELLED] 사용자가 업로드를 취소했습니다.');
+        }
+    };
 
     // 사진 첨부 방식 → 다이얼로그 텍스트 매핑
     const layoutLabelMap = { individual: '개별사진', collage: '콜라주', slideshow: '슬라이드' };
@@ -135,6 +142,8 @@ export async function uploadNaverBlog(
         } else {
             await progress(config, task.id, '기존 세션으로 로그인 유지.', 25);
         }
+
+        await assertNotCancelled(); // 로그인 후 취소 확인
 
         // 5. 블로그 글쓰기 페이지
         await progress(config, task.id, '블로그 에디터 열기...', 30);
@@ -281,6 +290,8 @@ export async function uploadNaverBlog(
         await mainFrame.waitForSelector('.se-section-text', { timeout: 10_000 });
         await mainFrame.locator('.se-section-text').first().click();
         await page.waitForTimeout(500);
+
+        await assertNotCancelled(); // 본문 입력 전 취소 확인
 
         // task.payload.content_body 우선 사용 (buildFullContent 포함: 인사말+본문+공인중개사 정보)
         // 없으면 DB에서 가져온 content.content 사용
@@ -488,6 +499,8 @@ export async function uploadNaverBlog(
                 }
             }
         }
+
+        await assertNotCancelled(); // 발행 전 최종 취소 확인
 
         // 10. 발행 버튼 클릭 + 발행 설정 다이얼로그 처리
         await progress(config, task.id, '발행 중...', 88);

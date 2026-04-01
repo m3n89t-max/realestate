@@ -155,7 +155,7 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
         .select('id, status, created_at')
         .eq('project_id', projectId)
         .eq('type', 'upload_naver_blog')
-        .in('status', ['pending', 'in_progress'])
+        .in('status', ['pending', 'running'])
         .order('created_at', { ascending: false })
       if (data) setUploadTasks(data)
     }
@@ -684,25 +684,25 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
                 {uploadTasks.map(task => (
                   <div key={task.id} className={cn(
                     'flex items-center gap-2 px-3 py-2 rounded-lg border text-xs',
-                    task.status === 'in_progress'
+                    task.status === 'running'
                       ? 'bg-blue-50 border-blue-200'
                       : 'bg-amber-50 border-amber-200'
                   )}>
                     <Loader2 size={12} className={cn(
-                      'flex-shrink-0',
-                      task.status === 'in_progress' ? 'animate-spin text-blue-500' : 'text-amber-500'
+                      'flex-shrink-0 animate-spin',
+                      task.status === 'running' ? 'text-blue-500' : 'text-amber-500'
                     )} />
                     <span className={cn(
                       'flex-1 font-medium',
-                      task.status === 'in_progress' ? 'text-blue-700' : 'text-amber-700'
+                      task.status === 'running' ? 'text-blue-700' : 'text-amber-700'
                     )}>
-                      {task.status === 'in_progress' ? '업로드 진행 중...' : '업로드 대기 중'}
+                      {task.status === 'running' ? '에이전트 업로드 진행 중...' : '업로드 대기 중 (에이전트 연결 필요)'}
                     </span>
                     <button
                       onClick={() => handleCancelTask(task.id)}
                       className="flex items-center gap-1 text-red-500 hover:text-red-700 transition-colors font-semibold flex-shrink-0"
                     >
-                      <XCircle size={13} /> 중지
+                      <XCircle size={13} /> {task.status === 'running' ? '강제중지' : '취소'}
                     </button>
                   </div>
                 ))}
