@@ -285,13 +285,17 @@ export default function ProjectEditForm({ project }: { project: Project }) {
               <tr>
                 <TLabel>주 차 대 수</TLabel>
                 <TCell colSpan={5}>
-                  <div className="flex items-center gap-4">
-                    <span className="text-xs text-gray-500">대장상</span>
-                    <TInput value={form.parking_legal} onChange={v => set('parking_legal', v)} placeholder="12" className="w-16" type="number" />
-                    <span className="text-xs text-gray-500">대</span>
-                    <span className="text-xs text-gray-500 ml-4">실주차</span>
-                    <TInput value={form.parking_actual} onChange={v => set('parking_actual', v)} placeholder="20" className="w-16" type="number" />
-                    <span className="text-xs text-gray-500">대</span>
+                  <div className="flex items-center gap-2 sm:gap-4 flex-wrap sm:flex-nowrap">
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-gray-500 whitespace-nowrap">대장상</span>
+                      <TInput value={form.parking_legal} onChange={v => set('parking_legal', v)} placeholder="12" className="w-16" type="number" />
+                      <span className="text-xs text-gray-500 whitespace-nowrap">대</span>
+                    </div>
+                    <div className="flex items-center gap-1 ml-0 sm:ml-4">
+                      <span className="text-xs text-gray-500 whitespace-nowrap">실주차</span>
+                      <TInput value={form.parking_actual} onChange={v => set('parking_actual', v)} placeholder="20" className="w-16" type="number" />
+                      <span className="text-xs text-gray-500 whitespace-nowrap">대</span>
+                    </div>
                   </div>
                 </TCell>
               </tr>
