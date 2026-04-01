@@ -171,13 +171,18 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
     } catch { toast.error('업로드 실패') } finally { setNamecardUploading(false) }
   }
 
-  const buildContactFooter = () => {
+  // 인사말 — 블로그 글 최상단에 위치
+  const buildGreetingHeader = () => {
+    if (!realtorGreeting.trim()) return ''
+    return `${realtorGreeting.trim()}\n\n`
+  }
+
+  // 공인중개사 정보 + 명함 — 블로그 글 최하단에 위치
+  const buildRealtorFooter = () => {
     const hasInfo = realtorName || realtorAddress || realtorPhone
-    const hasGreeting = realtorGreeting.trim()
     const hasNamecard = namecardUrl
-    if (!hasInfo && !hasGreeting && !hasNamecard) return ''
+    if (!hasInfo && !hasNamecard) return ''
     let footer = '\n\n---\n\n## 📞 문의 안내\n\n'
-    if (hasGreeting) footer += `${realtorGreeting}\n\n`
     if (hasInfo) {
       footer += `${realtorName ? `- **공인중개사:** ${realtorName}\n` : ''}${realtorAddress ? `- **사무소 주소:** ${realtorAddress}\n` : ''}${realtorPhone ? `- **연락처:** ${realtorPhone}\n` : ''}\n`
       footer += '신뢰할 수 있는 부동산 전문가와 함께 최선의 매물을 찾아드립니다. 언제든지 편하게 문의해 주세요! 😊\n'
@@ -185,6 +190,10 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
     if (hasNamecard) footer += `\n![공인중개사 명함](${namecardUrl})\n`
     return footer
   }
+
+  // 미리보기·업로드에 사용할 전체 내용 (인사말 + 본문 + 공인중개사 정보)
+  const buildFullContent = () =>
+    buildGreetingHeader() + (editContent || selected?.content || '') + buildRealtorFooter()
 
   const handleRegenerateTitles = async () => {
     if (!selectedId) return
@@ -254,7 +263,7 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
           content_id: selectedId,
           project_id: projectId,
           content_title: selectedTitle ?? selected.title,
-          content_body: (editContent || selected.content) + buildContactFooter(),
+          content_body: buildFullContent(),
           content_tags: selected.tags ?? [],
           photo_layout: photoLayout,
           photo_position: photoPosition,
@@ -534,7 +543,7 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
             <div className="mb-3 border-t border-gray-100 pt-3 space-y-3">
               {/* 인사말 */}
               <div>
-                <label className="text-xs text-gray-500 mb-1.5 block font-medium">인사말 (블로그 하단 자동 삽입)</label>
+                <label className="text-xs text-gray-500 mb-1.5 block font-medium">인사말 (블로그 최상단 자동 삽입)</label>
                 <textarea
                   placeholder={"예: 안녕하세요! 10년 경력의 홍길동 공인중개사입니다.\n부동산 관련 궁금하신 점은 언제든지 연락 주세요."}
                   value={realtorGreeting}
@@ -583,7 +592,7 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
               {/* 명함 이미지 */}
               <div>
                 <label className="text-xs text-gray-500 mb-1.5 flex items-center gap-1 font-medium">
-                  <CreditCard size={11} /> 명함/네임카드 (블로그 마지막 삽입)
+                  <CreditCard size={11} /> 명함/네임카드 (공인중개사 정보 아래 삽입)
                 </label>
                 {namecardUrl ? (
                   <div className="relative rounded-lg overflow-hidden border border-gray-200 mb-1.5">
@@ -829,16 +838,16 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
                     {showPreview ? '편집 모드' : '미리보기'}
                   </button>
                   <span className="text-xs text-gray-400">
-                    {editContent.length.toLocaleString()}자
-                    {editContent.length < 1500 && (
+                    {buildFullContent().length.toLocaleString()}자
+                    {buildFullContent().length < 1500 && (
                       <span className="text-amber-600 ml-1">
                         <AlertCircle size={12} className="inline mr-0.5" />
-                        {1500 - editContent.length}자 부족
+                        {1500 - buildFullContent().length}자 부족
                       </span>
                     )}
                   </span>
                   <button
-                    onClick={() => copyToClipboard(editContent, 'content')}
+                    onClick={() => copyToClipboard(buildFullContent(), 'content')}
                     className="btn-secondary py-1.5 text-xs"
                   >
                     {copiedTitle === 'content' ? <Check size={12} /> : <Copy size={12} />}
@@ -849,7 +858,7 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
 
               {showPreview ? (
                 <div className="w-full min-h-[400px] max-h-[600px] overflow-y-auto text-sm text-gray-700 border border-gray-200 rounded-lg p-4 bg-white prose prose-sm max-w-none">
-                  {editContent.split('\n').map((line, i) => {
+                  {buildFullContent().split('\n').map((line, i) => {
                     const imgMatch = line.match(/!\[(.*?)\]\((.*?)\)/)
                     if (imgMatch) {
                       const url = imgMatch[2];
