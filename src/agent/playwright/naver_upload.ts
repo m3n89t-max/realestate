@@ -2,7 +2,7 @@ import { chromium } from 'playwright';
 import { AgentConfig, getCredentials } from '../config';
 import { sendTaskProgress, getContent, getAssets, updateContent } from '../webhook-client';
 import { tmpdir } from 'os';
-import { writeFileSync, existsSync } from 'fs';
+import { writeFileSync } from 'fs';
 import { join } from 'path';
 import path from 'path';
 import os from 'os';
@@ -226,17 +226,31 @@ export async function uploadNaverBlog(
                 <head>
                     <meta charset="utf-8">
                     <style>
-                        body { 
-                            font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-                            background: white; 
-                            margin: 0; 
-                            padding: 20px; 
+                        * { box-sizing: border-box; margin: 0; padding: 0; }
+                        body {
+                            font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "Segoe UI", sans-serif;
+                            background: white;
+                            padding: 20px;
+                            font-size: 13px;
+                            color: #222;
                         }
                         #table-container {
                             display: inline-block;
                             background: white;
-                            min-width: 600px;
-                            max-width: 800px;
+                            min-width: 680px;
+                            max-width: 900px;
+                        }
+                        table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            font-size: 13px;
+                            margin: 0;
+                        }
+                        td, th {
+                            border: 1px solid #ccc;
+                            padding: 7px 10px;
+                            vertical-align: middle;
+                            line-height: 1.4;
                         }
                     </style>
                 </head>
@@ -268,6 +282,10 @@ export async function uploadNaverBlog(
         await mainFrame.locator('.se-section-text').first().click();
         await page.waitForTimeout(500);
 
+        // task.payload.content_body 우선 사용 (buildFullContent 포함: 인사말+본문+공인중개사 정보)
+        // 없으면 DB에서 가져온 content.content 사용
+        const bodyText: string = task.payload?.content_body || content.content || '';
+
         if (photoPosition === 'inline') {
             // ── 인라인 모드: 텍스트 중간에 이미지 삽입 ─────────────────────────────
             // 마크다운 이미지 URL에서 직접 다운로드 (URL 매칭 불필요)
@@ -293,7 +311,7 @@ export async function uploadNaverBlog(
                 }
             };
 
-            const parts = (content.content || '').split(/(<table[\s\S]*?<\/table>)/i);
+            const parts = bodyText.split(/(<table[\s\S]*?<\/table>)/i);
             let imgIdx = 0;
 
             for (let pIdx = 0; pIdx < parts.length; pIdx++) {
@@ -327,7 +345,7 @@ export async function uploadNaverBlog(
             }
         } else {
             // ── 일괄 모드: 텍스트 전체 입력 후 이미지 마지막에 삽입 ─────────────────
-            const parts = (content.content || '').split(/(<table[\s\S]*?<\/table>)/i);
+            const parts = bodyText.split(/(<table[\s\S]*?<\/table>)/i);
 
             for (let pIdx = 0; pIdx < parts.length; pIdx++) {
                 if (pIdx % 2 === 1) {
