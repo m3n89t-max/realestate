@@ -179,13 +179,48 @@ export async function uploadNaverBlog(
         );
         await page.waitForTimeout(800);
 
-        // 마크다운 줄 → 네이버용 텍스트로 변환 (이미지 제외)
+        // 마크다운 텍스트 정규화 (헤딩 제거, ** 제거, HTML 제거)
         const stripLine = (line: string) => line
             .replace(/<[^>]+>/g, '')
             .replace(/^#{1,6}\s+/, '')
             .replace(/\*\*([^*]+)\*\*/g, '$1')
             .replace(/\*([^*]+)\*/g, '$1')
             .replace(/^[-*]\s/, '• ');
+
+        // 에디터 포커스 확보 헬퍼
+        const focusEditor = async () => {
+            await mainFrame.locator('.se-section-text').first().click();
+            await page.waitForTimeout(150);
+        };
+
+        // 텍스트 입력 (bold 여부 지정 가능)
+        const typeText = async (text: string, bold = false) => {
+            await focusEditor();
+            if (bold) await page.keyboard.press('Control+B');
+            await mainFrame.locator('.se-section-text').first().pressSequentially(text, { delay: 15 });
+            if (bold) await page.keyboard.press('Control+B');
+        };
+
+        // 구분선 삽입
+        const insertHR = async () => {
+            const hrSelectors = [
+                'button[data-name="horizontalRule"]',
+                '.se-toolbar-item-horizontalrule > button',
+                'button[aria-label="구분선"]',
+                'button[title="구분선"]',
+            ];
+            for (const sel of hrSelectors) {
+                for (const ctx of [mainFrame, page]) {
+                    if (await ctx.locator(sel).count() > 0) {
+                        await ctx.locator(sel).first().click();
+                        await page.waitForTimeout(400);
+                        return;
+                    }
+                }
+            }
+            // fallback: 긴 대시 줄
+            await typeText('──────────────────────────────');
+        };
 
         // 이미지 1장을 현재 커서 위치에 삽입하는 헬퍼
         const insertImageAtCursor = async (tmpPath: string) => {
@@ -224,65 +259,30 @@ export async function uploadNaverBlog(
             await page.waitForTimeout(2000);
         };
 
-        // HTML 표 등 구조화된 콘텐츠를 이미지로 렌더링하고 사진으로 삽입하는 헬퍼
-        // 네이버 에디터의 강력한 HTML 필터링을 완벽히 우회하여 예쁜 서식을 유지합니다.
+        // HTML 표를 이미지로 렌더링 후 삽입 — renderPage 닫은 뒤 포커스 복구
         const insertHtmlAsImage = async (htmlStr: string, idx: number) => {
+            const imgPath = join(tmpdir(), `naver_table_${Date.now()}_${idx}.png`);
+            // 1) 별도 탭에서 스크린샷 촬영
             const renderPage = await context.newPage();
             try {
-                const fullHtml = `
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <meta charset="utf-8">
-                    <style>
-                        * { box-sizing: border-box; margin: 0; padding: 0; }
-                        body {
-                            font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "Segoe UI", sans-serif;
-                            background: white;
-                            padding: 20px;
-                            font-size: 13px;
-                            color: #222;
-                        }
-                        #table-container {
-                            display: inline-block;
-                            background: white;
-                            min-width: 680px;
-                            max-width: 900px;
-                        }
-                        table {
-                            width: 100%;
-                            border-collapse: collapse;
-                            font-size: 13px;
-                            margin: 0;
-                        }
-                        td, th {
-                            border: 1px solid #ccc;
-                            padding: 7px 10px;
-                            vertical-align: middle;
-                            line-height: 1.4;
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div id="table-container">
-                        ${htmlStr}
-                    </div>
-                </body>
-                </html>
-                `;
-                await renderPage.setContent(fullHtml, { waitUntil: 'load' });
-                
-                const tableEl = renderPage.locator('#table-container');
-                const imgPath = join(tmpdir(), `naver_table_${Date.now()}_${idx}.png`);
-                await tableEl.screenshot({ path: imgPath, type: 'png', omitBackground: true });
-                
-                await page.bringToFront();
-                await insertImageAtCursor(imgPath);
-            } catch (err) {
-                console.error('[NaverUpload] 표 이미지 변환 실패:', err);
+                const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+                    *{box-sizing:border-box;margin:0;padding:0;}
+                    body{font-family:-apple-system,BlinkMacSystemFont,"Malgun Gothic","Segoe UI",sans-serif;background:white;padding:20px;font-size:13px;color:#222;}
+                    #tc{display:inline-block;background:white;min-width:680px;max-width:900px;}
+                    table{width:100%;border-collapse:collapse;font-size:13px;}
+                    td,th{border:1px solid #ccc;padding:7px 10px;vertical-align:middle;line-height:1.4;}
+                </style></head><body><div id="tc">${htmlStr}</div></body></html>`;
+                await renderPage.setContent(fullHtml, { waitUntil: 'networkidle', timeout: 15_000 });
+                await renderPage.waitForTimeout(300);
+                await renderPage.locator('#tc').screenshot({ path: imgPath, type: 'png', omitBackground: true });
             } finally {
-                await renderPage.close();
+                await renderPage.close(); // 먼저 닫고
             }
+            // 2) 원본 페이지로 복귀 후 이미지 삽입
+            await page.bringToFront();
+            await page.waitForTimeout(600);
+            await focusEditor();
+            await insertImageAtCursor(imgPath);
         };
 
         // 7. 본문 입력
@@ -317,66 +317,90 @@ export async function uploadNaverBlog(
             }
         }
 
-        if (photoPosition === 'inline') {
-            // ── 인라인 모드: 텍스트 중간에 이미지 삽입 ─────────────────────────────
-            // 마크다운 이미지 URL에서 직접 다운로드 (URL 매칭 불필요)
-            const IMAGE_EXTS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp']);
-            const downloadImage = async (imgUrl: string, idx: number): Promise<string | null> => {
-                try {
-                    const matchExt = imgUrl.match(/\.([a-zA-Z0-9]+)(?:[\?#]|$)/);
-                    const ext = (matchExt ? matchExt[1] : 'jpg').toLowerCase();
-                    // 이미지 형식이 아니면 건너뜀 (mp4, mov 등 동영상 파일 제외)
-                    if (!IMAGE_EXTS.has(ext)) {
-                        console.warn(`[NaverUpload] 이미지 아닌 파일 건너뜀: ${imgUrl}`);
-                        return null;
-                    }
-                    const res = await fetch(imgUrl);
-                    if (!res.ok) return null;
-                    const buf = await res.arrayBuffer();
-                    const tmpPath = join(tmpdir(), `naver_inline_${Date.now()}_${idx}.${ext}`);
-                    writeFileSync(tmpPath, Buffer.from(buf));
-                    return tmpPath;
-                } catch (e) {
-                    console.warn(`[NaverUpload] 이미지 다운로드 실패: ${imgUrl}`, e);
+        // 이미지 URL 다운로드 공통 헬퍼
+        const IMAGE_EXTS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp']);
+        const downloadImage = async (imgUrl: string, idx: number): Promise<string | null> => {
+            try {
+                const matchExt = imgUrl.match(/\.([a-zA-Z0-9]+)(?:[\?#]|$)/);
+                const ext = (matchExt ? matchExt[1] : 'jpg').toLowerCase();
+                if (!IMAGE_EXTS.has(ext)) {
+                    console.warn(`[NaverUpload] 이미지 아닌 파일 건너뜀: ${imgUrl}`);
                     return null;
                 }
-            };
+                const res = await fetch(imgUrl);
+                if (!res.ok) return null;
+                const buf = await res.arrayBuffer();
+                const tmpPath = join(tmpdir(), `naver_inline_${Date.now()}_${idx}.${ext}`);
+                writeFileSync(tmpPath, Buffer.from(buf));
+                return tmpPath;
+            } catch (e) {
+                console.warn(`[NaverUpload] 이미지 다운로드 실패: ${imgUrl}`, e);
+                return null;
+            }
+        };
 
-            const parts = bodyText.split(/(<table[\s\S]*?<\/table>)/i);
-            let imgIdx = 0;
+        // 한 줄 처리 (헤딩→굵게, ---→구분선, 이미지→삽입, 일반→타이핑)
+        const processLine = async (line: string, imgIdxRef: { v: number }) => {
+            const imgMatch = line.match(/!\[([^\]]*)\]\(([^)]+)\)/);
+            if (imgMatch) {
+                // 이미지 마크다운 → 다운로드 후 삽입
+                const tmpPath = await downloadImage(imgMatch[2], imgIdxRef.v++);
+                if (tmpPath) {
+                    await focusEditor();
+                    await insertImageAtCursor(tmpPath);
+                    await page.keyboard.press('Enter');
+                }
+                return;
+            }
+            if (line.match(/^\*▲/)) return; // 캡션 건너뜀
+            if (line.match(/^---+\s*$/)) {
+                // 마크다운 수평선 → 네이버 구분선
+                await insertHR();
+                await page.keyboard.press('Enter');
+                return;
+            }
+            if (line.match(/^#{1,6}\s+/)) {
+                // 헤딩 → 굵은 글씨
+                const headText = line
+                    .replace(/^#{1,6}\s+/, '')
+                    .replace(/\*\*([^*]+)\*\*/g, '$1')
+                    .replace(/\*([^*]+)\*/g, '$1')
+                    .replace(/<[^>]+>/g, '');
+                if (headText.trim()) await typeText(headText, true);
+                await page.keyboard.press('Enter');
+                return;
+            }
+            // 일반 텍스트 — **bold** 인라인 지원
+            const plain = stripLine(line);
+            if (plain.trim()) await typeText(plain);
+            await page.keyboard.press('Enter');
+        };
+
+        if (photoPosition === 'inline') {
+            // ── 인라인 모드 ─────────────────────────────────────────────────────────
+            // bodyText를 코드펜스 속 테이블도 포함해 분리
+            // (GPT가 ```html ... ``` 로 감쌌을 경우도 처리)
+            const normalizedBody = bodyText.replace(/```(?:html)?\s*(<table[\s\S]*?<\/table>)\s*```/gi, '$1');
+            const parts = normalizedBody.split(/(<table[\s\S]*?<\/table>)/i);
+            const imgIdxRef = { v: 0 };
 
             for (let pIdx = 0; pIdx < parts.length; pIdx++) {
                 if (pIdx % 2 === 1) {
+                    // 홀수 파트 = 테이블 HTML → 이미지로 렌더링
                     await insertHtmlAsImage(parts[pIdx], pIdx);
                     await page.keyboard.press('Enter');
                     continue;
                 }
-
-                const rawLines = parts[pIdx].split('\n');
-                for (const line of rawLines) {
-                    const imgMatch = line.match(/!\[([^\]]*)\]\(([^)]+)\)/);
-                    if (imgMatch) {
-                        // 이미지 라인 → URL에서 직접 다운로드 후 삽입
-                        const tmpPath = await downloadImage(imgMatch[2], imgIdx++);
-                        if (tmpPath) {
-                            await insertImageAtCursor(tmpPath);
-                            await page.keyboard.press('Enter');
-                        }
-                    } else if (line.match(/^\*▲/)) {
-                        // 캡션 라인 — 건너뜀
-                    } else {
-                        const stripped = stripLine(line);
-                        if (stripped.trim()) {
-                            await mainFrame.locator('.se-section-text').first().pressSequentially(stripped, { delay: 20 });
-                        }
-                        await page.keyboard.press('Enter');
-                    }
-                    await page.waitForTimeout(80);
+                for (const line of parts[pIdx].split('\n')) {
+                    await processLine(line, imgIdxRef);
+                    await page.waitForTimeout(60);
                 }
             }
         } else {
-            // ── 일괄 모드: 텍스트 전체 입력 후 이미지 마지막에 삽입 ─────────────────
-            const parts = bodyText.split(/(<table[\s\S]*?<\/table>)/i);
+            // ── 일괄 모드: 텍스트 전체 입력 (헤딩/구분선 포함) 후 이미지 마지막에 삽입 ──
+            const normalizedBody2 = bodyText.replace(/```(?:html)?\s*(<table[\s\S]*?<\/table>)\s*```/gi, '$1');
+            const parts = normalizedBody2.split(/(<table[\s\S]*?<\/table>)/i);
+            const imgIdxRef2 = { v: 0 };
 
             for (let pIdx = 0; pIdx < parts.length; pIdx++) {
                 if (pIdx % 2 === 1) {
@@ -385,31 +409,11 @@ export async function uploadNaverBlog(
                     continue;
                 }
 
-                const plainBody = parts[pIdx]
-                    .replace(/!\[.*?\]\(.*?\)/g, '')
-                    .replace(/\*▲.*?\*/g, '')
-                    .replace(/<[^>]+>/g, '')  // table은 이미 parts 홀수 인덱스로 빠졌으므로 안전함
-                    .replace(/^#{1,6}\s+/gm, '')
-                    .replace(/\*\*([^*]+)\*\*/g, '$1')
-                    .replace(/\*([^*]+)\*/g, '$1')
-                    .replace(/^[-*]\s/gm, '• ')
-                    .replace(/\n{3,}/g, '\n\n')
-                    .trim();
-
-                if (!plainBody) continue;
-
-                const lines = plainBody.split('\n');
-                for (let i = 0; i < lines.length; i++) {
-                    if (lines[i].trim()) {
-                        await mainFrame.locator('.se-section-text').first().pressSequentially(lines[i], { delay: 20 });
-                    }
-                    if (i < lines.length - 1) await page.keyboard.press('Enter');
-                    await page.waitForTimeout(80);
-                }
-                
-                // 마지막 파트가 아니면 들여쓰기/여백 추가
-                if (pIdx < parts.length - 1) {
-                    await page.keyboard.press('Enter');
+                for (const line of parts[pIdx].replace(/\n{3,}/g, '\n\n').split('\n')) {
+                    // 이미지는 건너뜀 (일괄 모드에서는 마지막에 업로드)
+                    if (line.match(/!\[.*?\]\(.*?\)/)) continue;
+                    await processLine(line, imgIdxRef2);
+                    await page.waitForTimeout(60);
                 }
             }
 
@@ -419,13 +423,12 @@ export async function uploadNaverBlog(
                 await page.keyboard.press('Control+End');
                 await page.keyboard.press('Enter');
 
-                const BULK_IMAGE_EXTS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp']);
                 const tempPaths: string[] = [];
                 for (let i = 0; i < assets.length; i++) {
                     try {
                         const matchExt = assets[i].file_url.match(/\.([a-zA-Z0-9]+)(?:[\?#]|$)/);
                         const ext = (matchExt ? matchExt[1] : 'jpg').toLowerCase();
-                        if (!BULK_IMAGE_EXTS.has(ext)) {
+                        if (!IMAGE_EXTS.has(ext)) {
                             console.warn(`[NaverUpload] 이미지 아닌 파일 건너뜀: ${assets[i].file_url}`);
                             continue;
                         }
