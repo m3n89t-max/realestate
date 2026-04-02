@@ -147,6 +147,16 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
     } catch {}
   }, [style, tone, format, focus, photoLayout, photoPosition])
 
+  // 공인중개사 정보 변경 시 자동 저장 (저장 버튼 없이도 유지)
+  useEffect(() => {
+    if (!realtorName && !realtorAddress && !realtorPhone && !realtorGreeting) return
+    try {
+      localStorage.setItem('realestate_realtor', JSON.stringify({
+        name: realtorName, address: realtorAddress, phone: realtorPhone, greeting: realtorGreeting,
+      }))
+    } catch {}
+  }, [realtorName, realtorAddress, realtorPhone, realtorGreeting])
+
   // 업로드 작업 목록 로드 + Realtime 구독
   useEffect(() => {
     const fetchTasks = async () => {
