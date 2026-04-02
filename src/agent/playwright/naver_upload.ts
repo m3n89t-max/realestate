@@ -376,42 +376,47 @@ export async function uploadNaverBlog(
             await page.keyboard.press('Enter');
         };
 
+        // 5줄마다 취소 확인 (매줄 DB 조회 방지)
+        let lineCount = 0;
+        const checkCancelEvery5 = async () => {
+            if (++lineCount % 5 === 0) await assertNotCancelled();
+        };
+
         if (photoPosition === 'inline') {
             // ── 인라인 모드 ─────────────────────────────────────────────────────────
-            // bodyText를 코드펜스 속 테이블도 포함해 분리
-            // (GPT가 ```html ... ``` 로 감쌌을 경우도 처리)
             const normalizedBody = bodyText.replace(/```(?:html)?\s*(<table[\s\S]*?<\/table>)\s*```/gi, '$1');
             const parts = normalizedBody.split(/(<table[\s\S]*?<\/table>)/i);
             const imgIdxRef = { v: 0 };
 
             for (let pIdx = 0; pIdx < parts.length; pIdx++) {
+                await assertNotCancelled(); // 파트 단위 체크
                 if (pIdx % 2 === 1) {
-                    // 홀수 파트 = 테이블 HTML → 이미지로 렌더링
                     await insertHtmlAsImage(parts[pIdx], pIdx);
                     await page.keyboard.press('Enter');
                     continue;
                 }
                 for (const line of parts[pIdx].split('\n')) {
+                    await checkCancelEvery5();
                     await processLine(line, imgIdxRef);
                     await page.waitForTimeout(60);
                 }
             }
         } else {
-            // ── 일괄 모드: 텍스트 전체 입력 (헤딩/구분선 포함) 후 이미지 마지막에 삽입 ──
+            // ── 일괄 모드 ───────────────────────────────────────────────────────────
             const normalizedBody2 = bodyText.replace(/```(?:html)?\s*(<table[\s\S]*?<\/table>)\s*```/gi, '$1');
             const parts = normalizedBody2.split(/(<table[\s\S]*?<\/table>)/i);
             const imgIdxRef2 = { v: 0 };
 
             for (let pIdx = 0; pIdx < parts.length; pIdx++) {
+                await assertNotCancelled(); // 파트 단위 체크
                 if (pIdx % 2 === 1) {
                     await insertHtmlAsImage(parts[pIdx], pIdx);
                     await page.keyboard.press('Enter');
                     continue;
                 }
-
                 for (const line of parts[pIdx].replace(/\n{3,}/g, '\n\n').split('\n')) {
-                    // 이미지는 건너뜀 (일괄 모드에서는 마지막에 업로드)
                     if (line.match(/!\[.*?\]\(.*?\)/)) continue;
+                    await checkCancelEvery5();
                     await processLine(line, imgIdxRef2);
                     await page.waitForTimeout(60);
                 }
