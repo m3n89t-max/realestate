@@ -187,27 +187,133 @@ export async function uploadNaverBlog(
             .replace(/\*([^*]+)\*/g, '$1')
             .replace(/^[-*]\s/, '• ');
 
-        // 에디터 포커스 확보 헬퍼
+        // 에디터 포커스 확보 헬퍼 (마지막 섹션 끝으로 이동)
         const focusEditor = async () => {
-            await mainFrame.locator('.se-section-text').first().click();
-            await page.waitForTimeout(150);
+            // 마지막 텍스트 섹션 클릭 → Ctrl+End 로 커서를 맨 끝으로
+            const sections = mainFrame.locator('.se-section-text');
+            const count = await sections.count();
+            await (count > 0 ? sections.nth(count - 1) : sections.first()).click();
+            await page.waitForTimeout(100);
+            await page.keyboard.press('Control+End'); // 문서 끝으로 커서 이동
+            await page.waitForTimeout(50);
+        };
+
+        // SE3 볼드 툴바 버튼 셀렉터 (data-name="bold", class="se-bold-toolbar-button" 확인됨)
+        const BOLD_BTN_SELECTORS = [
+            'button[data-name="bold"]',                 // ✓ 실제 data-name 확인됨
+            'button.se-bold-toolbar-button',            // ✓ 실제 class 확인됨
+            'button[class*="se-bold-toolbar"]',
+            '.se-toolbar-item-bold > button',
+            'button[aria-label="굵게"]',
+            'button[title="굵게"]',
+        ];
+
+        // SE3 볼드 버튼 클릭 토글 (Ctrl+B 대신 툴바 버튼 직접 클릭)
+        const toggleBold = async () => {
+            for (const sel of BOLD_BTN_SELECTORS) {
+                for (const ctx of [mainFrame, page]) {
+                    if (await ctx.locator(sel).count() > 0) {
+                        await ctx.locator(sel).first().click({ force: true });
+                        await page.waitForTimeout(80);
+                        return;
+                    }
+                }
+            }
+            // 버튼 못 찾으면 Ctrl+B fallback
+            await page.keyboard.press('Control+B');
+            await page.waitForTimeout(80);
+        };
+
+        // SE3 글자 크기 변경 (data-name="font-size" 확인됨)
+        const FONTSIZE_BTN_SELECTORS = [
+            'button[data-name="font-size"]',
+            'button[data-log="prt.size"]',
+            'button.se-font-size-code-toolbar-button',
+        ];
+        const setFontSize = async (size: number) => {
+            let btn = null;
+            for (const sel of FONTSIZE_BTN_SELECTORS) {
+                for (const ctx of [mainFrame, page]) {
+                    if (await ctx.locator(sel).count() > 0) { btn = ctx.locator(sel).first(); break; }
+                }
+                if (btn) break;
+            }
+            if (!btn) return;
+            await btn.click({ force: true });
+            await page.waitForTimeout(400);
+            const sizeStr = String(size);
+            // 드롭다운에서 해당 크기 클릭 (다양한 셀렉터 시도)
+            for (const ctx of [mainFrame, page]) {
+                for (const sel of [
+                    `li[data-value="${sizeStr}"]`,
+                    `button[data-value="${sizeStr}"]`,
+                    `.se-list-item[data-value="${sizeStr}"]`,
+                    `.se-dropdown-item[data-value="${sizeStr}"]`,
+                    `[data-value="${sizeStr}"]`,
+                ]) {
+                    if (await ctx.locator(sel).count() > 0) {
+                        await ctx.locator(sel).first().click();
+                        await page.waitForTimeout(150);
+                        return;
+                    }
+                }
+                // 텍스트 매칭 (다양한 리스트 아이템 형태)
+                for (const listSel of ['li.se-list-item', '.se-listitem', 'li', '.se-dropdown-item']) {
+                    const opt = ctx.locator(listSel).filter({ hasText: new RegExp(`^${sizeStr}$`) }).first();
+                    if (await opt.count() > 0) { await opt.click(); await page.waitForTimeout(150); return; }
+                }
+            }
+            await page.keyboard.press('Escape'); // 못 찾으면 닫기
+            await page.waitForTimeout(100);
         };
 
         // 텍스트 입력 (bold 여부 지정 가능)
+        // page.keyboard.type 사용: 툴바 버튼 클릭 후 포커스가 유지된 상태에서 타이핑
         const typeText = async (text: string, bold = false) => {
-            await focusEditor();
-            if (bold) await page.keyboard.press('Control+B');
-            await mainFrame.locator('.se-section-text').first().pressSequentially(text, { delay: 15 });
-            if (bold) await page.keyboard.press('Control+B');
+            if (bold) {
+                await toggleBold();
+                // 볼드 버튼 클릭 후 에디터 포커스 복원 (툴바 클릭이 포커스를 가져갈 수 있음)
+                await focusEditor();
+            }
+            await page.keyboard.type(text, { delay: 20 });
+            if (bold) {
+                await toggleBold();
+                await page.waitForTimeout(50);
+            }
+        };
+
+        // 인라인 볼드(**...**) 처리 — 단락 내 굵은 글씨 지원
+        const typeInlineBold = async (text: string) => {
+            // 헤딩/HTML 태그 제거 후 인라인 볼드 분리
+            const cleaned = text
+                .replace(/<[^>]+>/g, '')
+                .replace(/^#{1,6}\s+/, '')
+                .replace(/^[-*]\s/, '• ');
+            const parts = cleaned.split(/(\*\*[^*]+\*\*)/);
+            for (const part of parts) {
+                if (!part) continue;
+                const boldMatch = part.match(/^\*\*([^*]+)\*\*$/);
+                if (boldMatch) {
+                    await typeText(boldMatch[1], true);
+                } else {
+                    const noItalic = part.replace(/\*([^*]+)\*/g, '$1');
+                    if (noItalic) await typeText(noItalic);
+                }
+            }
         };
 
         // 구분선 삽입
         const insertHR = async () => {
             const hrSelectors = [
+                'button[data-name="horizontal-line"]',          // SE3 실제 data-name
+                'button[data-log*="horizt"]',                   // data-log="dot.horizontal-line"
                 'button[data-name="horizontalRule"]',
                 '.se-toolbar-item-horizontalrule > button',
                 'button[aria-label="구분선"]',
-                'button[title="구분선"]',
+                'button[aria-label*="구분선"]',
+                'button[title*="구분선"]',
+                'button[data-se-item-name="horizontalRule"]',
+                '.se-toolbar__item--horizontalrule button',
             ];
             for (const sel of hrSelectors) {
                 for (const ctx of [mainFrame, page]) {
@@ -222,65 +328,117 @@ export async function uploadNaverBlog(
             await typeText('──────────────────────────────');
         };
 
-        // 이미지 1장을 현재 커서 위치에 삽입하는 헬퍼
-        const insertImageAtCursor = async (tmpPath: string) => {
-            const imgBtn = mainFrame.locator('button[data-name="image"], button[aria-label*="이미지 첨부"]').first();
-            if (await imgBtn.count() === 0) return;
-            const [fileChooser] = await Promise.all([
-                page.waitForEvent('filechooser', { timeout: 10_000 }).catch(() => null),
-                imgBtn.click(),
-            ]);
-            if (!fileChooser) return;
-            await fileChooser.setFiles([tmpPath]);
-            await page.waitForTimeout(2000);
+        // Naver SE3 이미지 버튼 셀렉터 (data-name="image", class="se-image-toolbar-button" 확인됨)
+        const IMAGE_BTN_SELECTORS = [
+            'button[data-name="image"]',                    // ✓ 실제 data-name 확인됨
+            'button.se-image-toolbar-button',               // ✓ 실제 class 확인됨
+            'button[class*="se-image-toolbar-button"]',
+            '.se-toolbar-item-image > button',
+            '.se-toolbar-item-image button',
+            'button[aria-label*="사진"]',
+            'button[title*="사진"]',
+        ];
 
-            // 사진 첨부 방식 다이얼로그 처리
+        // 이미지 버튼 탐색 헬퍼 (mainFrame 우선, page fallback)
+        const findImageButton = async () => {
+            for (const sel of IMAGE_BTN_SELECTORS) {
+                const c = mainFrame.locator(sel).first();
+                if (await c.count() > 0) {
+                    console.log(`[NaverUpload] 이미지 버튼 발견(mainFrame): ${sel}`);
+                    return c;
+                }
+                const cp = page.locator(sel).first();
+                if (await cp.count() > 0) {
+                    console.log(`[NaverUpload] 이미지 버튼 발견(page): ${sel}`);
+                    return cp;
+                }
+            }
+            console.warn('[NaverUpload] ⚠️ 이미지 버튼을 찾지 못했습니다. 모든 셀렉터 실패.');
+            return null;
+        };
+
+        // 사진 첨부 방식 다이얼로그 공통 처리
+        const handlePhotoDialog = async () => {
+            await page.waitForTimeout(1500);
             const dialogVisible = await page.locator('text=사진 첨부 방식').count() > 0
                 || await mainFrame.locator('text=사진 첨부 방식').count() > 0;
-            if (dialogVisible) {
-                for (const sel of [`text=${layoutLabel}`, `[data-type="${photoLayout}"]`, '.se-popup-photo-layout-item:first-child']) {
-                    for (const ctx of [page, mainFrame]) {
-                        if (await ctx.locator(sel).count() > 0) {
-                            await ctx.locator(sel).first().click();
-                            break;
-                        }
-                    }
-                }
-                await page.waitForTimeout(400);
-                for (const sel of ['button:has-text("확인")', 'button:has-text("적용")', '.se-popup-button-primary']) {
-                    for (const ctx of [page, mainFrame]) {
-                        if (await ctx.locator(sel).count() > 0) {
-                            await ctx.locator(sel).first().click();
-                            break;
-                        }
+            if (!dialogVisible) return;
+            for (const sel of [`text=${layoutLabel}`, `[data-type="${photoLayout}"]`, '.se-popup-photo-layout-item:first-child']) {
+                for (const ctx of [page, mainFrame]) {
+                    if (await ctx.locator(sel).count() > 0) {
+                        await ctx.locator(sel).first().click();
+                        break;
                     }
                 }
             }
+            await page.waitForTimeout(400);
+            for (const sel of ['button:has-text("확인")', 'button:has-text("적용")', '.se-popup-button-primary']) {
+                for (const ctx of [page, mainFrame]) {
+                    if (await ctx.locator(sel).count() > 0) {
+                        await ctx.locator(sel).first().click();
+                        break;
+                    }
+                }
+            }
+        };
+
+        // 이미지 1장을 현재 커서 위치에 삽입하는 헬퍼
+        const insertImageAtCursor = async (tmpPath: string) => {
+            const imgBtn = await findImageButton();
+            if (!imgBtn) return;
+
+            const [fileChooser] = await Promise.all([
+                page.waitForEvent('filechooser', { timeout: 12_000 }).catch(() => null),
+                imgBtn.click(),
+            ]);
+            if (!fileChooser) {
+                console.warn('[NaverUpload] ⚠️ 파일 선택 다이얼로그가 열리지 않았습니다.');
+                return;
+            }
+            await fileChooser.setFiles([tmpPath]);
+            await handlePhotoDialog();
             await page.waitForTimeout(2000);
         };
 
-        // HTML 표를 이미지로 렌더링 후 삽입 — renderPage 닫은 뒤 포커스 복구
+        // HTML 표를 이미지로 렌더링 후 삽입
+        // context.newPage() 대신 현재 페이지에 숨김 div 주입 → 탭 전환/포커스 문제 없음
         const insertHtmlAsImage = async (htmlStr: string, idx: number) => {
             const imgPath = join(tmpdir(), `naver_table_${Date.now()}_${idx}.png`);
-            // 1) 별도 탭에서 스크린샷 촬영
-            const renderPage = await context.newPage();
-            try {
-                const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+            const divId = `__table_render_${Date.now()}_${idx}__`;
+
+            // 현재 page(메인 프레임 외부)에 스타일 적용 숨김 div 주입
+            await page.evaluate(({ id, html }) => {
+                const div = document.createElement('div');
+                div.id = id;
+                // position:fixed + left:0 + top:0 → Playwright screenshot 가능 (off-screen은 빈 이미지 반환)
+                div.style.cssText = [
+                    'position:fixed',
+                    'left:0',
+                    'top:0',
+                    'z-index:99999',
+                    'background:white',
+                    'padding:20px',
+                    'font-size:13px',
+                    'color:#222',
+                    'font-family:-apple-system,BlinkMacSystemFont,"Malgun Gothic","Segoe UI",sans-serif',
+                    'width:700px',
+                    'box-sizing:border-box',
+                ].join(';');
+                div.innerHTML = `<style>
                     *{box-sizing:border-box;margin:0;padding:0;}
-                    body{font-family:-apple-system,BlinkMacSystemFont,"Malgun Gothic","Segoe UI",sans-serif;background:white;padding:20px;font-size:13px;color:#222;}
-                    #tc{display:inline-block;background:white;min-width:680px;max-width:900px;}
                     table{width:100%;border-collapse:collapse;font-size:13px;}
                     td,th{border:1px solid #ccc;padding:7px 10px;vertical-align:middle;line-height:1.4;}
-                </style></head><body><div id="tc">${htmlStr}</div></body></html>`;
-                await renderPage.setContent(fullHtml, { waitUntil: 'networkidle', timeout: 15_000 });
-                await renderPage.waitForTimeout(300);
-                await renderPage.locator('#tc').screenshot({ path: imgPath, type: 'png', omitBackground: true });
+                </style>${html}`;
+                document.body.appendChild(div);
+            }, { id: divId, html: htmlStr });
+
+            try {
+                await page.locator(`#${divId}`).screenshot({ path: imgPath, type: 'png' });
             } finally {
-                await renderPage.close(); // 먼저 닫고
+                await page.evaluate((id) => document.getElementById(id)?.remove(), divId);
             }
-            // 2) 원본 페이지로 복귀 후 이미지 삽입
-            await page.bringToFront();
-            await page.waitForTimeout(600);
+
+            // 탭 전환 없으므로 포커스 유지 — 바로 이미지 삽입
             await focusEditor();
             await insertImageAtCursor(imgPath);
         };
@@ -288,34 +446,19 @@ export async function uploadNaverBlog(
         // 7. 본문 입력
         await progress(config, task.id, `본문 입력 중... (사진 ${photoPosition === 'inline' ? '인라인' : '일괄'} 모드)`, 55);
         await mainFrame.waitForSelector('.se-section-text', { timeout: 10_000 });
-        await mainFrame.locator('.se-section-text').first().click();
+        await focusEditor();
         await page.waitForTimeout(500);
 
         await assertNotCancelled(); // 본문 입력 전 취소 확인
 
         // task.payload.content_body 우선 사용 (buildFullContent 포함: 인사말+본문+공인중개사 정보)
-        // 없으면 DB에서 가져온 content.content 사용
         const bodyText: string = task.payload?.content_body || content.content || '';
 
-        // 대표이미지 — 본문 최상단에 먼저 삽입 (네이버 썸네일 자동 설정)
-        const coverImageUrl: string | undefined = task.payload?.cover_image_url;
-        if (coverImageUrl) {
-            await progress(config, task.id, '대표이미지 삽입 중...', 57);
-            try {
-                const matchExt = coverImageUrl.match(/\.([a-zA-Z0-9]+)(?:[\?#]|$)/);
-                const ext = (matchExt ? matchExt[1] : 'jpg').toLowerCase();
-                const res = await fetch(coverImageUrl);
-                if (res.ok) {
-                    const buf = await res.arrayBuffer();
-                    const coverPath = join(tmpdir(), `naver_cover_${Date.now()}.${ext}`);
-                    writeFileSync(coverPath, Buffer.from(buf));
-                    await insertImageAtCursor(coverPath);
-                    await page.keyboard.press('Enter');
-                }
-            } catch (e) {
-                console.warn('[NaverUpload] 대표이미지 삽입 실패:', e);
-            }
-        }
+        // 인사말(첫 번째 # 헤딩 이전 텍스트)과 본문을 분리
+        const allBodyLines = bodyText.split('\n');
+        const firstHeadIdx = allBodyLines.findIndex(l => /^#{1,6}\s/.test(l.trim()));
+        const greetingLines = firstHeadIdx > 0 ? allBodyLines.slice(0, firstHeadIdx) : [];
+        const mainBodyText = firstHeadIdx >= 0 ? allBodyLines.slice(firstHeadIdx).join('\n') : bodyText;
 
         // 이미지 URL 다운로드 공통 헬퍼
         const IMAGE_EXTS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp']);
@@ -339,11 +482,11 @@ export async function uploadNaverBlog(
             }
         };
 
-        // 한 줄 처리 (헤딩→굵게, ---→구분선, 이미지→삽입, 일반→타이핑)
+        // 한 줄 처리 (헤딩→크기+굵게+구분선, ---→구분선, 이미지→삽입, 일반→타이핑)
+        let h2Count = 0; // H2 앞 구분선 제어용
         const processLine = async (line: string, imgIdxRef: { v: number }) => {
             const imgMatch = line.match(/!\[([^\]]*)\]\(([^)]+)\)/);
             if (imgMatch) {
-                // 이미지 마크다운 → 다운로드 후 삽입
                 const tmpPath = await downloadImage(imgMatch[2], imgIdxRef.v++);
                 if (tmpPath) {
                     await focusEditor();
@@ -354,42 +497,96 @@ export async function uploadNaverBlog(
             }
             if (line.match(/^\*▲/)) return; // 캡션 건너뜀
             if (line.match(/^---+\s*$/)) {
-                // 마크다운 수평선 → 네이버 구분선
                 await insertHR();
                 await page.keyboard.press('Enter');
                 return;
             }
             if (line.match(/^#{1,6}\s+/)) {
-                // 헤딩 → 굵은 글씨
+                // 헤딩 → 크기+굵게 (H1: 24, H2: 24+구분선, H3+: 18)
+                const level = (line.match(/^(#{1,6})\s+/)?.[1] ?? '##').length;
+                const fontSize = level === 1 ? 24 : level === 2 ? 24 : 18;
                 const headText = line
                     .replace(/^#{1,6}\s+/, '')
                     .replace(/\*\*([^*]+)\*\*/g, '$1')
                     .replace(/\*([^*]+)\*/g, '$1')
                     .replace(/<[^>]+>/g, '');
-                if (headText.trim()) await typeText(headText, true);
+                if (headText.trim()) {
+                    // H2 앞에 구분선 자동 삽입 (콘텐츠 사이 구분)
+                    if (level === 2) {
+                        h2Count++;
+                        if (h2Count > 1) await insertHR(); // 첫 H2 제외
+                    }
+                    await setFontSize(fontSize);
+                    await typeText(headText, true);
+                    await setFontSize(15); // 본문 크기로 복원
+                }
                 await page.keyboard.press('Enter');
                 return;
             }
-            // 일반 텍스트 — **bold** 인라인 지원
-            const plain = stripLine(line);
-            if (plain.trim()) await typeText(plain);
+            // FAQ Q:/A: 라인 — Q는 볼드, A는 일반
+            const qMatch = line.match(/^(?:\d+\.\s*)?Q[：:．.]\s*(.+)/);
+            if (qMatch) {
+                await typeText('Q. ' + qMatch[1].replace(/\*\*([^*]+)\*\*/g, '$1'), true);
+                await page.keyboard.press('Enter');
+                return;
+            }
+            const aMatch = line.match(/^(?:\s*\d+\.\s*)?A[：:．.]\s*(.+)/);
+            if (aMatch) {
+                await typeText('A. ' + aMatch[1].replace(/\*\*([^*]+)\*\*/g, '$1'));
+                await page.keyboard.press('Enter');
+                return;
+            }
+            // 인라인 볼드(**...**) 포함 여부에 따라 분기
+            if (line.includes('**')) {
+                await typeInlineBold(line);
+            } else {
+                const plain = stripLine(line);
+                if (plain.trim()) await typeText(plain);
+            }
             await page.keyboard.press('Enter');
         };
 
-        // 5줄마다 취소 확인 (매줄 DB 조회 방지)
+        // 5줄마다 취소 확인
         let lineCount = 0;
         const checkCancelEvery5 = async () => {
             if (++lineCount % 5 === 0) await assertNotCancelled();
         };
 
+        // 인사말 먼저 타이핑 (첫 번째 # 헤딩 이전)
+        const imgIdxGreeting = { v: 0 };
+        for (const line of greetingLines) {
+            await processLine(line, imgIdxGreeting);
+            await page.waitForTimeout(60);
+        }
+
+        // 대표이미지 — 인사말 다음, 본문 이전에 삽입 (네이버 썸네일 자동 설정)
+        const coverImageUrl: string | undefined = task.payload?.cover_image_url;
+        if (coverImageUrl) {
+            await progress(config, task.id, '대표이미지 삽입 중...', 57);
+            try {
+                const matchExt = coverImageUrl.match(/\.([a-zA-Z0-9]+)(?:[\?#]|$)/);
+                const ext = (matchExt ? matchExt[1] : 'jpg').toLowerCase();
+                const res = await fetch(coverImageUrl);
+                if (res.ok) {
+                    const buf = await res.arrayBuffer();
+                    const coverPath = join(tmpdir(), `naver_cover_${Date.now()}.${ext}`);
+                    writeFileSync(coverPath, Buffer.from(buf));
+                    await insertImageAtCursor(coverPath);
+                    await page.keyboard.press('Enter');
+                }
+            } catch (e) {
+                console.warn('[NaverUpload] 대표이미지 삽입 실패:', e);
+            }
+        }
+
         if (photoPosition === 'inline') {
             // ── 인라인 모드 ─────────────────────────────────────────────────────────
-            const normalizedBody = bodyText.replace(/```(?:html)?\s*(<table[\s\S]*?<\/table>)\s*```/gi, '$1');
+            const normalizedBody = mainBodyText.replace(/```(?:html)?\s*(<table[\s\S]*?<\/table>)\s*```/gi, '$1');
             const parts = normalizedBody.split(/(<table[\s\S]*?<\/table>)/i);
             const imgIdxRef = { v: 0 };
 
             for (let pIdx = 0; pIdx < parts.length; pIdx++) {
-                await assertNotCancelled(); // 파트 단위 체크
+                await assertNotCancelled();
                 if (pIdx % 2 === 1) {
                     await insertHtmlAsImage(parts[pIdx], pIdx);
                     await page.keyboard.press('Enter');
@@ -403,7 +600,7 @@ export async function uploadNaverBlog(
             }
         } else {
             // ── 일괄 모드 ───────────────────────────────────────────────────────────
-            const normalizedBody2 = bodyText.replace(/```(?:html)?\s*(<table[\s\S]*?<\/table>)\s*```/gi, '$1');
+            const normalizedBody2 = mainBodyText.replace(/```(?:html)?\s*(<table[\s\S]*?<\/table>)\s*```/gi, '$1');
             const parts = normalizedBody2.split(/(<table[\s\S]*?<\/table>)/i);
             const imgIdxRef2 = { v: 0 };
 
@@ -448,32 +645,15 @@ export async function uploadNaverBlog(
                 }
 
                 if (tempPaths.length > 0) {
-                    const imgBtn = mainFrame.locator('button[data-name="image"], button[aria-label*="이미지 첨부"]').first();
-                    if (await imgBtn.count() > 0) {
+                    const imgBtn = await findImageButton();
+                    if (imgBtn) {
                         const [fileChooser] = await Promise.all([
-                            page.waitForEvent('filechooser', { timeout: 10_000 }).catch(() => null),
+                            page.waitForEvent('filechooser', { timeout: 12_000 }).catch(() => null),
                             imgBtn.click(),
                         ]);
                         if (fileChooser) {
                             await fileChooser.setFiles(tempPaths);
-                            await page.waitForTimeout(2000);
-
-                            // 사진 첨부 방식 다이얼로그 처리
-                            const dialogVisible = await page.locator('text=사진 첨부 방식').count() > 0
-                                || await mainFrame.locator('text=사진 첨부 방식').count() > 0;
-                            if (dialogVisible) {
-                                for (const sel of [`text=${layoutLabel}`, `[data-type="${photoLayout}"]`, '.se-popup-photo-layout-item:first-child']) {
-                                    for (const ctx of [page, mainFrame]) {
-                                        if (await ctx.locator(sel).count() > 0) { await ctx.locator(sel).first().click(); break; }
-                                    }
-                                }
-                                await page.waitForTimeout(400);
-                                for (const sel of ['button:has-text("확인")', '.se-popup-button-primary']) {
-                                    for (const ctx of [page, mainFrame]) {
-                                        if (await ctx.locator(sel).count() > 0) { await ctx.locator(sel).first().click(); break; }
-                                    }
-                                }
-                            }
+                            await handlePhotoDialog();
                             await page.waitForTimeout(3000);
                         }
                     }
