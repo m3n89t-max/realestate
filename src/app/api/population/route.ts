@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { SGISClient } from '@/lib/sgis-client'
 
 // ── 장벽 감지 헬퍼 ────────────────────────────────────────────────────────────
@@ -89,10 +89,8 @@ out geom;`
 
 export async function POST(req: NextRequest) {
     try {
-        const supabase = await createClient()
         const adminSupabase = await createAdminClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        // if (!user) return NextResponse.json({ error: '인증되지 않은 요청입니다' }, { status: 401 })
+        // 인증 검사 필요 시: const supabase = await createClient(); const { data: { user } } = await supabase.auth.getUser()
 
         const { project_id } = await req.json()
         if (!project_id) return NextResponse.json({ error: 'project_id가 필요합니다' }, { status: 400 })
@@ -123,7 +121,17 @@ export async function POST(req: NextRequest) {
             console.log('[population] SGIS codes:', { sidoCd, sggCd, emdCd: emdCd + `(len=${emdCd.length})`, admNm });
         } catch (e: any) {
             console.error('SGIS RGeocode Error:', e.message);
-            return NextResponse.json({ error: '해당 위치의 행정동/인구 통계 데이터를 SGIS에서 찾을 수 없습니다. (좌표 예외 지역일 수 있습니다)' }, { status: 404 });
+            // 재시도 무한루프 방지: placeholder 저장 후 200 반환
+            const placeholder = {
+                error: 'SGIS 위치 코드 조회 실패 — 해당 좌표는 SGIS 예외 지역일 수 있습니다.',
+                density: 0, total_population: 0, total_households: 0,
+                single_households: 0, avg_members: 0, avg_age: 0,
+                adm_nm: '', adm_level: '알 수 없음',
+                radius_500m_estimated: null, barrier_coefficient: 100, barrier_names: [],
+                collected_at: new Date().toISOString(),
+            };
+            await adminSupabase.from('projects').update({ population_data: placeholder }).eq('id', project_id);
+            return NextResponse.json({ success: false, error: placeholder.error, population_data: placeholder });
         }
 
         // 2. Fetch basic population/household stat — 읍면동 → 시군구 → 시도 순으로 폴백
