@@ -220,16 +220,44 @@ export async function POST(req: NextRequest) {
             try {
                 const censusStats = await sgis.getPopulationStat(targetYear, usedAdmCd, '1');
                 if (censusStats && censusStats.length > 0) {
-                    const densities = censusStats
-                        .map((r: any) => parseFloat(r.ppltn_dnsty || '0'))
-                        .filter((d: number) => d > 0)
-                        .sort((a: number, b: number) => a - b);
-                    if (densities.length > 0) {
-                        const mid = Math.floor(densities.length / 2);
-                        const medianDensity = densities.length % 2 === 0
-                            ? (densities[mid - 1] + densities[mid]) / 2
-                            : densities[mid];
+                    // 인구 가중 평균 밀도 사용 (중간값 대신)
+                    // 이유: 아라동처럼 공원·산지·농지가 넓은 행정동은 저밀 집계구가 많아
+                    //       중간값이 실제 주거밀도보다 크게 낮아지는 문제가 있음.
+                    // 계산: 각 집계구의 인구(tot_ppltn) / 밀도(ppltn_dnsty) = 면적(km²)
+                    //       총인구 / 총면적 → 실질 주거지 가중 밀도
+                    const validBlocks = censusStats.filter((r: any) =>
+                        parseFloat(r.ppltn_dnsty || '0') > 0 &&
+                        parseInt(r.tot_ppltn || '0', 10) > 0
+                    );
 
+                    let useDensity = 0;
+                    if (validBlocks.length > 0) {
+                        const totalPop = validBlocks.reduce(
+                            (s: number, r: any) => s + parseInt(r.tot_ppltn || '0', 10), 0
+                        );
+                        const totalAreaKm2 = validBlocks.reduce((s: number, r: any) => {
+                            const d = parseFloat(r.ppltn_dnsty || '0');
+                            const p = parseInt(r.tot_ppltn || '0', 10);
+                            return s + (d > 0 ? p / d : 0);
+                        }, 0);
+                        useDensity = totalAreaKm2 > 0 ? totalPop / totalAreaKm2 : 0;
+                        console.log(`[population] census blocks: ${validBlocks.length}개, 가중평균밀도: ${Math.round(useDensity)}명/km²`);
+                    }
+
+                    // fallback: 밀도 상위 50% 평균 (가중 계산 실패 시)
+                    if (useDensity <= 0) {
+                        const densities = censusStats
+                            .map((r: any) => parseFloat(r.ppltn_dnsty || '0'))
+                            .filter((d: number) => d > 0)
+                            .sort((a: number, b: number) => a - b);
+                        if (densities.length > 0) {
+                            const topHalf = densities.slice(Math.floor(densities.length / 2));
+                            useDensity = topHalf.reduce((s: number, d: number) => s + d, 0) / topHalf.length;
+                            console.log(`[population] fallback 상위50% 평균밀도: ${Math.round(useDensity)}명/km²`);
+                        }
+                    }
+
+                    if (useDensity > 0) {
                         // 대로·하천 장벽 감지 (Overpass API)
                         try {
                             const barrier = await detectBarriers(project.lat, project.lng, 500);
@@ -239,7 +267,8 @@ export async function POST(req: NextRequest) {
                             console.log('[population] barrier detection failed, coeff=1.0');
                         }
 
-                        radius_500m_estimated = Math.round(medianDensity * Math.PI * 0.25 * barrier_coefficient);
+                        radius_500m_estimated = Math.round(useDensity * Math.PI * 0.25 * barrier_coefficient);
+                        console.log(`[population] 추정 배후인구: ${radius_500m_estimated}명 (장벽계수: ${barrier_coefficient.toFixed(2)})`);
                     }
                 }
             } catch (e) {
