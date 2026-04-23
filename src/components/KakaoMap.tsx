@@ -492,8 +492,16 @@ export default function KakaoMap({
             <span>👥</span> 배후 인구 분석
           </h4>
 
+          {/* SGIS 수집 실패 시 에러 안내 */}
+          {(populationData as any).error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg px-2.5 py-2 text-[10px] text-red-600 mb-2">
+              <p className="font-semibold mb-0.5">데이터 수집 실패</p>
+              <p className="text-red-500">SGIS가 이 좌표를 찾지 못했습니다. &apos;배후 인구 분석&apos; 버튼으로 재시도하세요.</p>
+            </div>
+          )}
+
           {/* 섹션 1: 반경 500m 추정 */}
-          {populationData.radius_500m_estimated != null && (
+          {!(populationData as any).error && populationData.radius_500m_estimated != null && (
             <div className="mb-2.5">
               <p className="text-[9px] font-semibold text-blue-600 mb-1">📍 매물 반경 500m 추정</p>
               <div className="bg-blue-50 rounded-lg px-2.5 py-1.5 flex justify-between items-center">
@@ -513,40 +521,41 @@ export default function KakaoMap({
             </div>
           )}
 
-          {/* 구분선 */}
-          <div className="border-t border-gray-200 my-2" />
+          {/* 구분선 — 에러 시 숨김 */}
+          {!(populationData as any).error && <div className="border-t border-gray-200 my-2" />}
 
-          {/* 섹션 2: 읍면동 행정구역 통계 */}
-          <div>
-            <p className="text-[9px] font-semibold text-gray-500 mb-1.5">
-              🏘 {populationData.adm_nm || '행정구역'} ({populationData.adm_level || '시군구'}) 전체 통계
-            </p>
-            <div className="space-y-1.5">
-              <div className="flex justify-between items-center text-[11px]">
-                <span className="text-gray-500">인구 밀도</span>
-                <span className="font-semibold text-brand-600">{populationData.density?.toLocaleString()}명/㎢</span>
+          {/* 섹션 2: 읍면동 행정구역 통계 — 에러 시 숨김 */}
+          {!(populationData as any).error && (
+            <div>
+              <p className="text-[9px] font-semibold text-gray-500 mb-1.5">
+                🏘 {populationData.adm_nm || '행정구역'} ({populationData.adm_level || '시군구'}) 전체 통계
+              </p>
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className="text-gray-500">인구 밀도</span>
+                  <span className="font-semibold text-brand-600">{populationData.density?.toLocaleString()}명/㎢</span>
+                </div>
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className="text-gray-500">총 인구</span>
+                  <span className="font-semibold text-gray-700">{populationData.total_population?.toLocaleString()}명</span>
+                </div>
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className="text-gray-500">총 가구 수</span>
+                  <span className="font-semibold text-gray-700">{populationData.total_households?.toLocaleString()}가구</span>
+                </div>
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className="text-gray-500">1인가구 비율</span>
+                  <span className="font-semibold text-orange-600">
+                    {populationData.total_households > 0
+                      ? ((populationData.single_households / populationData.total_households) * 100).toFixed(1)
+                      : 0}%
+                  </span>
+                </div>
               </div>
-              <div className="flex justify-between items-center text-[11px]">
-                <span className="text-gray-500">총 인구</span>
-                <span className="font-semibold text-gray-700">{populationData.total_population?.toLocaleString()}명</span>
-              </div>
-              <div className="flex justify-between items-center text-[11px]">
-                <span className="text-gray-500">총 가구 수</span>
-                <span className="font-semibold text-gray-700">{populationData.total_households?.toLocaleString()}가구</span>
-              </div>
-              <div className="flex justify-between items-center text-[11px]">
-                <span className="text-gray-500">1인가구 비율</span>
-                <span className="font-semibold text-orange-600">
-                  {populationData.total_households > 0
-                    ? ((populationData.single_households / populationData.total_households) * 100).toFixed(1)
-                    : 0}%
-                </span>
-              </div>
+              {populationData.collected_at && (
+                <p className="mt-2.5 text-[9px] text-gray-400 text-right">SGIS 통계청 기준</p>
+              )}
             </div>
-          </div>
-
-          {populationData.collected_at && (
-            <p className="mt-2.5 text-[9px] text-gray-400 text-right">SGIS 통계청 기준</p>
           )}
         </div>
       )}

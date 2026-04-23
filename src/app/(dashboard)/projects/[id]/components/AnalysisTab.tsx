@@ -634,7 +634,7 @@ function MapSection({
         body: JSON.stringify({ project_id: projectId }),
       })
       const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? '인구 통계 수집 실패')
+      if (!res.ok || json.success === false) throw new Error(json.error ?? '인구 통계 수집 실패')
       toast.success('배후 인구 분석이 완료되었습니다')
       window.location.reload()
     } catch (e: any) {
