@@ -4,10 +4,17 @@ export async function GET() {
   const serviceId = process.env.SGIS_SERVICE_ID
   const securityKey = process.env.SGIS_SECURITY_KEY
 
+  const sidTrimmed = serviceId?.trim() ?? ''
+  const keyTrimmed = securityKey?.trim() ?? ''
+
   const result: Record<string, any> = {
     env: {
-      SGIS_SERVICE_ID: serviceId ? `${serviceId.substring(0, 6)}... (${serviceId.length}자)` : '❌ 없음',
-      SGIS_SECURITY_KEY: securityKey ? `${securityKey.substring(0, 6)}... (${securityKey.length}자)` : '❌ 없음',
+      SGIS_SERVICE_ID: serviceId
+        ? `${sidTrimmed.substring(0, 6)}... (원본${serviceId.length}자 / trim후${sidTrimmed.length}자)`
+        : '❌ 없음',
+      SGIS_SECURITY_KEY: securityKey
+        ? `${keyTrimmed.substring(0, 6)}... (원본${securityKey.length}자 / trim후${keyTrimmed.length}자)`
+        : '❌ 없음',
     },
   }
 

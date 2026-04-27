@@ -5,8 +5,8 @@ export class SGISClient {
     private tokenExpiresAt: number = 0;
 
     constructor(serviceId?: string, securityKey?: string) {
-        this.serviceId = serviceId || process.env.SGIS_SERVICE_ID || '';
-        this.securityKey = securityKey || process.env.SGIS_SECURITY_KEY || '';
+        this.serviceId = (serviceId || process.env.SGIS_SERVICE_ID || '').trim();
+        this.securityKey = (securityKey || process.env.SGIS_SECURITY_KEY || '').trim();
 
         if (!this.serviceId || !this.securityKey) {
             throw new Error('SGIS 인증키가 설정되지 않았습니다. Vercel 환경변수에 SGIS_SERVICE_ID와 SGIS_SECURITY_KEY를 추가해주세요.');
