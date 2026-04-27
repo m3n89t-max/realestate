@@ -305,7 +305,7 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
     }
     setUploading(true)
     try {
-      const { error } = await supabase.from('tasks').insert({
+      const { data: newTask, error } = await supabase.from('tasks').insert({
         org_id: orgId,
         project_id: projectId,
         type: 'upload_naver_blog',
@@ -321,8 +321,10 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
           photo_position: photoPosition,
           cover_image_url: coverImageUrl || undefined,
         },
-      })
+      }).select('id, status, created_at').single()
       if (error) throw error
+      // Realtime 업데이트 전에 즉시 로컬 상태 반영 → 중복 클릭 방지
+      if (newTask) setUploadTasks(prev => [...prev, newTask])
       toast.success('네이버 블로그 업로드 작업이 등록되었습니다. 에이전트가 실행하면 자동 업로드됩니다.')
     } catch (err) {
       toast.error('작업 등록에 실패했습니다')

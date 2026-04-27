@@ -9,7 +9,7 @@ export class SGISClient {
         this.securityKey = securityKey || process.env.SGIS_SECURITY_KEY || '';
 
         if (!this.serviceId || !this.securityKey) {
-            console.warn('SGIS_SERVICE_ID or SGIS_SECURITY_KEY is not defined.');
+            throw new Error('SGIS 인증키가 설정되지 않았습니다. Vercel 환경변수에 SGIS_SERVICE_ID와 SGIS_SECURITY_KEY를 추가해주세요.');
         }
     }
 
