@@ -49,6 +49,22 @@ async function getHhStat(year: string, admCd: string, token: string) {
   return data.result
 }
 
+async function getHousingStat(year: string, admCd: string, token: string) {
+  const url = `https://sgisapi.kostat.go.kr/OpenAPI3/stats/housing.json?year=${year}&adm_cd=${admCd}&low_search=0&accessToken=${token}`
+  const res = await fetch(url)
+  const data = await res.json()
+  if (data.errCd !== 0) throw new Error(`SGIS 주택통계 실패`)
+  return data.result
+}
+
+async function getIndustryStat(year: string, admCd: string, token: string) {
+  const url = `https://sgisapi.kostat.go.kr/OpenAPI3/stats/industry.json?year=${year}&adm_cd=${admCd}&low_search=0&accessToken=${token}`
+  const res = await fetch(url)
+  const data = await res.json()
+  if (data.errCd !== 0) throw new Error(`SGIS 사업체통계 실패`)
+  return data.result
+}
+
 // ── 장벽 감지 ────────────────────────────────────────────────────────────────
 
 function minDistToPolylineM(lat: number, lng: number, geom: { lat: number; lon: number }[]): number {
@@ -140,7 +156,9 @@ Deno.serve(async (req) => {
     const { lat, lng } = project
 
     // 1. SGIS 인증
+    console.log('[population] SGIS auth 시작, serviceId:', serviceId.substring(0, 6) + '...')
     const token = await getSgisToken(serviceId, securityKey)
+    console.log('[population] SGIS auth 성공')
 
     // 2. 좌표변환
     const { posX, posY } = await transcoord(lng, lat, token)
@@ -195,6 +213,36 @@ Deno.serve(async (req) => {
       if (hh?.[0]) single_households = parseInt(hh[0].household_cnt || '0', 10)
     } catch { /* ignore */ }
 
+    // 5b. 주택 유형별 통계
+    let housing_stat: Record<string, number> | null = null
+    try {
+      const hs = await getHousingStat(targetYear, usedAdmCd, token)
+      if (hs?.[0]) {
+        const h = hs[0]
+        housing_stat = {
+          total: parseInt(h.house_cnt || '0', 10),
+          apt: parseInt(h.apt_cnt || '0', 10),
+          detached: parseInt(h.detach_house_cnt || h.detached_cnt || '0', 10),
+          row_house: parseInt(h.row_house_cnt || h.rowhouse_cnt || '0', 10),
+          multi: parseInt(h.multi_house_cnt || h.multi_cnt || '0', 10),
+          other: parseInt(h.etc_house_cnt || h.etc_cnt || '0', 10),
+        }
+      }
+    } catch { /* ignore */ }
+
+    // 5c. 사업체·종사자 통계
+    let industry_stat: { bsns_cnt: number; wrkr_cnt: number } | null = null
+    try {
+      const ind = await getIndustryStat(targetYear, usedAdmCd, token)
+      if (ind?.[0]) {
+        const r = ind[0]
+        // SGIS 사업체통계: bsns_cnt(사업체수), wrkr_cnt(종사자수) — 필드명 변형 대응
+        const bsns = parseInt(r.bsns_cnt || r.bsns_fmly_cnt || r.biz_cnt || '0', 10)
+        const wrkr = parseInt(r.wrkr_cnt || r.emplye_cnt || r.emp_cnt || '0', 10)
+        if (bsns > 0 || wrkr > 0) industry_stat = { bsns_cnt: bsns, wrkr_cnt: wrkr }
+      }
+    } catch { /* ignore */ }
+
     // 6. 500m 추정 배후인구
     const adm_level = usedAdmCd.length >= 8 ? '읍면동' : usedAdmCd.length >= 5 ? '시군구' : '시도'
     let radius_500m_estimated: number | null = null
@@ -242,6 +290,8 @@ Deno.serve(async (req) => {
       radius_500m_estimated,
       barrier_coefficient: Math.round(barrier_coefficient * 100),
       barrier_names,
+      housing_stat,
+      industry_stat,
       collected_at: new Date().toISOString(),
     }
 

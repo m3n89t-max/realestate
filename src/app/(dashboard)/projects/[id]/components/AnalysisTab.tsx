@@ -773,6 +773,125 @@ function MapSection({
           </div>
         </div>
       </div>
+
+      {/* 인구·주택·사업체 통계 요약 (SGIS) */}
+      {population_data && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mt-3">
+          {/* 인구 통계 */}
+          <div className="bg-white border border-blue-100 rounded-xl p-3 shadow-sm text-[11px]">
+            <p className="font-bold text-blue-700 mb-2">인구 통계 <span className="text-[9px] font-normal text-gray-400">({population_data.adm_nm ?? ''} · {population_data.adm_level ?? 'SGIS'})</span></p>
+            <div className="space-y-1">
+              {population_data.total_population > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-400">총 인구</span>
+                  <span className="font-semibold text-gray-700">{population_data.total_population.toLocaleString()}명</span>
+                </div>
+              )}
+              {population_data.density > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-400">인구밀도</span>
+                  <span className="font-semibold text-gray-700">{population_data.density.toLocaleString()}명/㎢</span>
+                </div>
+              )}
+              {population_data.avg_age > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-400">평균연령</span>
+                  <span className="font-semibold text-gray-700">{population_data.avg_age}세</span>
+                </div>
+              )}
+              {population_data.total_households > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-400">총 가구</span>
+                  <span className="font-semibold text-gray-700">{population_data.total_households.toLocaleString()}가구</span>
+                </div>
+              )}
+              {population_data.single_households > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-400">1인 가구</span>
+                  <span className="font-semibold text-gray-700">{population_data.single_households.toLocaleString()}가구</span>
+                </div>
+              )}
+              {population_data.avg_members > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-400">평균 가구원</span>
+                  <span className="font-semibold text-gray-700">{population_data.avg_members}명</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 주택 유형 */}
+          {population_data.housing_stat ? (
+            <div className="bg-white border border-emerald-100 rounded-xl p-3 shadow-sm text-[11px]">
+              <p className="font-bold text-emerald-700 mb-2">주택 유형 <span className="text-[9px] font-normal text-gray-400">SGIS 주택통계</span></p>
+              {(() => {
+                const hs = population_data.housing_stat
+                const total = hs.total || (hs.apt + hs.detached + hs.row_house + hs.multi + hs.other) || 1
+                const bars = [
+                  { label: '아파트', value: hs.apt, color: 'bg-blue-400' },
+                  { label: '단독주택', value: hs.detached, color: 'bg-amber-400' },
+                  { label: '연립주택', value: hs.row_house, color: 'bg-green-400' },
+                  { label: '다세대', value: hs.multi, color: 'bg-purple-400' },
+                  { label: '기타', value: hs.other, color: 'bg-gray-300' },
+                ].filter(b => b.value > 0)
+                return (
+                  <div className="space-y-1.5">
+                    {bars.map(b => {
+                      const pct = Math.round((b.value / total) * 100)
+                      return (
+                        <div key={b.label}>
+                          <div className="flex justify-between mb-0.5">
+                            <span className="text-gray-500">{b.label}</span>
+                            <span className="font-semibold text-gray-700">{pct}% <span className="text-gray-400 font-normal">({b.value.toLocaleString()})</span></span>
+                          </div>
+                          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${b.color}`} style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      )
+                    })}
+                    <p className="text-[9px] text-gray-300 text-right pt-0.5">총 {total.toLocaleString()}호</p>
+                  </div>
+                )
+              })()}
+            </div>
+          ) : (
+            <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm text-[11px] flex items-center justify-center text-gray-300">
+              주택 통계 미수집
+            </div>
+          )}
+
+          {/* 사업체·종사자 */}
+          {population_data.industry_stat ? (
+            <div className="bg-white border border-amber-100 rounded-xl p-3 shadow-sm text-[11px]">
+              <p className="font-bold text-amber-700 mb-2">사업체·종사자 <span className="text-[9px] font-normal text-gray-400">SGIS 사업체통계</span></p>
+              <div className="space-y-2">
+                <div className="p-2 bg-amber-50 rounded-lg text-center">
+                  <p className="text-[10px] text-gray-500 mb-0.5">사업체 수</p>
+                  <p className="text-lg font-bold text-amber-700">{population_data.industry_stat.bsns_cnt.toLocaleString()}개</p>
+                </div>
+                <div className="p-2 bg-orange-50 rounded-lg text-center">
+                  <p className="text-[10px] text-gray-500 mb-0.5">종사자 수</p>
+                  <p className="text-lg font-bold text-orange-600">{population_data.industry_stat.wrkr_cnt.toLocaleString()}명</p>
+                </div>
+                {population_data.industry_stat.bsns_cnt > 0 && population_data.industry_stat.wrkr_cnt > 0 && (
+                  <div className="flex justify-between pt-1 border-t border-gray-100">
+                    <span className="text-gray-400">사업체당 종사자</span>
+                    <span className="font-semibold text-gray-700">
+                      {(population_data.industry_stat.wrkr_cnt / population_data.industry_stat.bsns_cnt).toFixed(1)}명
+                    </span>
+                  </div>
+                )}
+              </div>
+              <p className="text-[9px] text-gray-300 text-right mt-1">소상공인 상권활성도 지표</p>
+            </div>
+          ) : (
+            <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm text-[11px] flex items-center justify-center text-gray-300">
+              사업체 통계 미수집
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

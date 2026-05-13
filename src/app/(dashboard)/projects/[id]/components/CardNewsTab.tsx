@@ -1414,15 +1414,15 @@ function CardPreview({
         <button
           onClick={onGenerateAI}
           disabled={aiLoading}
-          className="exclude-export absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-full shadow-lg bg-white/92 text-gray-700 hover:bg-white disabled:opacity-60"
+          className="exclude-export absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-[10px] font-medium px-2.5 py-1 rounded-full shadow-lg bg-yellow-400/95 text-yellow-900 hover:bg-yellow-400 disabled:opacity-60"
         >
-          {aiLoading ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} className="text-purple-500" />}
-          AI 배경
+          {aiLoading ? <Loader2 size={10} className="animate-spin" /> : <span className="text-[11px]">🍌</span>}
+          {aiLoading ? '생성 중...' : 'Nano Banana'}
         </button>
       )}
       {aiPhoto && (
-        <div className="absolute bottom-2 left-2 flex items-center gap-1 text-[9px] bg-purple-600/80 text-white px-1.5 py-0.5 rounded-full backdrop-blur-sm">
-          <Sparkles size={8} /> AI
+        <div className="absolute bottom-2 left-2 flex items-center gap-1 text-[9px] bg-yellow-500/90 text-yellow-900 px-1.5 py-0.5 rounded-full backdrop-blur-sm font-bold">
+          🍌 AI
         </div>
       )}
     </div>
@@ -1454,6 +1454,8 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
   const [canvaTemplates, setCanvaTemplates] = useState<CanvaTemplateSet[]>([])
   const [canvaTemplatesLoading, setCanvaTemplatesLoading] = useState(false)
   const [photoPickerSlot, setPhotoPickerSlot] = useState<number | null>(null)
+  const [nanoBananaLoading, setNanoBananaLoading] = useState(false)
+  const [nanoBananaProgress, setNanoBananaProgress] = useState(0)
   const cardRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -1545,16 +1547,57 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
       const res = await fetch(`/api/generate-card-image`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_prompt: card.image_prompt ?? 'Real estate property photo, professional', project_id: projectId, card_number: card.order }),
+        body: JSON.stringify({
+          image_prompt: card.image_prompt,
+          layout: card.layout,
+          project_id: projectId,
+          card_number: card.order,
+        }),
       })
       const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'AI 이미지 생성 실패')
+      if (!res.ok) throw new Error(json.error ?? 'Nano Banana 이미지 생성 실패')
       setAiPhotos(prev => ({ ...prev, [card.order]: json.image_url }))
-      toast.success(`카드 ${card.order} AI 배경 생성 완료`)
+      toast.success(`카드 ${card.order} Nano Banana 생성 완료`)
     } catch (err: any) {
-      toast.error(err.message ?? 'AI 이미지 생성 실패')
+      toast.error(err.message ?? 'Nano Banana 이미지 생성 실패')
     } finally {
       setAiLoading(prev => ({ ...prev, [card.order]: false }))
+    }
+  }
+
+  const handleGenerateAllAI = async () => {
+    if (slides.length === 0) { toast.error('카드뉴스를 먼저 생성하세요'); return }
+    setNanoBananaLoading(true)
+    setNanoBananaProgress(0)
+    try {
+      for (let i = 0; i < slides.length; i++) {
+        const card = slides[i]
+        setNanoBananaProgress(i)
+        setAiLoading(prev => ({ ...prev, [card.order]: true }))
+        try {
+          const res = await fetch('/api/generate-card-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              image_prompt: card.image_prompt,
+              layout: card.layout,
+              project_id: projectId,
+              card_number: card.order,
+            }),
+          })
+          const json = await res.json()
+          if (res.ok && json.image_url) {
+            setAiPhotos(prev => ({ ...prev, [card.order]: json.image_url }))
+          }
+        } catch { /* 개별 카드 실패 시 스킵 */ }
+        setAiLoading(prev => ({ ...prev, [card.order]: false }))
+      }
+      setNanoBananaProgress(slides.length)
+      toast.success('Nano Banana 이미지 생성 완료!')
+    } catch (err: any) {
+      toast.error(err.message ?? 'Nano Banana 생성 실패')
+    } finally {
+      setNanoBananaLoading(false)
     }
   }
 
@@ -1834,17 +1877,64 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
               </div>
             )}
 
-            {/* AI 배경 안내 (인스타만) */}
-            {platform === 'instagram' && (
-              <div className="card p-3 bg-purple-50 border border-purple-100">
-                <div className="flex items-start gap-2">
-                  <Sparkles size={13} className="text-purple-500 flex-shrink-0 mt-0.5" />
+            {/* Nano Banana 이미지 생성 패널 (인스타만) */}
+            {platform === 'instagram' && slides.length > 0 && (
+              <div className="card p-4 bg-gradient-to-br from-yellow-50 to-orange-50 border border-yellow-200">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-6 h-6 rounded-full bg-yellow-400 flex items-center justify-center text-[12px] flex-shrink-0">🍌</div>
                   <div>
-                    <p className="text-xs font-semibold text-purple-700 mb-0.5">AI 배경 이미지 (옵션)</p>
-                    <p className="text-[11px] text-purple-600 leading-snug">카드에 마우스를 올려 "AI 배경" 버튼 클릭 시 DALL-E가 배경 이미지를 생성합니다.</p>
-                    <p className="text-[10px] text-purple-400 mt-1">카드당 약 $0.04 비용 발생</p>
+                    <p className="text-xs font-bold text-yellow-900">Nano Banana</p>
+                    <p className="text-[10px] text-yellow-700">Google Gemini 이미지 생성</p>
                   </div>
                 </div>
+
+                {/* 전체 생성 버튼 */}
+                <button
+                  onClick={handleGenerateAllAI}
+                  disabled={nanoBananaLoading}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-sm text-white shadow-md transition-all disabled:opacity-60"
+                  style={{ background: nanoBananaLoading ? '#d97706' : 'linear-gradient(135deg,#f59e0b,#d97706)' }}
+                >
+                  {nanoBananaLoading ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      {nanoBananaProgress}/{slides.length} 생성 중...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={14} />
+                      6장 전체 이미지 생성
+                    </>
+                  )}
+                </button>
+
+                {/* 진행 바 */}
+                {nanoBananaLoading && (
+                  <div className="mt-2 h-1.5 bg-yellow-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-yellow-500 rounded-full transition-all duration-500"
+                      style={{ width: `${(nanoBananaProgress / slides.length) * 100}%` }}
+                    />
+                  </div>
+                )}
+
+                {/* 개별 카드 생성 안내 */}
+                <p className="text-[10px] text-yellow-700 mt-2.5 text-center">
+                  또는 카드 위에 마우스 올려 개별 생성
+                </p>
+
+                {/* 생성된 카드 수 */}
+                {Object.keys(aiPhotos).length > 0 && (
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-[10px] text-yellow-700">{Object.keys(aiPhotos).length}장 생성됨</span>
+                    <button
+                      onClick={() => setAiPhotos({})}
+                      className="text-[10px] text-yellow-600 hover:text-red-500 underline"
+                    >
+                      초기화
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

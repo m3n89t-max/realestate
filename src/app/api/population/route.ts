@@ -15,7 +15,16 @@ export async function POST(req: NextRequest) {
       body: { project_id },
     })
 
-    if (error) throw new Error(error.message)
+    if (error) {
+      // FunctionsHttpError.context는 실제 Response — 본문에서 실제 에러 메시지 추출
+      let msg = error.message
+      try {
+        const body = await (error as any).context?.json?.()
+        if (body?.error) msg = body.error
+      } catch { /* ignore */ }
+      console.error('[population] Edge Function error:', msg)
+      throw new Error(msg)
+    }
     if (data?.success === false) throw new Error(data.error ?? 'SGIS 수집 실패')
 
     return NextResponse.json({ success: true, population_data: data?.population_data })
