@@ -3,51 +3,74 @@ import { createClient } from '@/lib/supabase/server'
 
 const GEMINI_MODEL = 'gemini-3.1-flash-image-preview'
 
-const CARD_STYLE: Record<string, string> = {
-  cover:       '커버 카드: 매물의 첫 인상. 제목은 크고 굵게 중앙 하단, 어두운 그라디언트 오버레이, 프리미엄 느낌.',
-  location:    '입지 카드: 교통/편의시설 강조. 체크포인트를 아이콘과 함께 리스트업.',
-  composition: '구성 카드: 평면도/내부 구성 설명. 항목별 정보를 깔끔하게 그리드 배치.',
-  investment:  '투자 카드: 가치 상승 포인트 강조. 수치와 키워드를 임팩트 있게.',
-  interior:    '내부 카드: 실내 특장점 강조. 고급스러운 분위기와 디테일.',
-  cta:         'CTA 카드: 문의 유도. 가격/연락처를 명확하게. 해시태그 하단 배치.',
+const CARD_LAYOUT_GUIDE: Record<string, { zone: string; overlay: string; style: string }> = {
+  cover: {
+    zone:    '사진이 화면 상단 60~70%를 선명하게 채우고, 하단 30~40%에만 반투명 그라디언트(아래→위 검정 그라디언트, opacity 75%) 적용. 텍스트는 하단 영역에만 배치.',
+    overlay: '상단 사진 영역은 밝고 선명하게 유지. 오버레이 금지.',
+    style:   '제목은 크고 굵은 흰색(또는 금색). 가격 배지는 반투명 흰색 박스.',
+  },
+  location: {
+    zone:    '사진이 상단 45~55%를 선명하게 차지. 하단 절반은 어두운 네이비/차콜 배경. 텍스트는 하단 영역.',
+    overlay: '상단 사진 영역 오버레이 없음. 사진 색상/밝기 그대로.',
+    style:   '체크포인트는 아이콘(원형 불릿) + 흰색 텍스트 리스트.',
+  },
+  composition: {
+    zone:    '사진이 우측 또는 상단 45%를 선명하게 차지. 나머지 영역은 진한 네이비 또는 차콜 배경. 텍스트는 사진과 겹치지 않는 배경 영역에.',
+    overlay: '사진 영역은 필터 없이 원본 그대로.',
+    style:   '깔끔한 그리드 레이아웃. 금색 액센트 포인트.',
+  },
+  investment: {
+    zone:    '사진이 하단 40~50%를 선명하게 차지. 상단은 진한 배경(차콜/네이비). 텍스트와 수치는 상단 영역에.',
+    overlay: '하단 사진 영역은 약한 그라디언트만 (상→하, opacity 30% 이하). 사진이 뚜렷하게 보여야 함.',
+    style:   '임팩트 있는 굵은 숫자/수치. 강조 키워드는 금색.',
+  },
+  interior: {
+    zone:    '사진이 화면 전체를 채움. 하단 35~40%에만 그라디언트 오버레이(opacity 80%). 텍스트는 하단.',
+    overlay: '상단 65% 사진 영역은 밝고 선명하게. 오버레이 없음.',
+    style:   '고급스러운 흰색 타이포그래피. 특장점 리스트.',
+  },
+  cta: {
+    zone:    '사진이 상단 55%를 선명하게 차지. 하단 45%는 진한 배경. CTA 버튼은 하단 중앙.',
+    overlay: '사진은 선명하게. 하단 배경 영역에 텍스트와 버튼 배치.',
+    style:   '해시태그는 작은 크기로 줄바꿈. CTA 버튼은 흰색 또는 브랜드 색상 박스.',
+  },
 }
 
 function buildCardPrompt(layout: string, card: Record<string, any>): string {
-  const style = CARD_STYLE[layout] ?? CARD_STYLE.cover
-  const lines: string[] = [
-    `한국 부동산 카드뉴스 이미지를 생성해주세요. 인스타그램용 정사각형(1:1) 비율.`,
-    `카드 유형: ${style}`,
+  const guide = CARD_LAYOUT_GUIDE[layout] ?? CARD_LAYOUT_GUIDE.cover
+
+  const textLines: string[] = []
+  if (card.title)       textLines.push(`제목(크게): ${card.title}`)
+  if (card.subtitle)    textLines.push(`부제목: ${card.subtitle}`)
+  if (card.price_badge) textLines.push(`가격 배지: ${card.price_badge}`)
+  if (card.address)     textLines.push(`주소(작게): ${card.address}`)
+  if (card.highlight)   textLines.push(`강조 문구(금색 굵게): ${card.highlight}`)
+  if (card.body)        textLines.push(`본문: ${card.body}`)
+  if (Array.isArray(card.checkpoints) && card.checkpoints.filter(Boolean).length)
+    textLines.push(`체크포인트 리스트: ${card.checkpoints.filter(Boolean).join(' | ')}`)
+  if (Array.isArray(card.points) && card.points.filter(Boolean).length)
+    textLines.push(`포인트 리스트: ${card.points.filter(Boolean).join(' | ')}`)
+  if (Array.isArray(card.hashtags) && card.hashtags.filter(Boolean).length)
+    textLines.push(`해시태그(작게): ${card.hashtags.filter(Boolean).slice(0, 8).join(' ')}`)
+  if (card.cta)         textLines.push(`CTA 버튼 텍스트: ${card.cta}`)
+
+  return [
+    `[한국 부동산 인스타그램 카드뉴스 ${card.order ?? 1}/6 — 정사각형 1:1]`,
     ``,
-    `※ 제공된 매물 사진을 배경으로 활용하고 아래 텍스트를 이미지 위에 한국어로 직접 렌더링해주세요.`,
+    `## 사진 활용 방법 (가장 중요)`,
+    `- 제공된 매물 실제 사진을 ${guide.zone}`,
+    `- ${guide.overlay}`,
+    `- 사진 영역은 brightness 100%, contrast 105%, saturation 110% 수준으로 선명하고 생동감 있게.`,
+    `- 절대로 사진 전체를 어둡게 만들지 말 것. 사진이 카드의 핵심 시각 요소임.`,
     ``,
-  ]
-
-  if (card.title)       lines.push(`제목: ${card.title}`)
-  if (card.subtitle)    lines.push(`부제목: ${card.subtitle}`)
-  if (card.price_badge) lines.push(`가격: ${card.price_badge}`)
-  if (card.address)     lines.push(`주소: ${card.address}`)
-  if (card.highlight)   lines.push(`강조: ${card.highlight}`)
-  if (card.body)        lines.push(`본문: ${card.body}`)
-
-  if (Array.isArray(card.checkpoints) && card.checkpoints.length) {
-    lines.push(`핵심포인트: ${card.checkpoints.filter(Boolean).join(' / ')}`)
-  }
-  if (Array.isArray(card.points) && card.points.length) {
-    lines.push(`포인트: ${card.points.filter(Boolean).join(' / ')}`)
-  }
-  if (Array.isArray(card.hashtags) && card.hashtags.length) {
-    lines.push(`해시태그: ${card.hashtags.filter(Boolean).slice(0, 8).join(' ')}`)
-  }
-  if (card.cta) lines.push(`CTA: ${card.cta}`)
-
-  lines.push(``)
-  lines.push(`디자인 요구사항:`)
-  lines.push(`- 매물 사진을 배경으로 사용 (사진이 없으면 한국 아파트 분위기로 대체)`)
-  lines.push(`- 텍스트는 흰색 또는 금색으로 가독성 있게 오버레이`)
-  lines.push(`- 전문적이고 고급스러운 부동산 마케팅 카드 스타일`)
-  lines.push(`- 카드 번호: ${card.order ?? 1}/6`)
-
-  return lines.join('\n')
+    `## 텍스트 배치`,
+    ...textLines,
+    ``,
+    `## 디자인 스타일`,
+    guide.style,
+    `- 전문적인 한국 부동산 마케팅 카드뉴스. 깔끔하고 고급스러운 레이아웃.`,
+    `- 텍스트 가독성 최우선. 흰색 또는 금색 텍스트, 그림자 처리.`,
+  ].join('\n')
 }
 
 async function fetchImageAsBase64(url: string): Promise<{ data: string; mimeType: string } | null> {
