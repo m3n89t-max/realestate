@@ -223,10 +223,26 @@ function TextEditor({ card, onUpdate, onReset, hasEdits }: {
 export default function CardNewsTab({ projectId, contents, assets }: CardNewsTabProps) {
   const supabase = createClient()
 
+  // content에서 저장된 ai_image_url 복원
+  const extractSavedImages = (contentId: string | null): Record<number, string> => {
+    const c = contents.find(x => x.id === contentId)
+    if (!c?.content) return {}
+    try {
+      const raw = JSON.parse(c.content)
+      const cards: any[] = Array.isArray(raw) ? raw : Array.isArray(raw?.cards) ? raw.cards : []
+      const photos: Record<number, string> = {}
+      cards.forEach((card: any) => {
+        const order = card.order ?? card.card_number
+        if (order && card.ai_image_url) photos[order] = card.ai_image_url
+      })
+      return photos
+    } catch { return {} }
+  }
+
   const [generating, setGenerating] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(contents[0]?.id ?? null)
   const [editedCards, setEditedCards] = useState<Record<number, Partial<CardSlide>>>({})
-  const [aiPhotos, setAiPhotos] = useState<Record<number, string>>({})
+  const [aiPhotos, setAiPhotos] = useState<Record<number, string>>(() => extractSavedImages(contents[0]?.id ?? null))
   const [aiLoading, setAiLoading] = useState<Record<number, boolean>>({})
   const [cardPhotos, setCardPhotos] = useState<Record<number, string>>({})
   const [activeSlide, setActiveSlide] = useState(0)
@@ -240,6 +256,27 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
   const rawContent = selected?.content ? JSON.parse(selected.content) : null
   const rawCards: any[] = Array.isArray(rawContent) ? rawContent
     : Array.isArray(rawContent?.cards) ? rawContent.cards : []
+
+  /* ── DB에 ai_image_url 저장 ── */
+  const saveImageUrl = async (cardOrder: number, imageUrl: string) => {
+    if (!selectedId) return
+    try {
+      const updatedCards = rawCards.map((c: any) => {
+        const order = c.order ?? c.card_number
+        if (order === cardOrder) return { ...c, ai_image_url: imageUrl }
+        return c
+      })
+      const updatedContent = Array.isArray(rawContent)
+        ? JSON.stringify(updatedCards)
+        : JSON.stringify({ ...rawContent, cards: updatedCards })
+      await supabase
+        .from('generated_contents')
+        .update({ content: updatedContent })
+        .eq('id', selectedId)
+    } catch (e) {
+      console.warn('[card-news] 이미지 URL 저장 실패:', e)
+    }
+  }
 
   const slides: CardSlide[] = rawCards.map((c: any, i: number) => {
     const order = c.order ?? c.card_number ?? (i + 1)
@@ -308,7 +345,8 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'Nano Banana 생성 실패')
       setAiPhotos(prev => ({ ...prev, [card.order]: json.image_url }))
-      toast.success(`카드 ${card.order} 생성 완료`)
+      await saveImageUrl(card.order, json.image_url)
+      toast.success(`카드 ${card.order} 생성 및 저장 완료`)
     } catch (err: any) {
       toast.error(err.message ?? 'Nano Banana 생성 실패')
     } finally {
@@ -338,6 +376,7 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
           const json = await res.json()
           if (res.ok && json.image_url) {
             setAiPhotos(prev => ({ ...prev, [card.order]: json.image_url }))
+            await saveImageUrl(card.order, json.image_url)
           } else {
             console.warn(`카드 ${card.order} 실패:`, json.error)
           }
@@ -347,7 +386,7 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
         setAiLoading(prev => ({ ...prev, [card.order]: false }))
       }
       setNanoBananaProgress(slides.length)
-      toast.success('🍌 전체 이미지 생성 완료!', { id: toastId })
+      toast.success('🍌 전체 이미지 생성 및 저장 완료!', { id: toastId })
     } catch (err: any) {
       toast.error(err.message ?? 'Nano Banana 생성 실패', { id: toastId })
     } finally {
@@ -436,7 +475,13 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
           {contents.length > 1 && (
             <select
               value={selectedId ?? ''}
-              onChange={e => { setSelectedId(e.target.value); setActiveSlide(0); setEditedCards({}) }}
+              onChange={e => {
+                const id = e.target.value
+                setSelectedId(id)
+                setActiveSlide(0)
+                setEditedCards({})
+                setAiPhotos(extractSavedImages(id))
+              }}
               className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-600 bg-white"
             >
               {contents.map((c, i) => (
@@ -593,7 +638,12 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
                   {contents.map((c, i) => (
                     <button
                       key={c.id}
-                      onClick={() => { setSelectedId(c.id); setActiveSlide(0); setEditedCards({}) }}
+                      onClick={() => {
+                        setSelectedId(c.id)
+                        setActiveSlide(0)
+                        setEditedCards({})
+                        setAiPhotos(extractSavedImages(c.id))
+                      }}
                       className={cn(
                         'w-full text-left p-2 rounded-lg border text-xs transition-colors',
                         selectedId === c.id ? 'bg-brand-50 border-brand-200 text-brand-700' : 'border-gray-100 hover:bg-gray-50 text-gray-600'
