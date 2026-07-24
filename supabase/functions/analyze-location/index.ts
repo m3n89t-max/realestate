@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, handleCors } from '../_shared/cors.ts'
 
-import { callOpenAI } from '../_shared/openai.ts'
+import { callGemini } from '../_shared/gemini.ts'
 
 const POI_LABEL_MAP: Record<string, string> = {
   subway:      '지하철역',
@@ -395,12 +395,12 @@ ${kakaoDensityText}
 ${analysisInstructions}
 - 중개사 메모에 특이사항이 있으면 분석에 반드시 반영`
 
-    const responseText = await callOpenAI(
+    const responseText = await callGemini(
       [
         { role: 'system', content: systemPrompt },
         { role: 'user',   content: userPrompt },
       ],
-      { responseFormat: 'json', maxTokens: 2500, temperature: 0.5 }
+      { responseFormat: 'json', maxTokens: 8192, temperature: 0.5 }
     )
 
     const analysis = JSON.parse(responseText)
