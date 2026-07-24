@@ -437,6 +437,86 @@ export async function uploadNaverBlog(
             await page.waitForTimeout(2000);
         };
 
+        // Naver SE3 동영상 버튼 셀렉터
+        const VIDEO_BTN_SELECTORS = [
+            'button[data-name="video"]',
+            'button.se-video-toolbar-button',
+            'button[class*="se-video-toolbar-button"]',
+            '.se-toolbar-item-video > button',
+            '.se-toolbar-item-video button',
+            'button[aria-label*="동영상"]',
+            'button[title*="동영상"]',
+        ];
+        const findVideoButton = async () => {
+            for (const sel of VIDEO_BTN_SELECTORS) {
+                const c = mainFrame.locator(sel).first();
+                if (await c.count() > 0) { console.log(`[NaverUpload] 동영상 버튼 발견(mainFrame): ${sel}`); return c; }
+                const cp = page.locator(sel).first();
+                if (await cp.count() > 0) { console.log(`[NaverUpload] 동영상 버튼 발견(page): ${sel}`); return cp; }
+            }
+            console.warn('[NaverUpload] ⚠️ 동영상 버튼을 찾지 못했습니다.');
+            return null;
+        };
+
+        // 동영상 1개를 현재 커서 위치에 삽입 (업로드 + 인코딩 대기 최대 5분)
+        const insertVideoAtCursor = async (videoPath: string) => {
+            const vBtn = await findVideoButton();
+            if (!vBtn) return;
+
+            const [fileChooser] = await Promise.all([
+                page.waitForEvent('filechooser', { timeout: 15_000 }).catch(() => null),
+                vBtn.click(),
+            ]);
+            let chooser = fileChooser;
+            if (!chooser) {
+                // 동영상 업로드 팝업 안에 별도 '동영상 추가/파일 추가' 버튼이 있는 경우
+                for (const sel of ['button:has-text("동영상 추가")', 'button:has-text("파일 추가")', 'button:has-text("불러오기")', '.se-popup-video button']) {
+                    for (const ctx of [page, mainFrame]) {
+                        if (await ctx.locator(sel).count() > 0) {
+                            const [fc] = await Promise.all([
+                                page.waitForEvent('filechooser', { timeout: 10_000 }).catch(() => null),
+                                ctx.locator(sel).first().click().catch(() => {}),
+                            ]);
+                            if (fc) { chooser = fc; break; }
+                        }
+                    }
+                    if (chooser) break;
+                }
+            }
+            if (!chooser) { console.warn('[NaverUpload] ⚠️ 동영상 파일 선택창이 열리지 않았습니다.'); return; }
+
+            await chooser.setFiles([videoPath]);
+            await progress(config, task.id, '동영상 업로드/인코딩 대기 중... (최대 5분)', 62);
+
+            // 업로드/인코딩 완료 후 '완료/등록/게시' 버튼이 활성화되면 클릭
+            const encDeadline = Date.now() + 300_000;
+            let done = false;
+            while (Date.now() < encDeadline) {
+                await page.waitForTimeout(5000);
+                for (const sel of [
+                    '.se-popup-button-confirm:not([disabled])',
+                    '.se-popup-button-primary:not([disabled])',
+                    'button:has-text("완료"):not([disabled])',
+                    'button:has-text("등록"):not([disabled])',
+                    'button:has-text("게시"):not([disabled])',
+                    'button:has-text("삽입"):not([disabled])',
+                ]) {
+                    for (const ctx of [page, mainFrame]) {
+                        const btn = ctx.locator(sel).first();
+                        if (await btn.count() > 0 && await btn.isEnabled().catch(() => false)) {
+                            await btn.click().catch(() => {});
+                            done = true;
+                            break;
+                        }
+                    }
+                    if (done) break;
+                }
+                if (done) break;
+            }
+            if (!done) console.warn('[NaverUpload] ⚠️ 동영상 인코딩 완료/등록 버튼을 찾지 못해 시간 초과.');
+            await page.waitForTimeout(3000);
+        };
+
         // HTML 표를 이미지로 렌더링 후 삽입
         // context.newPage() 대신 현재 페이지에 숨김 div 주입 → 탭 전환/포커스 문제 없음
         const insertHtmlAsImage = async (htmlStr: string, idx: number) => {
@@ -497,8 +577,28 @@ export async function uploadNaverBlog(
         const greetingLines = firstHeadIdx > 0 ? allBodyLines.slice(0, firstHeadIdx) : [];
         const mainBodyText = firstHeadIdx >= 0 ? allBodyLines.slice(firstHeadIdx).join('\n') : bodyText;
 
-        // 이미지 URL 다운로드 공통 헬퍼
+        // 이미지/동영상 URL 다운로드 공통 헬퍼
         const IMAGE_EXTS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp']);
+        const VIDEO_EXTS = new Set(['mp4', 'mov', 'avi', 'webm', 'm4v', 'mkv']);
+        const isVideoUrl = (url: string) => {
+            const m = url.match(/\.([a-zA-Z0-9]+)(?:[\?#]|$)/);
+            return !!m && VIDEO_EXTS.has(m[1].toLowerCase());
+        };
+        const downloadVideo = async (url: string, idx: number): Promise<string | null> => {
+            try {
+                const matchExt = url.match(/\.([a-zA-Z0-9]+)(?:[\?#]|$)/);
+                const ext = (matchExt ? matchExt[1] : 'mp4').toLowerCase();
+                const res = await fetch(url);
+                if (!res.ok) return null;
+                const buf = await res.arrayBuffer();
+                const tmpPath = join(tmpdir(), `naver_video_${Date.now()}_${idx}.${ext}`);
+                writeFileSync(tmpPath, Buffer.from(buf));
+                return tmpPath;
+            } catch (e) {
+                console.warn(`[NaverUpload] 동영상 다운로드 실패: ${url}`, e);
+                return null;
+            }
+        };
         const downloadImage = async (imgUrl: string, idx: number): Promise<string | null> => {
             try {
                 const matchExt = imgUrl.match(/\.([a-zA-Z0-9]+)(?:[\?#]|$)/);
@@ -524,7 +624,18 @@ export async function uploadNaverBlog(
         const processLine = async (line: string, imgIdxRef: { v: number }) => {
             const imgMatch = line.match(/!\[([^\]]*)\]\(([^)]+)\)/);
             if (imgMatch) {
-                const tmpPath = await downloadImage(imgMatch[2], imgIdxRef.v++);
+                const mediaUrl = imgMatch[2];
+                if (isVideoUrl(mediaUrl)) {
+                    // 동영상 → 네이버 동영상 업로드로 삽입
+                    const vPath = await downloadVideo(mediaUrl, imgIdxRef.v++);
+                    if (vPath) {
+                        await focusEditor();
+                        await insertVideoAtCursor(vPath);
+                        await page.keyboard.press('Enter');
+                    }
+                    return;
+                }
+                const tmpPath = await downloadImage(mediaUrl, imgIdxRef.v++);
                 if (tmpPath) {
                     await focusEditor();
                     await insertImageAtCursor(tmpPath);
@@ -653,7 +764,9 @@ export async function uploadNaverBlog(
                     continue;
                 }
                 for (const line of parts[pIdx].replace(/\n{3,}/g, '\n\n').split('\n')) {
-                    if (line.match(/!\[.*?\]\(.*?\)/)) continue;
+                    // 이미지 마크다운은 일괄 업로드로 처리(스킵)하되, 동영상은 인라인으로 삽입
+                    const mm = line.match(/!\[.*?\]\((.*?)\)/);
+                    if (mm && !isVideoUrl(mm[1])) continue;
                     await checkCancelEvery5();
                     await processLine(line, imgIdxRef2);
                     await page.waitForTimeout(60);
