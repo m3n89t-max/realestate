@@ -36,7 +36,9 @@ export async function callGemini(
     contents,
     generationConfig: {
       temperature: options.temperature ?? 0.7,
-      maxOutputTokens: options.maxTokens ?? 4000,
+      maxOutputTokens: options.maxTokens ?? 8192,
+      // 2.5+ 모델의 thinking이 출력 토큰을 소모해 JSON이 잘리는 문제 방지 (thinking 비활성화)
+      thinkingConfig: { thinkingBudget: 0 },
       ...(options.responseFormat === 'json' && { responseMimeType: 'application/json' }),
     },
   }

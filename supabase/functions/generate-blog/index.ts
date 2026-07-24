@@ -201,7 +201,7 @@ Deno.serve(async (req) => {
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
-      { responseFormat: 'json', maxTokens: 5000, temperature: 0.7 }
+      { responseFormat: 'json', maxTokens: 16384, temperature: 0.7 }
     )
 
     // JSON 파싱
