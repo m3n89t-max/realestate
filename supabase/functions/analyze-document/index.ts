@@ -1,6 +1,6 @@
 import { corsHeaders, handleCors } from '../_shared/cors.ts'
 import { getAuthenticatedUser, getOrgId } from '../_shared/auth.ts'
-import { callOpenAI } from '../_shared/openai.ts'
+import { callGemini } from '../_shared/gemini.ts'
 import { maskPersonalInfo } from '../_shared/masking.ts'
 
 Deno.serve(async (req) => {
@@ -70,12 +70,12 @@ Deno.serve(async (req) => {
 
     const userPrompt = `다음 문서 내용을 분석하세요:\n\n${textToAnalyze.slice(0, 4000)}`
 
-    const responseText = await callOpenAI(
+    const responseText = await callGemini(
       [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
-      { responseFormat: 'json', maxTokens: 2000, temperature: 0.3 }
+      { responseFormat: 'json', maxTokens: 8192, temperature: 0.3 }
     )
 
     const result = JSON.parse(responseText)

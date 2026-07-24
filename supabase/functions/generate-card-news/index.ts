@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, handleCors } from '../_shared/cors.ts'
 import { getAuthenticatedUser, getOrgId, checkQuota } from '../_shared/auth.ts'
-import { callOpenAI, callOpenAIVision } from '../_shared/openai.ts'
+import { callGemini, callGeminiVision } from '../_shared/gemini.ts'
 
 type Platform = 'instagram' | 'kakao'
 
@@ -161,7 +161,7 @@ Deno.serve(async (req) => {
     const photoUrls: string[] = Array.isArray(asset_urls) ? asset_urls.slice(0, 4) : []
     if (photoUrls.length > 0) {
       try {
-        photoAnalysis = await callOpenAIVision([
+        photoAnalysis = await callGeminiVision([
           {
             role: 'user',
             content: [
@@ -219,12 +219,12 @@ ${advantages || '입지 정보 없음'}${photoAnalysis ? `\n\n[AI 사진 분석 
       ? buildInstagramSystemPrompt()
       : buildKakaoSystemPrompt()
 
-    const responseText = await callOpenAI(
+    const responseText = await callGemini(
       [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
-      { responseFormat: 'json', maxTokens: 2500, temperature: 0.8 }
+      { responseFormat: 'json', maxTokens: 8192, temperature: 0.8 }
     )
 
     const parsed = JSON.parse(responseText)

@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { handleCors } from '../_shared/cors.ts'
 import { getAuthenticatedUser, getOrgId } from '../_shared/auth.ts'
-import { callOpenAI } from '../_shared/openai.ts'
+import { callGemini } from '../_shared/gemini.ts'
 import { maskPersonalInfo } from '../_shared/masking.ts'
 import { ok, err } from '../_shared/response.ts'
 import { buildShortsSystemPrompt } from '../_shared/shorts-prompt.ts'
@@ -86,9 +86,9 @@ ${assetInfo ? `\n[업로드된 미디어]\n${assetInfo}` : ''}
       messages.push({ role: 'user', content: userPrompt })
     }
 
-    const responseText = await callOpenAI(
+    const responseText = await callGemini(
       messages as never,
-      { responseFormat: 'json', maxTokens: 2500, temperature: 0.8 }
+      { responseFormat: 'json', maxTokens: 8192, temperature: 0.8 }
     )
 
     const script = JSON.parse(responseText)
