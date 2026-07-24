@@ -58,7 +58,6 @@ export async function uploadNaverBlog(
         args: [
             '--start-maximized',
             '--disable-blink-features=AutomationControlled',
-            '--no-sandbox',
             '--disable-infobars',
         ],
         locale: 'ko-KR',
@@ -85,9 +84,11 @@ export async function uploadNaverBlog(
         // 4. 로그인 확인
         await progress(config, task.id, '네이버 로그인 확인 중...', 5);
         await page.goto('https://www.naver.com/', { waitUntil: 'domcontentloaded', timeout: 30_000 });
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(2500);
 
-        const isLoggedIn = await page.locator('.MyView-module__my_logo___HdBbr, .gnb_my_image, a[href*="logout"]').count() > 0;
+        // 로그인 상태 판정 (견고): 로그아웃 링크가 있거나, "로그인" 링크(nidlogin.login)가 없으면 로그인된 상태
+        const isLoggedIn = (await page.locator('a[href*="logout"]').count() > 0)
+            || (await page.locator('a[href*="nidlogin.login"]').count() === 0);
 
         if (!isLoggedIn) {
             await progress(config, task.id, '네이버 로그인 중...', 10);
@@ -102,40 +103,76 @@ export async function uploadNaverBlog(
             });
             await page.waitForTimeout(1500 + Math.random() * 1000);
 
-            // 사람처럼 클릭 후 한 글자씩 타이핑 (봇 탐지 우회)
-            // 기존 입력값 선택 후 덮어쓰기 (중복 입력 방지)
-            const idField = page.locator('#id');
-            await idField.click();
-            await page.waitForTimeout(300 + Math.random() * 200);
-            await page.keyboard.press('Control+A');
-            await page.waitForTimeout(100);
-            for (const ch of creds.id) {
-                await page.keyboard.type(ch, { delay: 80 + Math.random() * 120 });
-            }
-            await page.waitForTimeout(500 + Math.random() * 500);
+            // 사람처럼 한 글자씩 랜덤 간격으로 타이핑 (봇 탐지 우회).
+            // 필드 클릭 → 기존 값 전체선택 후 덮어쓰기(중복 입력 방지) → 랜덤 딜레이 타이핑.
+            const typeInto = async (selector: string, text: string) => {
+                const field = page.locator(selector);
+                await field.click();
+                await page.waitForTimeout(300 + Math.random() * 200);
+                await page.keyboard.press('Control+A');
+                await page.waitForTimeout(100);
+                for (const ch of text) {
+                    await page.keyboard.type(ch, { delay: 80 + Math.random() * 120 });
+                }
+            };
 
-            const pwField = page.locator('#pw');
-            await pwField.click();
-            await page.waitForTimeout(300 + Math.random() * 200);
-            await page.keyboard.press('Control+A');
-            await page.waitForTimeout(100);
-            for (const ch of creds.pw) {
-                await page.keyboard.type(ch, { delay: 80 + Math.random() * 120 });
-            }
+            await typeInto('#id', creds.id);
+            await page.waitForTimeout(500 + Math.random() * 500);
+            await typeInto('#pw', creds.pw);
             await page.waitForTimeout(800 + Math.random() * 500);
 
-            await page.locator('#log\\.login').click();
+            // 로그인 제출 — 비밀번호 입력 직후 Enter로 폼 제출.
+            // (버튼 셀렉터는 네이버가 자주 바꾸고, '패스키 로그인' 등 다른 버튼을 잘못 누를 위험이 있어
+            //  포커스가 비밀번호 필드에 있는 상태에서 Enter를 치는 것이 가장 안정적임)
+            await page.locator('#pw').press('Enter').catch(async () => {
+                await page.keyboard.press('Enter').catch(() => {});
+            });
             await page.waitForTimeout(5000);
 
-            // CAPTCHA 감지 — 사용자가 직접 풀 때까지 대기 (최대 3분)
-            const hasCaptcha = await page.locator('#captcha, .captcha_wrap, [class*="captcha"]').count() > 0;
-            if (hasCaptcha) {
-                await progress(config, task.id, '⚠️ 캡챠 발생 — 브라우저에서 직접 캡챠를 풀어주세요 (최대 3분 대기)...', 15);
-                await page.waitForFunction(
-                    () => !document.querySelector('#captcha, .captcha_wrap, [class*="captcha"]'),
-                    { timeout: 180_000 }
-                ).catch(() => { });
-                await page.waitForTimeout(2000);
+            // 로그인 제출 후: 성공(리다이렉트) 또는 추가 인증(2단계/캡챠/기기등록) 완료를 기다린다.
+            // ⚠️ 제출 직후 페이지를 다른 곳으로 이동시키면 2단계 인증 흐름이 끊기므로(이전 버그),
+            //    "그 자리에서" nid 인증 도메인을 벗어날 때(=로그인 성공)까지 최대 5분 폴링한다.
+            //    2단계 인증/캡챠는 nid 도메인 안에서 진행되므로, 이 동안 사용자가 휴대폰 승인 등을 직접 처리할 수 있다.
+            await progress(config, task.id, '로그인 확인 중... 2단계 인증이 뜨면 휴대폰(네이버 앱)으로 승인해 주세요.', 15);
+
+            // 로그인 성공 판정 (가장 견고): 블로그 글쓰기 페이지를 열어본다.
+            //  - 로그인 상태면 에디터(mainFrame)가 로드됨
+            //  - 로그아웃 상태면 nid 로그인 페이지로 리다이렉트됨
+            // (네이버가 자주 바꾸는 GNB 해시 클래스에 의존하지 않아 안정적. 실제 필요한 동작이기도 함)
+            const confirmLoggedIn = async (): Promise<boolean> => {
+                try {
+                    await page.goto('https://blog.naver.com/GoBlogWrite.naver', { waitUntil: 'domcontentloaded', timeout: 20_000 });
+                    await page.waitForTimeout(3000);
+                    if (/nid\.naver\.com/.test(page.url())) return false; // 로그인 페이지로 튕김 = 미로그인
+                    return page.frames().some(f => f.name() === 'mainFrame'); // 에디터 프레임 존재 = 로그인됨
+                } catch { return false; }
+            };
+
+            let loggedIn = await confirmLoggedIn();
+            if (!loggedIn) {
+                // 자동 로그인 미완료 (2단계 인증/캡챠/자격증명 등) → 열린 창에서 사용자가 직접 처리하도록 최대 5분 대기.
+                // 이 동안 페이지를 함부로 이동시키지 않아 2단계 인증 흐름을 끊지 않는다.
+                await progress(config, task.id, '⚠️ 자동 로그인이 완료되지 않았습니다. 열린 브라우저에서 직접 로그인/2단계 인증을 완료해 주세요 (최대 5분 대기). 최초 1회만 하면 이후 자동 유지됩니다.', 12);
+                const deadline = Date.now() + 300_000; // 5분
+                while (Date.now() < deadline) {
+                    await page.waitForTimeout(5000);
+                    const url = page.url();
+                    // "새로운 기기 등록" 페이지 자동 통과
+                    if (url.includes('deviceConfirm') || await page.locator('#new\\.save, #new\\.dontsave').count() > 0) {
+                        for (const sel of ['#new\\.dontsave', '#new\\.save', 'a:has-text("등록안함")', 'button:has-text("등록")']) {
+                            if (await page.locator(sel).count() > 0) { await page.locator(sel).first().click().catch(() => {}); break; }
+                        }
+                        continue;
+                    }
+                    // 인증 도메인을 벗어났으면(로그인/2단계 완료 가능성) 확정 확인
+                    if (!/nid\.naver\.com/.test(url)) {
+                        if (await confirmLoggedIn()) { loggedIn = true; break; }
+                    }
+                }
+            }
+
+            if (!loggedIn) {
+                throw new Error('[LOGIN_FAILED] 로그인이 완료되지 않았습니다. 2단계 인증/캡챠를 완료했는지, 자격증명이 정확한지 확인 후 다시 시도하세요.');
             }
 
             await progress(config, task.id, '로그인 완료.', 25);
@@ -523,17 +560,21 @@ export async function uploadNaverBlog(
                 await page.keyboard.press('Enter');
                 return;
             }
-            // FAQ Q:/A: 라인 — Q는 볼드, A는 일반
-            const qMatch = line.match(/^(?:\d+\.\s*)?Q[：:．.]\s*(.+)/);
+            // FAQ Q/A — 소스는 보통 **Q. ...** (굵게) + A. ... 형태. 굵기 마커를 먼저 제거해 인식한다.
+            // ⚠️ Q를 굵게 토글하면 focusEditor(Ctrl+End)가 커서를 이전 줄 끝으로 되돌려
+            //    A 답변에 Q가 달라붙거나 문장이 중간에 잘리는 문제가 있음 → FAQ는 '평문'으로 입력해 커서 튐 제거.
+            const faqBare = line.replace(/^\s*\*\*/, '').replace(/\*\*\s*$/, '').trim();
+            const qMatch = faqBare.match(/^(?:\d+\.\s*)?Q\s*[：:.．]\s*(.+)$/);
             if (qMatch) {
-                await typeText('Q. ' + qMatch[1].replace(/\*\*([^*]+)\*\*/g, '$1'), true);
+                await typeText('Q. ' + qMatch[1].replace(/\*\*/g, '').trim());
                 await page.keyboard.press('Enter');
                 return;
             }
-            const aMatch = line.match(/^(?:\s*\d+\.\s*)?A[：:．.]\s*(.+)/);
+            const aMatch = faqBare.match(/^(?:\d+\.\s*)?A\s*[：:.．]\s*(.+)$/);
             if (aMatch) {
-                await typeText('A. ' + aMatch[1].replace(/\*\*([^*]+)\*\*/g, '$1'));
+                await typeText('A. ' + aMatch[1].replace(/\*\*/g, '').trim());
                 await page.keyboard.press('Enter');
+                await page.keyboard.press('Enter'); // Q&A 쌍 사이 간격
                 return;
             }
             // 인라인 볼드(**...**) 포함 여부에 따라 분기
