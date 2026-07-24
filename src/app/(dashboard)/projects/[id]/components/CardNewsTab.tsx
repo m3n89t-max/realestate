@@ -257,26 +257,26 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
   const rawCards: any[] = Array.isArray(rawContent) ? rawContent
     : Array.isArray(rawContent?.cards) ? rawContent.cards : []
 
-  /* ── DB에 ai_image_url 저장 ── */
-  const saveImageUrl = async (cardOrder: number, imageUrl: string) => {
-    if (!selectedId) return
-    try {
-      const updatedCards = rawCards.map((c: any) => {
-        const order = c.order ?? c.card_number
-        if (order === cardOrder) return { ...c, ai_image_url: imageUrl }
-        return c
-      })
-      const updatedContent = Array.isArray(rawContent)
-        ? JSON.stringify(updatedCards)
-        : JSON.stringify({ ...rawContent, cards: updatedCards })
-      await supabase
-        .from('generated_contents')
-        .update({ content: updatedContent })
-        .eq('id', selectedId)
-    } catch (e) {
-      console.warn('[card-news] 이미지 URL 저장 실패:', e)
-    }
+  /* ── DB에 ai_image_url 저장 (여러 장을 한 번에 병합 저장) ── */
+  const persistImages = async (images: Record<number, string>) => {
+    if (!selectedId || Object.keys(images).length === 0) return
+    const updatedCards = rawCards.map((c: any) => {
+      const order = c.order ?? c.card_number
+      return images[order] ? { ...c, ai_image_url: images[order] } : c
+    })
+    const updatedContent = Array.isArray(rawContent)
+      ? JSON.stringify(updatedCards)
+      : JSON.stringify({ ...rawContent, cards: updatedCards })
+    // .update()는 RLS 거부/에러 시에도 throw하지 않으므로 반환된 error를 반드시 확인
+    const { error } = await supabase
+      .from('generated_contents')
+      .update({ content: updatedContent })
+      .eq('id', selectedId)
+    if (error) throw error
   }
+
+  const saveImageUrl = (cardOrder: number, imageUrl: string) =>
+    persistImages({ [cardOrder]: imageUrl })
 
   const slides: CardSlide[] = rawCards.map((c: any, i: number) => {
     const order = c.order ?? c.card_number ?? (i + 1)
@@ -345,8 +345,12 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'Nano Banana 생성 실패')
       setAiPhotos(prev => ({ ...prev, [card.order]: json.image_url }))
-      await saveImageUrl(card.order, json.image_url)
-      toast.success(`카드 ${card.order} 생성 및 저장 완료`)
+      try {
+        await saveImageUrl(card.order, json.image_url)
+        toast.success(`카드 ${card.order} 생성 및 저장 완료`)
+      } catch (saveErr: any) {
+        toast.error(`카드 ${card.order} 생성됐지만 저장 실패: ${saveErr.message ?? saveErr}`)
+      }
     } catch (err: any) {
       toast.error(err.message ?? 'Nano Banana 생성 실패')
     } finally {
@@ -360,6 +364,7 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
     setNanoBananaLoading(true)
     setNanoBananaProgress(0)
     const toastId = toast.loading('Nano Banana 이미지 생성 시작...')
+    const newImages: Record<number, string> = {}
     try {
       for (let i = 0; i < slides.length; i++) {
         const card = slides[i]
@@ -376,7 +381,7 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
           const json = await res.json()
           if (res.ok && json.image_url) {
             setAiPhotos(prev => ({ ...prev, [card.order]: json.image_url }))
-            await saveImageUrl(card.order, json.image_url)
+            newImages[card.order] = json.image_url
           } else {
             console.warn(`카드 ${card.order} 실패:`, json.error)
           }
@@ -386,7 +391,18 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
         setAiLoading(prev => ({ ...prev, [card.order]: false }))
       }
       setNanoBananaProgress(slides.length)
-      toast.success('🍌 전체 이미지 생성 및 저장 완료!', { id: toastId })
+      // 생성된 모든 이미지를 한 번에 병합 저장 (루프 내 개별 저장 시 마지막 1장만 남던 버그 수정)
+      const savedCount = Object.keys(newImages).length
+      if (savedCount === 0) {
+        toast.error('생성된 이미지가 없습니다', { id: toastId })
+      } else {
+        try {
+          await persistImages(newImages)
+          toast.success(`🍌 ${savedCount}장 생성 및 저장 완료!`, { id: toastId })
+        } catch (saveErr: any) {
+          toast.error(`이미지는 생성됐으나 저장 실패: ${saveErr.message ?? saveErr}`, { id: toastId })
+        }
+      }
     } catch (err: any) {
       toast.error(err.message ?? 'Nano Banana 생성 실패', { id: toastId })
     } finally {

@@ -153,13 +153,17 @@ export async function POST(req: NextRequest) {
       const { createClient: createSupa } = await import('@supabase/supabase-js')
       const admin = createSupa(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
       const { error: upErr } = await admin.storage
-        .from('assets')
+        .from('project-assets')
         .upload(path, buf, { contentType: mimeType, upsert: true })
       if (!upErr) {
-        const { data: pub } = admin.storage.from('assets').getPublicUrl(path)
+        const { data: pub } = admin.storage.from('project-assets').getPublicUrl(path)
         if (pub?.publicUrl) stored_url = pub.publicUrl
+      } else {
+        console.error('[nano-banana] storage upload failed, falling back to data URL:', upErr.message)
       }
-    } catch { /* fallback to data URL */ }
+    } catch (e) {
+      console.error('[nano-banana] storage upload threw, falling back to data URL:', e)
+    }
 
     return NextResponse.json({ success: true, image_url: stored_url, card_number: card.order })
   } catch (e) {
