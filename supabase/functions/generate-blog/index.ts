@@ -1,7 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, handleCors } from '../_shared/cors.ts'
 import { getAuthenticatedUser, getOrgId, checkQuota } from '../_shared/auth.ts'
-import { callOpenAI, countTokens } from '../_shared/openai.ts'
+import { countTokens } from '../_shared/openai.ts'
+import { callGemini } from '../_shared/gemini.ts'
 import { maskPersonalInfo } from '../_shared/masking.ts'
 import { buildBlogSystemPrompt, buildBlogUserPrompt, type BlogPromptContext } from '../_shared/seo-prompt.ts'
 
@@ -58,7 +59,7 @@ Deno.serve(async (req) => {
 출력 형식 (JSON만):
 {"titles": ["제목1", "제목2", "제목3", "제목4", "제목5"]}`
 
-      const responseText = await callOpenAI(
+      const responseText = await callGemini(
         [{ role: 'user', content: titlesPrompt }],
         { responseFormat: 'json', maxTokens: 800, temperature: 0.9 }
       )
@@ -195,7 +196,7 @@ Deno.serve(async (req) => {
     const userPrompt = buildBlogUserPrompt(ctx)
     const tokenEstimate = countTokens(systemPrompt + userPrompt)
 
-    const responseText = await callOpenAI(
+    const responseText = await callGemini(
       [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
