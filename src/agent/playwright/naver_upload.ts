@@ -54,6 +54,9 @@ export async function uploadNaverBlog(
     const context = await chromium.launchPersistentContext(agentProfileDir, {
         channel: 'msedge',
         headless: false,
+        // viewport: null → 페이지가 기본 1280px에 고정되지 않고 --start-maximized된 창 전체 크기를 사용
+        // (에디터가 넓게 렌더되어 라이브러리 패널이 열려도 본문이 좁게 잘려 보이지 않음)
+        viewport: null,
         permissions: ['clipboard-read', 'clipboard-write'],
         args: [
             '--start-maximized',
