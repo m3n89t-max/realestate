@@ -272,7 +272,7 @@ export default async function ProjectDetailPage({
       )}
 
       {tab === 'blog' && (
-        <BlogTab projectId={id} orgId={project.org_id} contents={blogContents} assets={assets ?? []} />
+        <BlogTab projectId={id} orgId={project.org_id} project={project} contents={blogContents} assets={assets ?? []} />
       )}
 
       {tab === 'card_news' && (

@@ -5,11 +5,12 @@ import { Wand2, Copy, Check, ChevronDown, ChevronUp, AlertCircle, Upload, Loader
 import { createClient } from '@/lib/supabase/client'
 import type { GeneratedContent, SeoScore } from '@/lib/types'
 import toast from 'react-hot-toast'
-import { cn } from '@/lib/utils'
+import { cn, formatPrice, getPropertyTypeLabel } from '@/lib/utils'
 
 interface BlogTabProps {
   projectId: string
   orgId: string
+  project?: any
   contents: GeneratedContent[]
   assets: any[]
 }
@@ -79,7 +80,7 @@ function parseBold(text: string): React.ReactNode[] {
   }).filter(Boolean) as React.ReactNode[]
 }
 
-export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabProps) {
+export default function BlogTab({ projectId, orgId, project, contents, assets }: BlogTabProps) {
   const supabase = createClient()
   const [generating, setGenerating] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -105,6 +106,7 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
   const [namecardUrl, setNamecardUrl] = useState('')
   const [namecardFileName, setNamecardFileName] = useState('')
   const [coverImageUrl, setCoverImageUrl] = useState<string>('')
+  const [generatingThumb, setGeneratingThumb] = useState(false)
   const [uploadTasks, setUploadTasks] = useState<{ id: string; status: string; created_at: string }[]>([])
   const [namecardUploading, setNamecardUploading] = useState(false)
 
@@ -291,6 +293,55 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
       console.error(err)
     } finally {
       setGenerating(false)
+    }
+  }
+
+  // ── AI 디자인 썸네일(대표이미지) 생성 ──────────────────────────────────────
+  // 매물 사진 위에 지역·유형·강점·가격을 얹은 클릭유도형 썸네일을 생성해 대표이미지로 설정.
+  const handleGenerateThumbnail = async () => {
+    const imageAssets = (assets ?? []).filter((a: any) => a.type !== 'video' && a.file_url)
+    // 베이스 사진: 지정된 대표사진(과거 생성된 data URL 제외) 또는 대표/첫 이미지
+    const basePhoto = (coverImageUrl && !coverImageUrl.startsWith('data:')) ? coverImageUrl
+      : (imageAssets.find((a: any) => a.is_cover)?.file_url ?? imageAssets[0]?.file_url)
+    if (!basePhoto) { toast.error('썸네일로 쓸 매물 사진이 필요합니다'); return }
+
+    setGeneratingThumb(true)
+    try {
+      const addr: string = project?.address ?? ''
+      const region = addr.split(/\s+/).filter(Boolean).slice(0, 3).join(' ')
+      const typeLabel = project?.property_type ? getPropertyTypeLabel(project.property_type) : ''
+
+      let priceBadge = ''
+      const tx = project?.transaction_type
+      if (tx === 'rent') priceBadge = `월세 ${project?.monthly_rent ? formatPrice(project.monthly_rent) : '협의'}`
+      else if (tx === 'lease') priceBadge = `전세 ${project?.deposit ? formatPrice(project.deposit) : '협의'}`
+      else priceBadge = `매매 ${project?.price ? formatPrice(project.price) : '협의'}`
+
+      const features: string[] = Array.isArray(project?.features) ? project.features : []
+      const card = {
+        layout: 'cover',
+        order: 1,
+        title: [region, typeLabel].filter(Boolean).join(' ') || (selectedTitle ?? selected?.title ?? '매물 소개'),
+        subtitle: features.slice(0, 1).join('') || (project?.direction ?? ''),
+        price_badge: priceBadge,
+        checkpoints: features.slice(0, 3),
+      }
+
+      const res = await fetch('/api/generate-card-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ card, photo_url: basePhoto, project_id: projectId }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? '썸네일 생성 실패')
+
+      setCoverImageUrl(json.image_url)
+      try { localStorage.setItem(`realestate_cover_${projectId}`, json.image_url) } catch {}
+      toast.success('AI 썸네일이 생성되어 대표이미지로 설정되었습니다')
+    } catch (err: any) {
+      toast.error(err.message ?? '썸네일 생성에 실패했습니다')
+    } finally {
+      setGeneratingThumb(false)
     }
   }
 
@@ -780,6 +831,19 @@ export default function BlogTab({ projectId, orgId, contents, assets }: BlogTabP
             <Star size={10} className="inline mr-0.5 text-amber-400" />
             별 아이콘 클릭 → 대표이미지 설정 (업로드 시 첫 번째로 삽입)
           </p>
+
+          {/* AI 디자인 썸네일 생성 */}
+          <button
+            onClick={handleGenerateThumbnail}
+            disabled={generatingThumb}
+            className="w-full mb-2.5 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold text-yellow-900 shadow-sm transition-all disabled:opacity-60"
+            style={{ background: 'linear-gradient(135deg,#fbbf24,#f59e0b)' }}
+            title="매물 사진 위에 지역·유형·강점·가격을 얹은 클릭유도형 썸네일을 AI로 생성해 대표이미지로 설정합니다"
+          >
+            {generatingThumb
+              ? <><Loader2 size={13} className="animate-spin" /> 썸네일 생성 중...</>
+              : <><Wand2 size={13} /> 🍌 AI 썸네일 생성 (대표이미지)</>}
+          </button>
 
           {coverImageUrl && (
             <div className="mb-2 flex items-center gap-2 px-2 py-1.5 rounded-lg bg-amber-50 border border-amber-200">
