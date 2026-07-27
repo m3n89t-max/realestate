@@ -1059,6 +1059,13 @@ export default function BlogTab({ projectId, orgId, project, contents, assets }:
 
               {showPreview ? (
                 <div className="w-full min-h-[400px] max-h-[600px] overflow-y-auto text-sm text-gray-700 border border-gray-200 rounded-lg p-4 bg-white prose prose-sm max-w-none">
+                  {/* 대표 썸네일 — 글 맨 위에 표시 (네이버 업로드 시 대표이미지로 사용됨) */}
+                  {coverImageUrl && (
+                    <div className="not-prose mb-4">
+                      <img src={coverImageUrl} alt="대표 썸네일" className="w-full max-w-[420px] mx-auto rounded-xl border border-gray-200 shadow-sm" />
+                      <p className="text-center text-[11px] text-gray-400 mt-1">▲ 대표 썸네일 (네이버 대표이미지로 사용)</p>
+                    </div>
+                  )}
                   {buildFullContent().split('\n').map((line, i) => {
                     const imgMatch = line.match(/!\[(.*?)\]\((.*?)\)/)
                     if (imgMatch) {
