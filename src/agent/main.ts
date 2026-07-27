@@ -117,8 +117,13 @@ async function startAgent() {
 }
 
 const createTray = () => {
-    const iconPath = path.join(__dirname, '../../public/favicon.ico');
-    const icon = fs.existsSync(iconPath)
+    // 패키징된 앱(extraResources) → 개발 실행(public/) 순으로 브랜드 아이콘 탐색
+    const iconCandidates = [
+        path.join(process.resourcesPath || '', 'favicon.ico'),
+        path.join(__dirname, '../../public/favicon.ico'),
+    ];
+    const iconPath = iconCandidates.find(p => p && fs.existsSync(p));
+    const icon = iconPath
         ? nativeImage.createFromPath(iconPath)
         : nativeImage.createFromBuffer(createIconBuffer());
     tray = new Tray(icon);

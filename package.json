@@ -78,6 +78,7 @@
     "compression": "store",
     "artifactName": "RealEstateAgent.exe",
     "win": {
+      "icon": "public/favicon.ico",
       "target": [
         {
           "target": "portable",
@@ -120,6 +121,10 @@
           "**/*.bat",
           "**/*.sh"
         ]
+      },
+      {
+        "from": "public/favicon.ico",
+        "to": "favicon.ico"
       }
     ]
   }
