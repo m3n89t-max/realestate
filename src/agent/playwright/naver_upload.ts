@@ -238,29 +238,11 @@ export async function uploadNaverBlog(
             await page.waitForTimeout(50);
         };
 
-        // SE3 볼드 툴바 버튼 셀렉터 (data-name="bold", class="se-bold-toolbar-button" 확인됨)
-        const BOLD_BTN_SELECTORS = [
-            'button[data-name="bold"]',                 // ✓ 실제 data-name 확인됨
-            'button.se-bold-toolbar-button',            // ✓ 실제 class 확인됨
-            'button[class*="se-bold-toolbar"]',
-            '.se-toolbar-item-bold > button',
-            'button[aria-label="굵게"]',
-            'button[title="굵게"]',
-        ];
-
-        // 현재 "선택된" 텍스트에 굵게 적용 (툴바 버튼 우선, 실패 시 Ctrl+B).
-        // ⚠️ 반드시 텍스트가 선택된 상태에서 호출할 것.
+        // 현재 "선택된" 텍스트에 굵게 적용.
+        // ⚠️ 툴바 버튼 클릭은 에디터 포커스를 빼앗아 선택이 풀리고, 이후 타이핑이 선택 영역을
+        //    덮어써 글자가 유실된다. Ctrl+B는 포커스를 유지한 채 선택 영역에만 굵게를 적용하므로
+        //    Ctrl+B만 사용한다. (SE3가 Ctrl+B를 지원 안 하면 굵게가 안 될 뿐, 글자 유실은 없음)
         const boldSelection = async () => {
-            for (const sel of BOLD_BTN_SELECTORS) {
-                for (const ctx of [mainFrame, page]) {
-                    if (await ctx.locator(sel).count() > 0) {
-                        await ctx.locator(sel).first().click({ force: true });
-                        await page.waitForTimeout(80);
-                        return;
-                    }
-                }
-            }
-            // 버튼 못 찾으면 Ctrl+B fallback
             await page.keyboard.press('Control+B');
             await page.waitForTimeout(80);
         };
