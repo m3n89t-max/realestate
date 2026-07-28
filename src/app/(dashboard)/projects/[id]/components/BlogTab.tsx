@@ -315,29 +315,28 @@ export default function BlogTab({ projectId, orgId, project, contents, assets }:
     setGeneratingThumb(true)
     try {
       const addr: string = project?.address ?? ''
-      const region = addr.split(/\s+/).filter(Boolean).slice(0, 3).join(' ')
+      const parts = addr.split(/\s+/).filter(Boolean)
+      const clean = (s: string) => (s || '').replace(/특별자치도|특별자치시|특별시|광역시/g, '').trim()
+      // 큰 제목: 시/구 + 읍/면/동
+      const region = [clean(parts[1] ?? parts[0] ?? ''), parts[2] ?? ''].filter(Boolean).join(' ') || clean(addr)
       const typeLabel = project?.property_type ? getPropertyTypeLabel(project.property_type) : ''
-
-      let priceBadge = ''
       const tx = project?.transaction_type
-      if (tx === 'rent') priceBadge = `월세 ${project?.monthly_rent ? formatPrice(project.monthly_rent) : '협의'}`
-      else if (tx === 'lease') priceBadge = `전세 ${project?.deposit ? formatPrice(project.deposit) : '협의'}`
-      else priceBadge = `매매 ${project?.price ? formatPrice(project.price) : '협의'}`
+      const txLabel = tx === 'rent' ? '월세' : tx === 'lease' ? '전세' : '매매'
+      const type_label = [typeLabel, txLabel].filter(Boolean).join(' ')
+
+      let price_badge = ''
+      if (tx === 'rent') price_badge = `월세 ${project?.monthly_rent ? formatPrice(project.monthly_rent) : '협의'}`
+      else if (tx === 'lease') price_badge = `전세 ${project?.deposit ? formatPrice(project.deposit) : '협의'}`
+      else price_badge = `매매 ${project?.price ? formatPrice(project.price) : '협의'}`
 
       const features: string[] = Array.isArray(project?.features) ? project.features : []
-      const card = {
-        layout: 'cover',
-        order: 1,
-        title: [region, typeLabel].filter(Boolean).join(' ') || (selectedTitle ?? selected?.title ?? '매물 소개'),
-        subtitle: features.slice(0, 1).join('') || (project?.direction ?? ''),
-        price_badge: priceBadge,
-        checkpoints: features.slice(0, 3),
-      }
+      const badges = features.slice(0, 4).join(' · ')
+      const tag = `${clean(parts[0] ?? '') || '부동산'} 부동산`
 
-      const res = await fetch('/api/generate-card-image', {
+      const res = await fetch('/api/generate-thumbnail', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ card, photo_url: basePhoto, project_id: projectId }),
+        body: JSON.stringify({ photo_url: basePhoto, region, type_label, price_badge, badges, tag, project_id: projectId }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? '썸네일 생성 실패')
