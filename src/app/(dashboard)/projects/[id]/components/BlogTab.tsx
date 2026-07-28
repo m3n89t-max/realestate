@@ -242,8 +242,15 @@ export default function BlogTab({ projectId, orgId, project, contents, assets }:
   }
 
   // 미리보기·업로드에 사용할 전체 내용 (인사말 + 본문 + 공인중개사 정보)
-  const buildFullContent = () =>
-    buildGreetingHeader() + (editContent || selected?.content || '') + buildRealtorFooter()
+  const buildFullContent = () => {
+    let content = editContent || selected?.content || ''
+    const footer = buildRealtorFooter()
+    // 공인중개사 푸터(연락처 포함 문의안내)가 있으면, 본문 끝의 AI 생성 "문의 안내" 섹션을 제거해 중복 방지
+    if (footer) {
+      content = content.replace(/\n*#{1,3}\s*(?:📞\s*)?문의\s*안내[\s\S]*$/i, '').trimEnd()
+    }
+    return buildGreetingHeader() + content + footer
+  }
 
   const handleRegenerateTitles = async () => {
     if (!selectedId) return

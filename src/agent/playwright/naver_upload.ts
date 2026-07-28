@@ -248,8 +248,9 @@ export async function uploadNaverBlog(
             'button[title="굵게"]',
         ];
 
-        // SE3 볼드 버튼 클릭 토글 (Ctrl+B 대신 툴바 버튼 직접 클릭)
-        const toggleBold = async () => {
+        // 현재 "선택된" 텍스트에 굵게 적용 (툴바 버튼 우선, 실패 시 Ctrl+B).
+        // ⚠️ 반드시 텍스트가 선택된 상태에서 호출할 것.
+        const boldSelection = async () => {
             for (const sel of BOLD_BTN_SELECTORS) {
                 for (const ctx of [mainFrame, page]) {
                     if (await ctx.locator(sel).count() > 0) {
@@ -308,17 +309,20 @@ export async function uploadNaverBlog(
         };
 
         // 텍스트 입력 (bold 여부 지정 가능)
-        // page.keyboard.type 사용: 툴바 버튼 클릭 후 포커스가 유지된 상태에서 타이핑
+        // 굵게: "먼저 타이핑 → 방금 입력한 글자만 선택 → 굵게 적용 → 선택 해제" 방식으로 확실하게 적용.
+        // (기존 '굵게 토글 후 타이핑'은 커서/포커스 이동으로 굵기가 안 먹던 문제가 있었음)
         const typeText = async (text: string, bold = false) => {
-            if (bold) {
-                await toggleBold();
-                // 볼드 버튼 클릭 후 에디터 포커스 복원 (툴바 클릭이 포커스를 가져갈 수 있음)
-                await focusEditor();
-            }
+            if (!text) return;
             await page.keyboard.type(text, { delay: 20 });
             if (bold) {
-                await toggleBold();
-                await page.waitForTimeout(50);
+                const len = Array.from(text).length;
+                for (let i = 0; i < len; i++) {
+                    await page.keyboard.press('Shift+ArrowLeft');
+                }
+                await page.waitForTimeout(60);
+                await boldSelection();
+                await page.waitForTimeout(60);
+                await page.keyboard.press('ArrowRight'); // 선택 해제 + 커서를 텍스트 끝으로
             }
         };
 
@@ -680,7 +684,7 @@ export async function uploadNaverBlog(
             const faqBare = line.replace(/^\s*\*\*/, '').replace(/\*\*\s*$/, '').trim();
             const qMatch = faqBare.match(/^(?:\d+\.\s*)?Q\s*[：:.．]\s*(.+)$/);
             if (qMatch) {
-                await typeText('Q. ' + qMatch[1].replace(/\*\*/g, '').trim());
+                await typeText('Q. ' + qMatch[1].replace(/\*\*/g, '').trim(), true);
                 await page.keyboard.press('Enter');
                 return;
             }
