@@ -291,41 +291,31 @@ export async function uploadNaverBlog(
         };
 
         // 텍스트 입력 (bold 여부 지정 가능)
-        // 굵게: "먼저 타이핑 → 방금 입력한 글자만 선택 → 굵게 적용 → 선택 해제" 방식으로 확실하게 적용.
-        // (기존 '굵게 토글 후 타이핑'은 커서/포커스 이동으로 굵기가 안 먹던 문제가 있었음)
+        // ⚠️ bold=true는 "한 줄 전체"에만 사용할 것(헤딩/FAQ 질문). 타이핑 후 Shift+Home으로
+        //    줄 시작~현재 커서까지 선택 → Ctrl+B로 굵게 → End로 선택 해제. 문자 단위 선택(Shift+ArrowLeft)은
+        //    커서가 앞줄로 넘어가 굵기 번짐/글자 붙음을 유발해 사용하지 않는다.
         const typeText = async (text: string, bold = false) => {
             if (!text) return;
             await page.keyboard.type(text, { delay: 20 });
             if (bold) {
-                const len = Array.from(text).length;
-                for (let i = 0; i < len; i++) {
-                    await page.keyboard.press('Shift+ArrowLeft');
-                }
+                await page.keyboard.press('Shift+Home');
                 await page.waitForTimeout(60);
                 await boldSelection();
                 await page.waitForTimeout(60);
-                await page.keyboard.press('ArrowRight'); // 선택 해제 + 커서를 텍스트 끝으로
+                await page.keyboard.press('End'); // 선택 해제 + 커서를 줄 끝으로
             }
         };
 
-        // 인라인 볼드(**...**) 처리 — 단락 내 굵은 글씨 지원
+        // 인라인 볼드(**...**) 처리 — 단락 내 부분 굵게는 자동화로 안정적 처리가 불가(글자 유실/붙음)하여
+        // ** 마커만 제거하고 "평문"으로 입력한다. (굵기 구분은 헤딩/FAQ 질문에서만 적용)
         const typeInlineBold = async (text: string) => {
-            // 헤딩/HTML 태그 제거 후 인라인 볼드 분리
             const cleaned = text
                 .replace(/<[^>]+>/g, '')
                 .replace(/^#{1,6}\s+/, '')
-                .replace(/^[-*]\s/, '• ');
-            const parts = cleaned.split(/(\*\*[^*]+\*\*)/);
-            for (const part of parts) {
-                if (!part) continue;
-                const boldMatch = part.match(/^\*\*([^*]+)\*\*$/);
-                if (boldMatch) {
-                    await typeText(boldMatch[1], true);
-                } else {
-                    const noItalic = part.replace(/\*([^*]+)\*/g, '$1');
-                    if (noItalic) await typeText(noItalic);
-                }
-            }
+                .replace(/^[-*]\s/, '• ')
+                .replace(/\*\*([^*]+)\*\*/g, '$1')
+                .replace(/\*([^*]+)\*/g, '$1');
+            if (cleaned.trim()) await typeText(cleaned);
         };
 
         // 구분선 삽입
