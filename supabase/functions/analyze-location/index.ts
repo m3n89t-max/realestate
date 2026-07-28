@@ -226,10 +226,15 @@ Deno.serve(async (req) => {
       const hasFoodBiz = ((density?.categories?.FD6?.total_count ?? 0) + (density?.categories?.CE7?.total_count ?? 0))
       const populationScore = hasFoodBiz >= 30 ? 0.8 : hasFoodBiz >= 10 ? 0.5 : 0.3
 
-      const raw = poiScore * 0.4 + transitScore * 0.3 + populationScore * 0.3
+      // 지하철이 없는 지역(제주 등)은 대중교통(지하철) 점수가 항상 최하가 되어
+      // 유동인구를 부당하게 깎으므로, 대중교통 가중치(0.3)를 POI·배후인구로 재분배한다.
+      const hasSubway = nearestSubway < 99999
+      const raw = hasSubway
+        ? poiScore * 0.4 + transitScore * 0.3 + populationScore * 0.3
+        : poiScore * 0.55 + populationScore * 0.45
       const score = Math.round(raw * 100)
       const label = score >= 75 ? '높음' : score >= 50 ? '보통' : score >= 25 ? '낮음' : '매우 낮음'
-      return { score, label, breakdown: { poi_score: Math.round(poiScore * 100), transit_score: Math.round(transitScore * 100), population_score: Math.round(populationScore * 100), total_poi: totalPoi, nearest_subway_m: nearestSubway < 99999 ? nearestSubway : null } }
+      return { score, label, breakdown: { poi_score: Math.round(poiScore * 100), transit_score: hasSubway ? Math.round(transitScore * 100) : null, population_score: Math.round(populationScore * 100), total_poi: totalPoi, nearest_subway_m: hasSubway ? nearestSubway : null } }
     })()
 
     // ── 매물 유형별 분석 관점 설정 ──────────────────────────
@@ -388,7 +393,7 @@ ${kakaoDensityText}
 [유동인구 추정 (로컬 계산 결과 - 참고용)]
 유동인구 지수: ${footTrafficLocal.score}/100 (${footTrafficLocal.label})
 - POI 밀도 점수: ${footTrafficLocal.breakdown.poi_score}/100 (반경 500m 총 ${footTrafficLocal.breakdown.total_poi}개)
-- 대중교통 점수: ${footTrafficLocal.breakdown.transit_score}/100 ${footTrafficLocal.breakdown.nearest_subway_m ? `(가장 가까운 지하철 ${footTrafficLocal.breakdown.nearest_subway_m}m)` : '(지하철 없음)'}
+- 대중교통 점수: ${footTrafficLocal.breakdown.nearest_subway_m ? `${footTrafficLocal.breakdown.transit_score}/100 (가장 가까운 지하철 ${footTrafficLocal.breakdown.nearest_subway_m}m)` : '해당 없음 (지하철 미운행 지역 — POI·배후인구 가중 재분배)'}
 - 배후인구 점수: ${footTrafficLocal.breakdown.population_score}/100
 
 위 실측 데이터를 종합하여 ${ptLabel} 매물에 최적화된 분석을 수행하세요:
