@@ -238,72 +238,14 @@ export async function uploadNaverBlog(
             await page.waitForTimeout(50);
         };
 
-        // 현재 "선택된" 텍스트에 굵게 적용.
-        // ⚠️ 툴바 버튼 클릭은 에디터 포커스를 빼앗아 선택이 풀리고, 이후 타이핑이 선택 영역을
-        //    덮어써 글자가 유실된다. Ctrl+B는 포커스를 유지한 채 선택 영역에만 굵게를 적용하므로
-        //    Ctrl+B만 사용한다. (SE3가 Ctrl+B를 지원 안 하면 굵게가 안 될 뿐, 글자 유실은 없음)
-        const boldSelection = async () => {
-            await page.keyboard.press('Control+B');
-            await page.waitForTimeout(80);
-        };
-
-        // SE3 글자 크기 변경 (data-name="font-size" 확인됨)
-        const FONTSIZE_BTN_SELECTORS = [
-            'button[data-name="font-size"]',
-            'button[data-log="prt.size"]',
-            'button.se-font-size-code-toolbar-button',
-        ];
-        const setFontSize = async (size: number) => {
-            let btn = null;
-            for (const sel of FONTSIZE_BTN_SELECTORS) {
-                for (const ctx of [mainFrame, page]) {
-                    if (await ctx.locator(sel).count() > 0) { btn = ctx.locator(sel).first(); break; }
-                }
-                if (btn) break;
-            }
-            if (!btn) return;
-            await btn.click({ force: true });
-            await page.waitForTimeout(400);
-            const sizeStr = String(size);
-            // 드롭다운에서 해당 크기 클릭 (다양한 셀렉터 시도)
-            for (const ctx of [mainFrame, page]) {
-                for (const sel of [
-                    `li[data-value="${sizeStr}"]`,
-                    `button[data-value="${sizeStr}"]`,
-                    `.se-list-item[data-value="${sizeStr}"]`,
-                    `.se-dropdown-item[data-value="${sizeStr}"]`,
-                    `[data-value="${sizeStr}"]`,
-                ]) {
-                    if (await ctx.locator(sel).count() > 0) {
-                        await ctx.locator(sel).first().click();
-                        await page.waitForTimeout(150);
-                        return;
-                    }
-                }
-                // 텍스트 매칭 (다양한 리스트 아이템 형태)
-                for (const listSel of ['li.se-list-item', '.se-listitem', 'li', '.se-dropdown-item']) {
-                    const opt = ctx.locator(listSel).filter({ hasText: new RegExp(`^${sizeStr}$`) }).first();
-                    if (await opt.count() > 0) { await opt.click(); await page.waitForTimeout(150); return; }
-                }
-            }
-            await page.keyboard.press('Escape'); // 못 찾으면 닫기
-            await page.waitForTimeout(100);
-        };
-
-        // 텍스트 입력 (bold 여부 지정 가능)
-        // ⚠️ bold=true는 "한 줄 전체"에만 사용할 것(헤딩/FAQ 질문). 타이핑 후 Shift+Home으로
-        //    줄 시작~현재 커서까지 선택 → Ctrl+B로 굵게 → End로 선택 해제. 문자 단위 선택(Shift+ArrowLeft)은
-        //    커서가 앞줄로 넘어가 굵기 번짐/글자 붙음을 유발해 사용하지 않는다.
-        const typeText = async (text: string, bold = false) => {
+        // 텍스트 입력 — "평문"으로만.
+        // ⚠️ SE3 에디터는 자동화의 툴바 서식(굵게 버튼/글자크기 드롭다운)에 매우 취약하다:
+        //    버튼 클릭이 에디터 포커스를 빼앗아 커서가 튀고, 그 결과 글자가 유실되거나 문단이
+        //    엉뚱한 위치(글 맨 끝 등)에 입력된다. Ctrl+B도 SE3에서는 굵게가 적용되지 않는다.
+        //    따라서 서식을 전혀 쓰지 않고, 헤딩은 마커(▣)+빈 줄+구분선으로 구분한다. (안정성 최우선)
+        const typeText = async (text: string, _bold = false) => {
             if (!text) return;
             await page.keyboard.type(text, { delay: 20 });
-            if (bold) {
-                await page.keyboard.press('Shift+Home');
-                await page.waitForTimeout(60);
-                await boldSelection();
-                await page.waitForTimeout(60);
-                await page.keyboard.press('End'); // 선택 해제 + 커서를 줄 끝으로
-            }
         };
 
         // 인라인 볼드(**...**) 처리 — 단락 내 부분 굵게는 자동화로 안정적 처리가 불가(글자 유실/붙음)하여
@@ -336,6 +278,7 @@ export async function uploadNaverBlog(
                     if (await ctx.locator(sel).count() > 0) {
                         await ctx.locator(sel).first().click();
                         await page.waitForTimeout(400);
+                        await focusEditor(); // 툴바 클릭이 뺏은 포커스를 에디터로 복원(커서 튐 방지)
                         return;
                     }
                 }
@@ -629,9 +572,8 @@ export async function uploadNaverBlog(
                 return;
             }
             if (line.match(/^#{1,6}\s+/)) {
-                // 헤딩 → 크기+굵게 (H1: 24, H2: 24+구분선, H3+: 18)
+                // 헤딩 → 서식(굵게/크기) 대신 마커+빈 줄+구분선으로 구분 (SE3 자동화 안정성)
                 const level = (line.match(/^(#{1,6})\s+/)?.[1] ?? '##').length;
-                const fontSize = level === 1 ? 24 : level === 2 ? 24 : 18;
                 const headText = line
                     .replace(/^#{1,6}\s+/, '')
                     .replace(/\*\*([^*]+)\*\*/g, '$1')
@@ -643,9 +585,9 @@ export async function uploadNaverBlog(
                         h2Count++;
                         if (h2Count > 1) await insertHR(); // 첫 H2 제외
                     }
-                    await setFontSize(fontSize);
-                    await typeText(headText, true);
-                    await setFontSize(15); // 본문 크기로 복원
+                    const marker = level >= 3 ? '◽ ' : '▣ ';
+                    await typeText(marker + headText);
+                    await page.keyboard.press('Enter'); // 헤딩 뒤 빈 줄
                 }
                 await page.keyboard.press('Enter');
                 return;
@@ -656,7 +598,7 @@ export async function uploadNaverBlog(
             const faqBare = line.replace(/^\s*\*\*/, '').replace(/\*\*\s*$/, '').trim();
             const qMatch = faqBare.match(/^(?:\d+\.\s*)?Q\s*[：:.．]\s*(.+)$/);
             if (qMatch) {
-                await typeText('Q. ' + qMatch[1].replace(/\*\*/g, '').trim(), true);
+                await typeText('Q. ' + qMatch[1].replace(/\*\*/g, '').trim());
                 await page.keyboard.press('Enter');
                 return;
             }
