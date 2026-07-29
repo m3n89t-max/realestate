@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
 import type { POIItem, RealPriceItem } from '@/lib/types'
 import KakaoMap from '@/components/KakaoMap'
+import { effectiveCatchment } from '@/lib/effective-catchment'
 
 // ── POI 아이콘 맵 ─────────────────────────────────────────────
 const POI_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
@@ -672,30 +673,46 @@ function MapSection({
         <div className="bg-white border border-blue-100 rounded-xl p-3 shadow-sm">
           <p className="font-bold text-blue-700 mb-2 flex items-center gap-1">
             <span className="w-3 h-3 rounded-full border-2 border-dashed inline-block flex-shrink-0" style={{borderColor:'#ef4444'}} />
-            배후인구 산정방식
+            유효 배후인구 산정방식
           </p>
           {/* 공식 박스 */}
           <div className="bg-blue-50 rounded-lg px-2.5 py-2 text-[10px] leading-relaxed text-blue-800 font-mono mb-2">
-            <div>통계청 집계구 밀도 (중간값)</div>
-            <div className="pl-2">× π × 0.5² <span className="text-blue-400">(= 0.785㎢)</span></div>
-            <div className="pl-2">× 장벽 보정계수</div>
-            <div className="border-t border-blue-200 mt-1 pt-1 font-bold">= 추정 배후인구</div>
+            <div><span className="text-blue-400">거주</span> = 집계구 밀도 × 0.785㎢ × 장벽보정</div>
+            <div><span className="text-emerald-500">유동</span> = 거주 × 상권등급 배수</div>
+            <div className="pl-2 text-[9px] text-blue-400">S×3 · A×2 · B×1 · C×0.5 · D×0.2</div>
+            <div className="border-t border-blue-200 mt-1 pt-1 font-bold">= 유효 배후인구 (거주 + 유동)</div>
           </div>
           {/* 실제 값 표시 */}
-          {population_data?.radius_500m_estimated != null && (
-            <div className="text-[10px] text-gray-600 space-y-0.5">
-              <div className="flex justify-between">
-                <span className="text-gray-400">추정 결과</span>
-                <span className="font-bold text-blue-700">약 {population_data.radius_500m_estimated.toLocaleString()}명</span>
-              </div>
-              {population_data.barrier_coefficient != null && population_data.barrier_coefficient < 100 && (
+          {population_data?.radius_500m_estimated != null && (() => {
+            const cat = effectiveCatchment(population_data.radius_500m_estimated, locationAnalysis?.commercial_grade)
+            if (!cat) return null
+            return (
+              <div className="text-[10px] text-gray-600 space-y-0.5">
                 <div className="flex justify-between">
-                  <span className="text-gray-400">장벽 보정</span>
-                  <span className="text-orange-600 font-medium">×{(population_data.barrier_coefficient / 100).toFixed(2)}</span>
+                  <span className="text-gray-400">· 거주 배후인구</span>
+                  <span className="font-medium text-gray-700">{cat.resident.toLocaleString()}명</span>
                 </div>
-              )}
-            </div>
-          )}
+                {cat.multiplier > 0 ? (
+                  <div className="flex justify-between">
+                    <span className="text-emerald-600">· 유동인구 ({cat.grade}등급 ×{cat.multiplier})</span>
+                    <span className="font-medium text-emerald-700">+{cat.floating.toLocaleString()}명</span>
+                  </div>
+                ) : (
+                  <div className="text-[9px] text-gray-400">상권등급 분석 후 유동 합산 (현재 거주만)</div>
+                )}
+                <div className="flex justify-between border-t border-gray-100 pt-0.5 mt-0.5">
+                  <span className="text-gray-400">유효 배후인구</span>
+                  <span className="font-bold text-blue-700">약 {cat.effective.toLocaleString()}명</span>
+                </div>
+                {population_data.barrier_coefficient != null && population_data.barrier_coefficient < 100 && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">거주 장벽 보정</span>
+                    <span className="text-orange-600 font-medium">×{(population_data.barrier_coefficient / 100).toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
           <div className="flex gap-1.5 mt-2 pt-1.5 border-t border-gray-100">
             <span className="flex items-center gap-0.5 text-[9px] text-gray-400"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#ef4444'}} />고밀</span>
             <span className="flex items-center gap-0.5 text-[9px] text-gray-400"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#f97316'}} />중밀</span>

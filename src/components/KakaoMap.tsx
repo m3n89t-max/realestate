@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { POIItem, KakaoDensity } from '@/lib/types'
+import { effectiveCatchment } from '@/lib/effective-catchment'
 
 declare global {
   interface Window { kakao: any }
@@ -220,7 +221,13 @@ export default function KakaoMap({
     circle.setMap(map)
     popCircleRef.current = circle
 
-    // 라벨은 원 위쪽에 배치
+    // 라벨은 원 위쪽에 배치 (유효 배후인구 = 거주 + 유동)
+    const cat = effectiveCatchment(populationData.radius_500m_estimated, locationAnalysis?.commercial_grade)
+    const labelText = cat != null
+      ? `약 ${cat.effective.toLocaleString()}명`
+      : (populationData.radius_500m_estimated != null
+          ? `약 ${populationData.radius_500m_estimated.toLocaleString()}명`
+          : `${(populationData.total_population / 10000).toFixed(1)}만명`)
     const labelPos = new window.kakao.maps.LatLng(
       lat + (popRadius / 111_000) * 0.9,
       lng
@@ -228,12 +235,12 @@ export default function KakaoMap({
     const label = new window.kakao.maps.CustomOverlay({
       map,
       position: labelPos,
-      content: `<div style="background:${color};color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:99px;white-space:nowrap;opacity:0.9;">👥 ${populationData.radius_500m_estimated != null ? `약 ${populationData.radius_500m_estimated.toLocaleString()}명` : `${(populationData.total_population / 10000).toFixed(1)}만명`}</div>`,
+      content: `<div style="background:${color};color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:99px;white-space:nowrap;opacity:0.9;">👥 ${labelText}</div>`,
       yAnchor: 1,
     })
     label.setMap(map)
     popLabelRef.current = label
-  }, [populationData, lat, lng, mapReady])
+  }, [populationData, lat, lng, mapReady, locationAnalysis])
 
   // ── Effect 3: 유동인구 원 (cardData 우선, fallback: commercial_data.floating_population)
   useEffect(() => {
@@ -500,26 +507,47 @@ export default function KakaoMap({
             </div>
           )}
 
-          {/* 섹션 1: 반경 500m 추정 */}
-          {!(populationData as any).error && populationData.radius_500m_estimated != null && (
-            <div className="mb-2.5">
-              <p className="text-[9px] font-semibold text-blue-600 mb-1">📍 매물 반경 500m 추정</p>
-              <div className="bg-blue-50 rounded-lg px-2.5 py-1.5 flex justify-between items-center">
-                <span className="text-[11px] text-blue-700">추정 배후인구</span>
-                <span className="text-[13px] font-bold text-blue-800">약 {populationData.radius_500m_estimated.toLocaleString()}명</span>
-              </div>
-              {populationData.barrier_names?.length > 0 && (
-                <div className="flex justify-between items-center text-[10px] mt-1">
-                  <span className="text-orange-500">장벽 보정</span>
-                  <span className="text-orange-600 font-medium">
-                    ×{(populationData.barrier_coefficient / 100).toFixed(2)}
-                    <span className="text-gray-400 ml-1">({populationData.barrier_names.join(', ')})</span>
-                  </span>
+          {/* 섹션 1: 반경 500m 추정 (거주 + 유동 = 유효 배후인구) */}
+          {!(populationData as any).error && populationData.radius_500m_estimated != null && (() => {
+            const cat = effectiveCatchment(populationData.radius_500m_estimated, locationAnalysis?.commercial_grade)
+            if (!cat) return null
+            const hasFloating = cat.multiplier > 0
+            return (
+              <div className="mb-2.5">
+                <p className="text-[9px] font-semibold text-blue-600 mb-1">📍 매물 반경 500m · 유효 배후인구</p>
+                <div className="bg-blue-50 rounded-lg px-2.5 py-1.5 flex justify-between items-center">
+                  <span className="text-[11px] text-blue-700">유효 배후인구</span>
+                  <span className="text-[13px] font-bold text-blue-800">약 {cat.effective.toLocaleString()}명</span>
                 </div>
-              )}
-              <p className="text-[8px] text-gray-400 mt-0.5 text-right">집계구 밀도 × 장벽 보정</p>
-            </div>
-          )}
+                {hasFloating ? (
+                  <div className="mt-1 space-y-0.5 text-[10px]">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500">· 거주 배후인구</span>
+                      <span className="text-gray-700 font-medium">{cat.resident.toLocaleString()}명</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-emerald-600">· 유동인구</span>
+                      <span className="text-emerald-700 font-medium">+{cat.floating.toLocaleString()}명
+                        <span className="text-gray-400 ml-1">({cat.grade}등급 ×{cat.multiplier})</span>
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-[9px] text-gray-400 mt-1">상권등급 분석 후 유동인구가 합산됩니다 (현재 거주만)</p>
+                )}
+                {populationData.barrier_names?.length > 0 && (
+                  <div className="flex justify-between items-center text-[10px] mt-1">
+                    <span className="text-orange-500">거주 장벽 보정</span>
+                    <span className="text-orange-600 font-medium">
+                      ×{(populationData.barrier_coefficient / 100).toFixed(2)}
+                      <span className="text-gray-400 ml-1">({populationData.barrier_names.join(', ')})</span>
+                    </span>
+                  </div>
+                )}
+                <p className="text-[8px] text-gray-400 mt-0.5 text-right">거주(집계구 밀도×장벽) + 유동(상권등급)</p>
+              </div>
+            )
+          })()}
 
           {/* 구분선 — 에러 시 숨김 */}
           {!(populationData as any).error && <div className="border-t border-gray-200 my-2" />}
