@@ -5,6 +5,14 @@ import { callGemini, callGeminiVision } from '../_shared/gemini.ts'
 
 type Platform = 'instagram' | 'kakao'
 
+// 카드 문구(제목·체크포인트·본문)에서 AI 글투를 제거하는 공통 규칙 (humanizer 기준)
+const CARD_HUMANIZER_RULES = `[카드 문구 — AI 티 제거 규칙 (제목·체크포인트·본문에 적용, image_prompt 제외)]
+✗ 부동산 광고 상투어 금지: "품격 있는", "프리미엄", "누구나 꿈꾸는", "도심 속 힐링", "~에 자리한", "명품 입지", "완벽한", "최고의"
+✗ 과장된 의미부여 금지: "~의 상징", "명실상부", "새로운 기준", "삶의 질을 높이는"
+✗ 습관적 3연속 나열 금지: "편리하고 쾌적하고 안전한" 식으로 형용사 3개 묶지 말 것
+✗ 뜻 없는 강조부사(정말/너무/매우) 반복 금지
+→ 대신 확인 가능한 사실·수치 하나로: "프리미엄 입지" ✗ → "도보 5분 지하철" ○, "쾌적한 환경" ✗ → "저층 상가 적어 조용" ○`
+
 function buildInstagramSystemPrompt(): string {
   return `당신은 부동산 인스타그램 카드뉴스 제작 전문가입니다.
 매물 정보, 입지 분석, 사진 분석을 바탕으로 정확히 6장의 카드뉴스 JSON을 생성하세요.
@@ -15,6 +23,8 @@ function buildInstagramSystemPrompt(): string {
 - image_prompt: 이 매물의 실제 지역·건물유형·외관·분위기를 영어로 구체적 묘사 (generic 금지)
 - 사진 분석 결과가 있으면 내부/외관 특징에 반드시 반영
 - ⚠️ 데이터 없음 → 생략 원칙: 제공된 데이터에 없는 정보는 절대 추측하거나 지어내지 말 것. 임대현황이 없으면 4장에 "임대 정보 없음"이라 쓰거나 알고 있는 정보만 기재. 층별 구성 모르면 spec_grid에 "미확인" 대신 알려진 내용만 기재. 빈 checkpoints/points는 실제 근거 있는 것만 포함하되 1개라도 무방
+
+${CARD_HUMANIZER_RULES}
 
 [image_prompt 작성 규칙 - 매우 중요]
 ❌ 나쁜 예: "Professional real estate exterior photo, bright lighting"
@@ -86,6 +96,8 @@ function buildKakaoSystemPrompt(): string {
 입지 분석 및 매물 정보를 바탕으로 정확히 6장의 카드뉴스 텍스트를 JSON 객체로 생성하세요.
 카카오톡에 맞게 더 간결하고 정보 중심의 Bullet point 형식으로 작성하세요.
 ⚠️ 데이터에 없는 내용은 절대 추측하거나 지어내지 말 것. 근거 있는 정보만 포함하고, 없으면 해당 항목을 빈 배열이나 짧은 실제 내용으로 처리하세요.
+
+${CARD_HUMANIZER_RULES}
 
 [카드 6장 필수 구성 - 이 흐름을 반드시 준수]
 1장: Hook (시선을 끄는 카피 한 줄)
