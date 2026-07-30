@@ -695,13 +695,13 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
 
             {/* 메인 이미지 뷰어 */}
             <div className="relative">
-              <button onClick={prevSlide} disabled={activeSlide === 0}
+              <button type="button" aria-label="이전 카드" onClick={prevSlide} disabled={activeSlide === 0}
                 className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-5 z-10 w-9 h-9 bg-white rounded-full shadow-lg border border-gray-200 flex items-center justify-center disabled:opacity-30 hover:bg-gray-50">
-                <ChevronLeft size={16} />
+                <ChevronLeft size={16} aria-hidden="true" />
               </button>
-              <button onClick={nextSlide} disabled={activeSlide === slides.length - 1}
+              <button type="button" aria-label="다음 카드" onClick={nextSlide} disabled={activeSlide === slides.length - 1}
                 className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-5 z-10 w-9 h-9 bg-white rounded-full shadow-lg border border-gray-200 flex items-center justify-center disabled:opacity-30 hover:bg-gray-50">
-                <ChevronRight size={16} />
+                <ChevronRight size={16} aria-hidden="true" />
               </button>
 
               <div className="max-w-[440px] mx-auto">
@@ -721,8 +721,11 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
                 {slides.map((_, i) => (
                   <button
                     key={i}
+                    type="button"
+                    aria-label={`${i + 1}번째 카드로 이동`}
+                    aria-current={activeSlide === i}
                     onClick={() => setActiveSlide(i)}
-                    className={cn('h-2 rounded-full transition-all',
+                    className={cn('h-2 rounded-full transition-[width,background-color]',
                       activeSlide === i ? 'w-6 bg-brand-600' : 'w-2 bg-gray-300 hover:bg-gray-400'
                     )}
                   />

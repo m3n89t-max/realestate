@@ -108,14 +108,16 @@ export default function ProjectsListView({ projects, searchParams }: ProjectsLis
             <div className="flex flex-col md:flex-row items-start md:items-center gap-3 mb-5">
                 {/* 검색 */}
                 <form onSubmit={handleSearch} className="relative w-full md:w-72 flex-shrink-0">
-                    <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <Search size={16} aria-hidden="true" className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
+                        type="search"
+                        aria-label="주소 검색"
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
-                        placeholder="주소로 검색..."
+                        placeholder="주소로 검색…"
                         className="w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl
                        placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent
-                       transition-all duration-200"
+                       transition-colors duration-200"
                     />
                 </form>
 
@@ -159,10 +161,12 @@ export default function ProjectsListView({ projects, searchParams }: ProjectsLis
                     {/* 필터 초기화 */}
                     {(searchParams.status || searchParams.type || searchParams.q) && (
                         <button
+                            type="button"
+                            aria-label="필터 초기화"
                             onClick={() => router.push('/projects')}
                             className="px-3 py-2 rounded-xl text-sm text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors"
                         >
-                            <X size={14} />
+                            <X size={14} aria-hidden="true" />
                         </button>
                     )}
                 </div>
