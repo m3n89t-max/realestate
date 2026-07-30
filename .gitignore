@@ -51,3 +51,6 @@ release-agent/
 realestate-agent-setup.zip
 public/Setup.exe
 dist/
+
+# Understand-Anything 분석 산출물
+.ua/
