@@ -67,6 +67,9 @@ function CadastralMapCard({ doc }: { doc: Document }) {
           <img
             src={doc.file_url}
             alt="지적도"
+            width={800}
+            height={800}
+            loading="lazy"
             className="w-full rounded-lg border border-gray-200"
           />
           {doc.summary && typeof doc.summary === 'string' && (
@@ -123,7 +126,7 @@ function DocumentCard({ doc, onAnalyze, analyzing }: {
               className="btn-secondary py-1.5 text-xs text-purple-600 border-purple-200 hover:bg-purple-50"
             >
               {analyzing
-                ? <><Loader2 size={12} className="animate-spin" /> 분석중...</>
+                ? <><Loader2 size={12} className="animate-spin" /> 분석중…</>
                 : <><Sparkles size={12} /> AI 요약</>
               }
             </button>
@@ -296,7 +299,7 @@ export default function DocsTab({ projectId, documents }: DocsTabProps) {
                 className="btn-primary mt-3 text-xs py-1.5 w-full"
               >
                 {requesting === 'building_register'
-                  ? <><Loader2 size={12} className="animate-spin" /> 수집중...</>
+                  ? <><Loader2 size={12} className="animate-spin" /> 수집중…</>
                   : buildingDocs.length > 0 ? <><RefreshCw size={12} /> 재수집</> : <>자동 수집</>
                 }
               </button>
@@ -319,7 +322,7 @@ export default function DocsTab({ projectId, documents }: DocsTabProps) {
                 className="btn-primary mt-3 text-xs py-1.5 w-full"
               >
                 {requesting === 'cadastral_map'
-                  ? <><Loader2 size={12} className="animate-spin" /> 생성중...</>
+                  ? <><Loader2 size={12} className="animate-spin" /> 생성중…</>
                   : cadastralDocs.length > 0 ? <><RefreshCw size={12} /> 재생성</> : <>지적도 다운로드</>
                 }
               </button>
@@ -342,7 +345,7 @@ export default function DocsTab({ projectId, documents }: DocsTabProps) {
                 className="btn-secondary mt-3 text-xs py-1.5 w-full"
               >
                 {requesting === 'seumteo'
-                  ? <><Loader2 size={12} className="animate-spin" /> 조회중...</>
+                  ? <><Loader2 size={12} className="animate-spin" /> 조회중…</>
                   : <><RefreshCw size={12} /> 세움터 조회</>
                 }
               </button>

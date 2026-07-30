@@ -68,10 +68,10 @@ function CardImageDisplay({
     <div className="relative aspect-square rounded-2xl overflow-hidden bg-gray-100 shadow-xl group">
       {/* 이미지 표시 */}
       {hasAI ? (
-        <img src={aiPhoto} alt={card.title} className="absolute inset-0 w-full h-full object-cover" />
+        <img src={aiPhoto} alt={card.title} width={440} height={440} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
       ) : photo ? (
         <>
-          <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover opacity-60" />
+          <img src={photo} alt="" width={440} height={440} loading="lazy" className="absolute inset-0 w-full h-full object-cover opacity-60" />
           <div className="absolute inset-0 bg-black/40" />
           {/* 텍스트 오버레이 미리보기 */}
           <div className="absolute inset-0 flex flex-col justify-end p-6">
@@ -132,7 +132,7 @@ function CardImageDisplay({
           loading && 'opacity-70 cursor-not-allowed'
         )}>
           {loading
-            ? <><Loader2 size={15} className="animate-spin" /> 생성 중...</>
+            ? <><Loader2 size={15} className="animate-spin" /> 생성 중…</>
             : <><span>🍌</span> {hasAI ? '재생성' : 'Nano Banana 생성'}</>
           }
         </div>
@@ -363,12 +363,12 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
     if (!slides.length) { toast.error('텍스트 구조를 먼저 생성하세요'); return }
     setNanoBananaLoading(true)
     setNanoBananaProgress(0)
-    const toastId = toast.loading('Nano Banana 이미지 생성 시작...')
+    const toastId = toast.loading('Nano Banana 이미지 생성 시작…')
     const newImages: Record<number, string> = {}
     try {
       for (let i = 0; i < slides.length; i++) {
         const card = slides[i]
-        toast.loading(`카드 ${card.order}/6 생성 중...`, { id: toastId })
+        toast.loading(`카드 ${card.order}/${slides.length} 생성 중…`, { id: toastId })
         setNanoBananaProgress(i)
         setAiLoading(prev => ({ ...prev, [card.order]: true }))
         try {
@@ -490,6 +490,7 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
           {/* 버전 선택 */}
           {contents.length > 1 && (
             <select
+              aria-label="버전 선택"
               value={selectedId ?? ''}
               onChange={e => {
                 const id = e.target.value
@@ -508,7 +509,7 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
 
           {/* 텍스트 재생성 */}
           <button onClick={handleGenerate} disabled={generating} className="btn-secondary text-xs gap-1.5">
-            {generating ? <><Loader2 size={12} className="animate-spin" /> 생성중...</> : <><RefreshCw size={12} /> 텍스트 재생성</>}
+            {generating ? <><Loader2 size={12} className="animate-spin" /> 생성중…</> : <><RefreshCw size={12} /> 텍스트 재생성</>}
           </button>
         </div>
       </div>
@@ -523,7 +524,7 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
           </p>
           <button onClick={handleGenerate} disabled={generating} className="btn-primary mx-auto">
             {generating
-              ? <><Loader2 size={14} className="animate-spin" /> 생성중...</>
+              ? <><Loader2 size={14} className="animate-spin" /> 생성중…</>
               : <><Wand2 size={14} /> 카드 텍스트 구조 생성</>
             }
           </button>
@@ -551,14 +552,20 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
                 style={{ background: 'linear-gradient(135deg,#fbbf24,#f59e0b)' }}
               >
                 {nanoBananaLoading ? (
-                  <><Loader2 size={15} className="animate-spin" /> {nanoBananaProgress}/{slides.length} 생성 중...</>
+                  <><Loader2 size={15} className="animate-spin" /> {nanoBananaProgress}/{slides.length} 생성 중…</>
                 ) : (
-                  <><Sparkles size={15} /> 6장 전체 이미지 생성</>
+                  <><Sparkles size={15} aria-hidden="true" /> {slides.length}장 전체 이미지 생성</>
                 )}
               </button>
 
               {nanoBananaLoading && (
-                <div className="mt-2 h-2 bg-yellow-200 rounded-full overflow-hidden">
+                <div
+                  className="mt-2 h-2 bg-yellow-200 rounded-full overflow-hidden"
+                  role="progressbar"
+                  aria-valuenow={Math.round((nanoBananaProgress / slides.length) * 100)}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                >
                   <div
                     className="h-full bg-yellow-500 rounded-full transition-all duration-700"
                     style={{ width: `${(nanoBananaProgress / slides.length) * 100}%` }}
@@ -569,7 +576,16 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
               {generatedCount > 0 && !nanoBananaLoading && (
                 <div className="mt-2.5 flex items-center justify-between text-[11px]">
                   <span className="text-yellow-800 font-medium">✓ {generatedCount}장 생성됨</span>
-                  <button onClick={() => setAiPhotos({})} className="text-red-400 hover:text-red-600">초기화</button>
+                  <button
+                    onClick={() => {
+                      if (confirm('생성된 카드 이미지를 모두 초기화할까요?')) {
+                        setAiPhotos({})
+                      }
+                    }}
+                    className="text-red-400 hover:text-red-600"
+                  >
+                    초기화
+                  </button>
                 </div>
               )}
             </div>
@@ -598,7 +614,7 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
                           )}
                         >
                           {photo
-                            ? <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                            ? <img src={photo} alt="매물 사진" width={96} height={96} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
                             : <div className="absolute inset-0 bg-gray-100 flex items-center justify-center"><ImageIcon size={12} className="text-gray-300" /></div>
                           }
                           <div className="absolute inset-x-0 bottom-0 py-0.5 text-center bg-black/50">
@@ -631,7 +647,7 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
                               isAssigned ? 'ring-2 ring-brand-500 ring-offset-1' : 'opacity-75 hover:opacity-100'
                             )}
                           >
-                            <img src={asset.file_url} alt="" className="w-full h-full object-cover" />
+                            <img src={asset.file_url} alt="매물 사진" width={56} height={56} loading="lazy" className="w-full h-full object-cover" />
                             {isAssigned && (
                               <div className="absolute inset-0 bg-brand-500/20 flex items-center justify-center">
                                 <Check size={14} className="text-white drop-shadow" />

@@ -139,7 +139,7 @@ function AIAnalysisReport({ analysis, projectId, hasCoords, hasPOI, hasData, isC
           className="btn-primary disabled:opacity-40 disabled:cursor-not-allowed"
           title={!canAnalyze ? '선행 데이터 수집이 필요합니다' : undefined}
         >
-          {loading ? <><Loader2 size={14} className="animate-spin" /> 분석 중...</> : <><RefreshCw size={14} /> AI 분석 실행</>}
+          {loading ? <><Loader2 size={14} className="animate-spin" /> 분석 중…</> : <><RefreshCw size={14} /> AI 분석 실행</>}
         </button>
         {!canAnalyze && (
           <p className="text-xs text-amber-600 mt-2">
@@ -224,7 +224,7 @@ function AIAnalysisReport({ analysis, projectId, hasCoords, hasPOI, hasData, isC
                   <Users size={13} className="text-brand-500" />
                   <span className="text-xs font-semibold text-gray-600">유동인구 지수</span>
                 </div>
-                <p className={`text-3xl font-black ${color}`}>{ft.score}</p>
+                <p className={`text-3xl font-black tabular-nums ${color}`}>{ft.score}</p>
                 <p className="text-xs text-gray-500 mt-1">{ft.label} · /100</p>
                 <div className="mt-2 space-y-0.5">
                   {[
@@ -397,7 +397,7 @@ function POISection({ poi_data, projectId, lat, lng }: {
       <MapPin size={32} className="mx-auto text-gray-200" />
       <p className="text-sm text-gray-400">POI 데이터 없음</p>
       <button onClick={collect} disabled={loading || !lat} className="btn-primary text-xs py-1.5 w-full justify-center">
-        {loading ? <><Loader2 size={12} className="animate-spin" /> 수집 중...</> : <><RefreshCw size={12} /> POI 수집</>}
+        {loading ? <><Loader2 size={12} className="animate-spin" /> 수집 중…</> : <><RefreshCw size={12} /> POI 수집</>}
       </button>
     </div>
   )
@@ -490,7 +490,7 @@ function KakaoDensityPanel({ kakao_density, projectId, lat, lng }: {
         <BarChart3 size={28} className="text-gray-200" />
         <p className="text-xs text-gray-400">반경 500m 업종 밀집도 미분석</p>
         <button onClick={analyze} disabled={loading || !lat} className="btn-secondary text-xs py-1.5 px-3">
-          {loading ? <><Loader2 size={12} className="animate-spin" />분석 중...</> : <><BarChart3 size={12} />업종 밀집도 분석</>}
+          {loading ? <><Loader2 size={12} className="animate-spin" />분석 중…</> : <><BarChart3 size={12} />업종 밀집도 분석</>}
         </button>
       </div>
     )
@@ -530,7 +530,7 @@ function KakaoDensityPanel({ kakao_density, projectId, lat, lng }: {
           >
             <span className={cfg.color}>{cfg.icon}</span>
             <span className="text-xs text-gray-600">{cfg.label}</span>
-            <span className={`text-base font-bold ${cfg.color}`}>{data.total_count.toLocaleString()}</span>
+            <span className={`text-base font-bold tabular-nums ${cfg.color}`}>{data.total_count.toLocaleString()}</span>
             <span className="text-xs text-gray-400">개</span>
           </button>
         ))}
@@ -547,7 +547,7 @@ function KakaoDensityPanel({ kakao_density, projectId, lat, lng }: {
                 style={{ width: `${(data.total_count / maxCount) * 100}%` }}
               />
             </div>
-            <span className="w-8 text-right text-gray-500">{data.total_count}</span>
+            <span className="w-8 text-right text-gray-500 tabular-nums">{data.total_count}</span>
           </div>
         ))}
       </div>
@@ -616,7 +616,7 @@ function MapSection({
       <MapPin size={32} className="mx-auto text-gray-200" />
       <p className="text-sm text-gray-400">좌표 없음</p>
       <button onClick={geocode} disabled={loading} className="btn-secondary text-xs py-1.5">
-        {loading ? <><Loader2 size={12} className="animate-spin" /> 수집 중...</> : <><RefreshCw size={12} /> 좌표 재수집</>}
+        {loading ? <><Loader2 size={12} className="animate-spin" /> 수집 중…</> : <><RefreshCw size={12} /> 좌표 재수집</>}
       </button>
     </div>
   )
@@ -650,7 +650,7 @@ function MapSection({
       <div className="flex justify-between items-center px-1">
         <p className="text-xs text-gray-500">지도의 마커와 팝업으로 상세 위치 정보를 확인하세요.</p>
         <button onClick={analyzePopulation} disabled={popLoading || !lat} className="btn-secondary text-[11px] py-1 px-2.5 h-7">
-          {popLoading ? <><Loader2 size={11} className="animate-spin" /> 수집 중...</> : <><Users size={11} /> 배후 인구 분석</>}
+          {popLoading ? <><Loader2 size={11} className="animate-spin" /> 수집 중…</> : <><Users size={11} /> 배후 인구 분석</>}
         </button>
       </div>
       <div className="rounded-xl overflow-hidden border border-gray-100 relative">
@@ -717,7 +717,7 @@ function MapSection({
             <span className="flex items-center gap-0.5 text-[9px] text-gray-400"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#ef4444'}} />고밀</span>
             <span className="flex items-center gap-0.5 text-[9px] text-gray-400"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#f97316'}} />중밀</span>
             <span className="flex items-center gap-0.5 text-[9px] text-gray-400"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#22c55e'}} />저밀</span>
-            <span className="text-[9px] text-gray-300 ml-auto">SGIS 2022</span>
+            <span className="text-[9px] text-gray-500 ml-auto">SGIS 2022</span>
           </div>
         </div>
 
@@ -733,7 +733,7 @@ function MapSection({
               <div>🚗 왕복 4차선+ 대로 — 신호 없이 횡단 어려움</div>
               <div>🌊 하천·강·운하 — 교량 없으면 완전 차단</div>
               <div>🚃 지상 철도·선로 — 건널목 외 통행 불가</div>
-              <div className="text-gray-300 pt-0.5">※ 이면도로·골목은 장벽 아님</div>
+              <div className="text-gray-500 pt-0.5">※ 이면도로·골목은 장벽 아님</div>
             </div>
           </div>
           <div className="bg-orange-50 rounded-lg px-2.5 py-1.5 text-[10px] text-orange-700 mb-2">
@@ -756,7 +756,7 @@ function MapSection({
               ✅ 주요 장벽 없음 (보정 미적용)
             </div>
           ) : null}
-          <p className="text-[9px] text-gray-300 mt-1.5 text-right">OpenStreetMap 기반</p>
+          <p className="text-[9px] text-gray-500 mt-1.5 text-right">OpenStreetMap 기반</p>
         </div>
 
         {/* ③ 유동인구 + 히트맵 */}
@@ -785,7 +785,7 @@ function MapSection({
               <span className="w-5 h-2 rounded-sm inline-block" style={{background:'rgba(239,68,68,0.85)'}} />
               <span className="w-5 h-2 rounded-sm inline-block" style={{background:'rgba(234,179,8,0.7)'}} />
               <span className="w-5 h-2 rounded-sm inline-block" style={{background:'rgba(59,130,246,0.5)'}} />
-              <span className="text-[9px] text-gray-300 ml-1">높음 → 낮음</span>
+              <span className="text-[9px] text-gray-500 ml-1">높음 → 낮음</span>
             </div>
           </div>
         </div>
@@ -801,37 +801,37 @@ function MapSection({
               {population_data.total_population > 0 && (
                 <div className="flex justify-between">
                   <span className="text-gray-400">총 인구</span>
-                  <span className="font-semibold text-gray-700">{population_data.total_population.toLocaleString()}명</span>
+                  <span className="font-semibold text-gray-700 tabular-nums">{population_data.total_population.toLocaleString()}명</span>
                 </div>
               )}
               {population_data.density > 0 && (
                 <div className="flex justify-between">
                   <span className="text-gray-400">인구밀도</span>
-                  <span className="font-semibold text-gray-700">{population_data.density.toLocaleString()}명/㎢</span>
+                  <span className="font-semibold text-gray-700 tabular-nums">{population_data.density.toLocaleString()}명/㎢</span>
                 </div>
               )}
               {population_data.avg_age > 0 && (
                 <div className="flex justify-between">
                   <span className="text-gray-400">평균연령</span>
-                  <span className="font-semibold text-gray-700">{population_data.avg_age}세</span>
+                  <span className="font-semibold text-gray-700 tabular-nums">{population_data.avg_age}세</span>
                 </div>
               )}
               {population_data.total_households > 0 && (
                 <div className="flex justify-between">
                   <span className="text-gray-400">총 가구</span>
-                  <span className="font-semibold text-gray-700">{population_data.total_households.toLocaleString()}가구</span>
+                  <span className="font-semibold text-gray-700 tabular-nums">{population_data.total_households.toLocaleString()}가구</span>
                 </div>
               )}
               {population_data.single_households > 0 && (
                 <div className="flex justify-between">
                   <span className="text-gray-400">1인 가구</span>
-                  <span className="font-semibold text-gray-700">{population_data.single_households.toLocaleString()}가구</span>
+                  <span className="font-semibold text-gray-700 tabular-nums">{population_data.single_households.toLocaleString()}가구</span>
                 </div>
               )}
               {population_data.avg_members > 0 && (
                 <div className="flex justify-between">
                   <span className="text-gray-400">평균 가구원</span>
-                  <span className="font-semibold text-gray-700">{population_data.avg_members}명</span>
+                  <span className="font-semibold text-gray-700 tabular-nums">{population_data.avg_members}명</span>
                 </div>
               )}
             </div>
@@ -885,22 +885,22 @@ function MapSection({
               <div className="space-y-2">
                 <div className="p-2 bg-amber-50 rounded-lg text-center">
                   <p className="text-[10px] text-gray-500 mb-0.5">사업체 수</p>
-                  <p className="text-lg font-bold text-amber-700">{population_data.industry_stat.bsns_cnt.toLocaleString()}개</p>
+                  <p className="text-lg font-bold text-amber-700 tabular-nums">{population_data.industry_stat.bsns_cnt.toLocaleString()}개</p>
                 </div>
                 <div className="p-2 bg-orange-50 rounded-lg text-center">
                   <p className="text-[10px] text-gray-500 mb-0.5">종사자 수</p>
-                  <p className="text-lg font-bold text-orange-600">{population_data.industry_stat.wrkr_cnt.toLocaleString()}명</p>
+                  <p className="text-lg font-bold text-orange-600 tabular-nums">{population_data.industry_stat.wrkr_cnt.toLocaleString()}명</p>
                 </div>
                 {population_data.industry_stat.bsns_cnt > 0 && population_data.industry_stat.wrkr_cnt > 0 && (
                   <div className="flex justify-between pt-1 border-t border-gray-100">
                     <span className="text-gray-400">사업체당 종사자</span>
-                    <span className="font-semibold text-gray-700">
+                    <span className="font-semibold text-gray-700 tabular-nums">
                       {(population_data.industry_stat.wrkr_cnt / population_data.industry_stat.bsns_cnt).toFixed(1)}명
                     </span>
                   </div>
                 )}
               </div>
-              <p className="text-[9px] text-gray-300 text-right mt-1">소상공인 상권활성도 지표</p>
+              <p className="text-[9px] text-gray-500 text-right mt-1">소상공인 상권활성도 지표</p>
             </div>
           ) : (
             <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm text-[11px] flex items-center justify-center text-gray-300">
@@ -941,7 +941,7 @@ function RealPriceSection({ real_price_data, projectId, legalDong }: { real_pric
       <TrendingUp size={32} className="mx-auto text-gray-200" />
       <p className="text-sm text-gray-400">실거래가 데이터 없음</p>
       <button onClick={collect} disabled={loading} className="btn-primary text-xs py-1.5">
-        {loading ? <><Loader2 size={12} className="animate-spin" /> 수집 중...</> : <><RefreshCw size={12} /> 실거래가 수집</>}
+        {loading ? <><Loader2 size={12} className="animate-spin" /> 수집 중…</> : <><RefreshCw size={12} /> 실거래가 수집</>}
       </button>
     </div>
   )
@@ -1055,7 +1055,7 @@ function CommercialSection({ commercial_data, projectId }: {
         <Store size={32} className="mx-auto text-gray-200" />
         <p className="text-sm text-gray-400">상권 데이터 없음</p>
         <button onClick={fetchData} disabled={loading} className="btn-primary text-xs py-1.5">
-          {loading ? <><Loader2 size={12} className="animate-spin" /> 수집 중...</> : <><RefreshCw size={12} /> 상권 데이터 수집</>}
+          {loading ? <><Loader2 size={12} className="animate-spin" /> 수집 중…</> : <><RefreshCw size={12} /> 상권 데이터 수집</>}
         </button>
       </div>
     )
@@ -1115,15 +1115,15 @@ function CommercialSection({ commercial_data, projectId }: {
       {/* 유동인구 */}
       {floating_population && (
         <div className="p-3 bg-purple-50 rounded-lg">
-          <p className="text-xs font-semibold text-purple-700 mb-2">🚶 유동인구 (반경 500m)</p>
+          <p className="text-xs font-semibold text-purple-700 mb-2"><span aria-hidden="true">🚶</span> 유동인구 (반경 500m)</p>
           <div className="grid grid-cols-2 gap-2 mb-3">
             <div className="text-center">
               <p className="text-[10px] text-gray-500">주중</p>
-              <p className="text-lg font-bold text-purple-700">{floating_population.weekday.toLocaleString()}명</p>
+              <p className="text-lg font-bold text-purple-700 tabular-nums">{floating_population.weekday.toLocaleString()}명</p>
             </div>
             <div className="text-center">
               <p className="text-[10px] text-gray-500">주말</p>
-              <p className="text-lg font-bold text-purple-500">{floating_population.weekend.toLocaleString()}명</p>
+              <p className="text-lg font-bold text-purple-500 tabular-nums">{floating_population.weekend.toLocaleString()}명</p>
             </div>
           </div>
           <p className="text-[10px] text-gray-500 mb-1">시간대별 유동인구</p>
@@ -1149,7 +1149,7 @@ function CommercialSection({ commercial_data, projectId }: {
       {/* 카드 매출 */}
       {sales_data && (
         <div className="p-3 bg-green-50 rounded-lg">
-          <p className="text-xs font-semibold text-green-700 mb-2">💳 카드 매출 현황</p>
+          <p className="text-xs font-semibold text-green-700 mb-2"><span aria-hidden="true">💳</span> 카드 매출 현황</p>
           {sales_data.area_name && (
             <p className="text-[10px] text-gray-400 mb-1">{sales_data.area_name} 상권 기준</p>
           )}
@@ -1298,7 +1298,7 @@ function CommercialSection({ commercial_data, projectId }: {
         return (
           <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 space-y-2">
             <p className="text-xs font-semibold text-gray-700 flex items-center gap-1">
-              <span>📋</span> 상권 분석 요약
+              <span aria-hidden="true">📋</span> 상권 분석 요약
             </p>
             <div className="space-y-1.5 text-[11px] text-gray-600 leading-relaxed">
               {fp && (
@@ -1388,29 +1388,29 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
     ;(async () => {
       try {
         if (needsPOI) {
-          setAutoStep('주변 시설(POI) 수집 중...')
+          setAutoStep('주변 시설(POI) 수집 중…')
           await post('/api/poi')
         }
         if (needsRealPrice) {
-          setAutoStep('부동산 실거래가 수집 중...')
+          setAutoStep('부동산 실거래가 수집 중…')
           const { error } = await supabase.functions.invoke('collect-real-price', { body: { project_id: projectId } })
           if (error) throw new Error(error.message)
         }
         if (needsCommercial) {
-          setAutoStep('유동인구 · 상권 데이터 수집 중...')
+          setAutoStep('유동인구 · 상권 데이터 수집 중…')
           const { error } = await supabase.functions.invoke('analyze-commercial', { body: { project_id: projectId } })
           if (error) throw new Error(error.message)
         }
         if (needsKakao) {
-          setAutoStep('업종 밀집도 분석 중...')
+          setAutoStep('업종 밀집도 분석 중…')
           await post('/api/kakao-poi')
         }
         if (needsPopulation) {
-          setAutoStep('배후 인구 분석 중...')
+          setAutoStep('배후 인구 분석 중…')
           await post('/api/population')
         }
         if (needsTourism) {
-          setAutoStep('관광 시설 데이터 수집 중...')
+          setAutoStep('관광 시설 데이터 수집 중…')
           const { error } = await supabase.functions.invoke('analyze-tourism', { body: { project_id: projectId } })
           if (error) {
             console.warn('[analyze-tourism] skipped:', error.message)
@@ -1421,7 +1421,7 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
           }
         }
         if (needsCardData) {
-          setAutoStep('카드 이용 데이터 수집 중...')
+          setAutoStep('카드 이용 데이터 수집 중…')
           const { error } = await supabase.functions.invoke('analyze-jeju-card', { body: { project_id: projectId } })
           if (error) {
             console.warn('[analyze-jeju-card] skipped:', error.message)
@@ -1457,18 +1457,20 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
       <div className="card p-4">
         <p className="text-xs text-gray-400 mb-3 font-medium uppercase tracking-wide">데이터 수집 현황</p>
         <WorkflowStatus steps={workflowSteps} />
-        {autoStep && (
-          <div className="flex items-center gap-2 mt-3 p-2.5 bg-blue-50 rounded-lg border border-blue-100">
-            <Loader2 size={13} className="text-blue-600 flex-shrink-0 animate-spin" />
-            <p className="text-xs text-blue-700 font-medium">{autoStep}</p>
-          </div>
-        )}
-        {autoError && (
-          <div className="flex items-center gap-2 mt-3 p-2.5 bg-red-50 rounded-lg border border-red-100">
-            <AlertCircle size={13} className="text-red-500 flex-shrink-0" />
-            <p className="text-xs text-red-600 font-medium">자동 수집 실패: {autoError}</p>
-          </div>
-        )}
+        <div aria-live="polite">
+          {autoStep && (
+            <div className="flex items-center gap-2 mt-3 p-2.5 bg-blue-50 rounded-lg border border-blue-100">
+              <Loader2 size={13} className="text-blue-600 flex-shrink-0 animate-spin" />
+              <p className="text-xs text-blue-700 font-medium">{autoStep}</p>
+            </div>
+          )}
+          {autoError && (
+            <div className="flex items-center gap-2 mt-3 p-2.5 bg-red-50 rounded-lg border border-red-100">
+              <AlertCircle size={13} className="text-red-500 flex-shrink-0" />
+              <p className="text-xs text-red-600 font-medium">자동 수집 실패: {autoError}</p>
+            </div>
+          )}
+        </div>
         {!autoStep && !autoError && (!hasPOI || !hasCommercial || !project.kakao_density || !project.population_data) && (
           <div className="flex items-center gap-2 mt-3 p-2.5 bg-brand-50 rounded-lg border border-brand-100">
             <AlertCircle size={13} className="text-brand-600 flex-shrink-0" />
@@ -1608,7 +1610,7 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
       {project.card_data?.has_data && (
         <div className="card p-5 bg-gray-50/50">
           <h3 className="section-title flex items-center gap-2 mb-4">
-            <span className="text-base">💳</span>
+            <span className="text-base" aria-hidden="true">💳</span>
             카드 이용 현황
             <span className="ml-auto text-[10px] text-gray-400">제주데이터허브 · 내국인 관광객 기준</span>
           </h3>

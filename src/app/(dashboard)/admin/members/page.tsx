@@ -127,9 +127,9 @@ export default function MembersPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px]">
+      <div className="flex flex-col items-center justify-center min-h-[400px]" aria-live="polite">
         <Loader2 className="w-8 h-8 text-brand-500 animate-spin mb-4" />
-        <p className="text-slate-500 font-medium">회원 정보를 불러오고 있습니다...</p>
+        <p className="text-slate-500 font-medium">회원 정보를 불러오고 있습니다…</p>
       </div>
     )
   }
@@ -142,8 +142,8 @@ export default function MembersPage() {
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">구성원 관리</h1>
           <p className="text-slate-500 mt-1">조직의 모든 구성원을 확인하고 역할을 관리합니다.</p>
         </div>
-        <button 
-          className="flex items-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-medium transition-all shadow-sm shadow-brand-200"
+        <button
+          className="flex items-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-medium transition-colors shadow-sm shadow-brand-200"
           onClick={() => toast('구성원 초대 기능은 준비 중입니다.')}
         >
           <UserPlus size={18} />
@@ -161,7 +161,7 @@ export default function MembersPage() {
             <span className="text-sm font-semibold text-slate-500 uppercase tracking-wider">전체 구성원</span>
           </div>
           <div className="flex items-end gap-2">
-            <span className="text-3xl font-bold text-slate-900">{members.length}</span>
+            <span className="text-3xl font-bold text-slate-900 tabular-nums">{members.length}</span>
             <span className="text-slate-400 mb-1">명</span>
           </div>
         </div>
@@ -173,7 +173,7 @@ export default function MembersPage() {
             <span className="text-sm font-semibold text-slate-500 uppercase tracking-wider">관리자</span>
           </div>
           <div className="flex items-end gap-2">
-            <span className="text-3xl font-bold text-slate-900">
+            <span className="text-3xl font-bold text-slate-900 tabular-nums">
               {members.filter(m => m.role === 'owner' || m.role === 'admin').length}
             </span>
             <span className="text-slate-400 mb-1">명</span>
@@ -187,7 +187,7 @@ export default function MembersPage() {
             <span className="text-sm font-semibold text-slate-500 uppercase tracking-wider">신규 가입 (이번 달)</span>
           </div>
           <div className="flex items-end gap-2 text-3xl font-bold text-slate-900">
-            <span>0</span>
+            <span className="tabular-nums">0</span>
             <span className="text-slate-400 text-sm font-normal mb-1">명</span>
           </div>
         </div>
@@ -206,13 +206,20 @@ export default function MembersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
+              {members.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-6 py-12 text-center text-sm text-slate-400">
+                    구성원이 없습니다.
+                  </td>
+                </tr>
+              )}
               {members.map((member) => (
                 <tr key={member.id} className="hover:bg-slate-50/50 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200">
                         {member.user.avatar_url ? (
-                          <img src={member.user.avatar_url} alt="" className="w-full h-full object-cover" />
+                          <img src={member.user.avatar_url} alt="" width={32} height={32} loading="lazy" className="w-full h-full object-cover" />
                         ) : (
                           <User size={20} className="text-slate-400" />
                         )}
@@ -228,8 +235,9 @@ export default function MembersPage() {
                   </td>
                   <td className="px-6 py-4">
                     {editingRoleId === member.id && member.role !== 'owner' ? (
-                      <div className="flex items-center gap-1.5 animate-in fade-in slide-in-from-left-2 transition-all">
+                      <div className="flex items-center gap-1.5 animate-in fade-in slide-in-from-left-2 transition-colors">
                         <select
+                          aria-label="역할 선택"
                           className="text-xs font-medium px-2 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                           defaultValue={member.role}
                           onChange={(e) => handleUpdateRole(member.id, e.target.value as any)}
@@ -239,11 +247,12 @@ export default function MembersPage() {
                           <option value="editor">편집자 (Editor)</option>
                           <option value="viewer">조회자 (Viewer)</option>
                         </select>
-                        <button 
+                        <button
                           onClick={() => setEditingRoleId(null)}
+                          aria-label="편집 취소"
                           className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
                         >
-                          <X size={14} />
+                          <X size={14} aria-hidden="true" />
                         </button>
                       </div>
                     ) : (
@@ -260,11 +269,12 @@ export default function MembersPage() {
                            member.role === 'editor' ? '편집자' : '조회자'}
                         </span>
                         {canManage && member.role !== 'owner' && (
-                          <button 
+                          <button
                             onClick={() => setEditingRoleId(member.id)}
+                            aria-label="역할 변경"
                             className="p-1 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity hover:text-slate-600"
                           >
-                            <Shield size={14} />
+                            <Shield size={14} aria-hidden="true" />
                           </button>
                         )}
                       </div>
@@ -275,12 +285,13 @@ export default function MembersPage() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     {canManage && member.role !== 'owner' && member.user_id !== currentUser?.id && (
-                      <button 
+                      <button
                          onClick={() => handleRemoveMember(member.id, member.user.full_name || member.user.email)}
                          disabled={updatingId === member.id}
+                         aria-label="멤버 제외"
                          className="p-2 text-slate-400 hover:text-red-500 rounded-xl hover:bg-red-50 transition-colors"
                       >
-                        {updatingId === member.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                        {updatingId === member.id ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <Trash2 size={16} aria-hidden="true" />}
                       </button>
                     )}
                   </td>

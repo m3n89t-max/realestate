@@ -146,15 +146,15 @@ export function RealPriceCard({ real_price_data }: RealPriceCardProps) {
         <div className="grid grid-cols-3 gap-3 mb-4 p-3 bg-gray-50 rounded-lg">
           <div className="text-center">
             <p className="text-xs text-gray-400 mb-0.5">평균</p>
-            <p className="text-sm font-bold text-brand-700">{formatAmount(avgAmount)}</p>
+            <p className="text-sm font-bold text-brand-700 tabular-nums">{formatAmount(avgAmount)}</p>
           </div>
           <div className="text-center border-x border-gray-200">
             <p className="text-xs text-gray-400 mb-0.5">최고</p>
-            <p className="text-sm font-bold text-red-600">{formatAmount(maxAmount)}</p>
+            <p className="text-sm font-bold text-red-600 tabular-nums">{formatAmount(maxAmount)}</p>
           </div>
           <div className="text-center">
             <p className="text-xs text-gray-400 mb-0.5">최저</p>
-            <p className="text-sm font-bold text-blue-600">{formatAmount(minAmount)}</p>
+            <p className="text-sm font-bold text-blue-600 tabular-nums">{formatAmount(minAmount)}</p>
           </div>
         </div>
       )}
@@ -169,7 +169,7 @@ export function RealPriceCard({ real_price_data }: RealPriceCardProps) {
               {t.area && <span className="text-gray-400 flex-shrink-0">{t.area}㎡</span>}
               {t.floor && <span className="text-gray-400 flex-shrink-0">{t.floor}층</span>}
             </div>
-            <span className="font-semibold text-gray-800 flex-shrink-0 ml-2">{formatAmount(t.amount)}</span>
+            <span className="font-semibold text-gray-800 flex-shrink-0 ml-2 tabular-nums">{formatAmount(t.amount)}</span>
           </div>
         ))}
       </div>

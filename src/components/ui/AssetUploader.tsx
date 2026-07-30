@@ -167,6 +167,7 @@ export default function AssetUploader({
                 {/* 카테고리 선택 (이미지인 경우) */}
                 {file.type.startsWith('image/') && !file.uploading && !file.error && (
                   <select
+                    aria-label="카테고리"
                     value={file.category ?? ''}
                     onChange={e => updateCategory(file.id, e.target.value)}
                     className="text-xs border border-gray-200 rounded px-2 py-1 text-gray-600 bg-white"
@@ -189,9 +190,10 @@ export default function AssetUploader({
                 {/* 삭제 버튼 */}
                 <button
                   onClick={() => removeFile(file.id)}
+                  aria-label="파일 제거"
                   className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 flex-shrink-0"
                 >
-                  <X size={14} />
+                  <X size={14} aria-hidden="true" />
                 </button>
               </div>
             ))}

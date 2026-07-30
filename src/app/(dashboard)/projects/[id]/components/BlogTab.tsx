@@ -483,6 +483,7 @@ export default function BlogTab({ projectId, orgId, project, contents, assets }:
                   <button
                     key={val}
                     onClick={() => setStyle(val)}
+                    aria-pressed={style === val}
                     className={cn(
                       'py-1.5 text-xs rounded border font-medium transition-colors',
                       style === val
@@ -508,6 +509,7 @@ export default function BlogTab({ projectId, orgId, project, contents, assets }:
                   <button
                     key={val}
                     onClick={() => setFocus(val)}
+                    aria-pressed={focus === val}
                     className={cn(
                       'py-1 text-[11px] rounded border font-medium transition-colors',
                       focus === val
@@ -534,6 +536,7 @@ export default function BlogTab({ projectId, orgId, project, contents, assets }:
                   <button
                     key={val}
                     onClick={() => setTone(val)}
+                    aria-pressed={tone === val}
                     className={cn(
                       'py-1 text-[11px] rounded border font-medium transition-colors',
                       tone === val
@@ -559,6 +562,7 @@ export default function BlogTab({ projectId, orgId, project, contents, assets }:
                   <button
                     key={val}
                     onClick={() => setFormat(val)}
+                    aria-pressed={format === val}
                     className={cn(
                       'py-1 text-[11px] rounded border font-medium transition-colors',
                       format === val
@@ -581,6 +585,7 @@ export default function BlogTab({ projectId, orgId, project, contents, assets }:
                   <button
                     key={val}
                     onClick={() => setPhotoPosition(val)}
+                    aria-pressed={photoPosition === val}
                     className={cn(
                       'py-2 px-2 text-left rounded-lg border transition-colors',
                       photoPosition === val
@@ -606,6 +611,7 @@ export default function BlogTab({ projectId, orgId, project, contents, assets }:
                   <button
                     key={val}
                     onClick={() => setPhotoLayout(val)}
+                    aria-pressed={photoLayout === val}
                     className={cn(
                       'py-1.5 text-xs rounded-lg border font-medium transition-colors',
                       photoLayout === val
@@ -628,7 +634,7 @@ export default function BlogTab({ projectId, orgId, project, contents, assets }:
             {generating ? (
               <>
                 <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                AI 생성중...
+                AI 생성중…
               </>
             ) : (
               <>
@@ -708,15 +714,16 @@ export default function BlogTab({ projectId, orgId, project, contents, assets }:
                 </label>
                 {namecardUrl ? (
                   <div className="relative rounded-lg overflow-hidden border border-gray-200 mb-1.5">
-                    <img src={namecardUrl} alt="명함" className="w-full object-contain max-h-24 bg-gray-50" />
+                    <img src={namecardUrl} alt="명함" width={400} height={96} loading="lazy" className="w-full object-contain max-h-24 bg-gray-50" />
                     <button
                       onClick={() => {
                         setNamecardUrl('')
                         setNamecardFileName('')
                         localStorage.removeItem('realestate_namecard')
                       }}
+                      aria-label="명함 삭제"
                       className="absolute top-1 right-1 w-5 h-5 bg-black/50 text-white rounded-full text-[10px] flex items-center justify-center hover:bg-black/70"
-                    >✕</button>
+                    ><span aria-hidden="true">✕</span></button>
                   </div>
                 ) : null}
                 <label className={cn(
@@ -724,7 +731,7 @@ export default function BlogTab({ projectId, orgId, project, contents, assets }:
                   namecardUploading ? 'opacity-50 pointer-events-none' : 'border-dashed border-gray-300 text-gray-500 hover:border-green-400 hover:text-green-600'
                 )}>
                   {namecardUploading
-                    ? <><Loader2 size={11} className="animate-spin" /> 업로드 중...</>
+                    ? <><Loader2 size={11} className="animate-spin" /> 업로드 중…</>
                     : <><Upload size={11} /> {namecardUrl ? '명함 교체' : '명함 이미지 업로드'}</>
                   }
                   <input type="file" className="hidden" accept="image/*" onChange={handleNamecardUpload} disabled={namecardUploading} />
@@ -739,7 +746,7 @@ export default function BlogTab({ projectId, orgId, project, contents, assets }:
               className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
             >
               {uploading
-                ? <><Loader2 size={15} className="animate-spin" /> 업로드 등록 중...</>
+                ? <><Loader2 size={15} className="animate-spin" /> 업로드 등록 중…</>
                 : <><Upload size={15} /> 📤 네이버 블로그 자동 업로드</>
               }
             </button>
@@ -847,21 +854,22 @@ export default function BlogTab({ projectId, orgId, project, contents, assets }:
             title="매물 사진 위에 지역·유형·강점·가격을 얹은 클릭유도형 썸네일을 AI로 생성해 대표이미지로 설정합니다"
           >
             {generatingThumb
-              ? <><Loader2 size={13} className="animate-spin" /> 썸네일 생성 중...</>
+              ? <><Loader2 size={13} className="animate-spin" /> 썸네일 생성 중…</>
               : <><Wand2 size={13} /> 🍌 AI 썸네일 생성 (대표이미지)</>}
           </button>
 
           {coverImageUrl && (
             <div className="mb-2 flex items-center gap-2 px-2 py-1.5 rounded-lg bg-amber-50 border border-amber-200">
-              <img src={coverImageUrl} alt="대표이미지" className="w-8 h-8 rounded object-cover flex-shrink-0" />
+              <img src={coverImageUrl} alt="대표이미지" width={32} height={32} loading="lazy" className="w-8 h-8 rounded object-cover flex-shrink-0" />
               <span className="text-[11px] text-amber-700 font-medium flex-1 truncate">대표이미지 선택됨</span>
               <button
                 onClick={() => {
                   setCoverImageUrl('')
                   localStorage.removeItem(`realestate_cover_${projectId}`)
                 }}
+                aria-label="대표 이미지 해제"
                 className="text-[10px] text-gray-400 hover:text-gray-600 flex-shrink-0"
-              >✕</button>
+              ><span aria-hidden="true">✕</span></button>
             </div>
           )}
 
@@ -888,7 +896,7 @@ export default function BlogTab({ projectId, orgId, project, contents, assets }:
                         </div>
                       </>
                     ) : (
-                      <img src={asset.file_url} alt="" className="object-cover w-full h-full" />
+                      <img src={asset.file_url} alt={asset.alt_text || '매물 사진'} width={150} height={150} loading="lazy" className="object-cover w-full h-full" />
                     )}
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
                       <span className="text-[10px] text-white font-medium">삽입</span>
@@ -974,7 +982,7 @@ export default function BlogTab({ projectId, orgId, project, contents, assets }:
                             className="text-xs text-brand-600 hover:underline flex items-center gap-1"
                           >
                             {regeneratingTitles
-                              ? <><Loader2 size={11} className="animate-spin" />재생성 중...</>
+                              ? <><Loader2 size={11} className="animate-spin" />재생성 중…</>
                               : <><Wand2 size={11} />제목 5개 재생성</>
                             }
                           </button>
@@ -993,7 +1001,7 @@ export default function BlogTab({ projectId, orgId, project, contents, assets }:
                         <div className="mb-2 px-2 py-1.5 bg-brand-50 border border-brand-200 rounded-lg flex items-center gap-2">
                           <span className="text-[10px] text-brand-600 font-semibold flex-shrink-0">선택됨</span>
                           <p className="text-xs text-brand-800 flex-1 truncate">{selectedTitle}</p>
-                          <button onClick={() => setSelectedTitle(null)} className="text-[10px] text-gray-400 hover:text-gray-600 flex-shrink-0">✕</button>
+                          <button onClick={() => setSelectedTitle(null)} aria-label="선택 제목 취소" className="text-[10px] text-gray-400 hover:text-gray-600 flex-shrink-0"><span aria-hidden="true">✕</span></button>
                         </div>
                       )}
                       <div className="space-y-1.5">
@@ -1007,11 +1015,12 @@ export default function BlogTab({ projectId, orgId, project, contents, assets }:
                               <p className={cn("text-sm flex-1", isSelected ? "text-brand-700 font-medium" : "text-gray-700")}>{title}</p>
                               <button
                                 onClick={e => { e.stopPropagation(); copyToClipboard(title, `title-${i}`) }}
+                                aria-label="복사"
                                 className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-gray-100 flex-shrink-0"
                               >
                                 {copiedTitle === `title-${i}`
-                                  ? <Check size={12} className="text-green-500" />
-                                  : <Copy size={12} className="text-gray-400" />
+                                  ? <Check size={12} className="text-green-500" aria-hidden="true" />
+                                  : <Copy size={12} className="text-gray-400" aria-hidden="true" />
                                 }
                               </button>
                             </div>
@@ -1044,11 +1053,11 @@ export default function BlogTab({ projectId, orgId, project, contents, assets }:
                   >
                     {showPreview ? '편집 모드' : '미리보기'}
                   </button>
-                  <span className="text-xs text-gray-400">
+                  <span className="text-xs text-gray-400" aria-live="polite">
                     {buildFullContent().length.toLocaleString()}자
                     {buildFullContent().length < 1500 && (
                       <span className="text-amber-600 ml-1">
-                        <AlertCircle size={12} className="inline mr-0.5" />
+                        <AlertCircle size={12} className="inline mr-0.5" aria-hidden="true" />
                         {1500 - buildFullContent().length}자 부족
                       </span>
                     )}
@@ -1068,7 +1077,7 @@ export default function BlogTab({ projectId, orgId, project, contents, assets }:
                   {/* 대표 썸네일 — 글 맨 위에 표시 (네이버 업로드 시 대표이미지로 사용됨) */}
                   {coverImageUrl && (
                     <div className="not-prose mb-4">
-                      <img src={coverImageUrl} alt="대표 썸네일" className="w-full max-w-[420px] mx-auto rounded-xl border border-gray-200 shadow-sm" />
+                      <img src={coverImageUrl} alt="대표 썸네일" width={420} height={280} loading="lazy" className="w-full max-w-[420px] mx-auto rounded-xl border border-gray-200 shadow-sm" />
                       <p className="text-center text-[11px] text-gray-400 mt-1">▲ 대표 썸네일 (네이버 대표이미지로 사용)</p>
                     </div>
                   )}
@@ -1082,7 +1091,7 @@ export default function BlogTab({ projectId, orgId, project, contents, assets }:
                           {isVideo ? (
                             <video src={url} controls className="rounded-lg border border-gray-200 max-w-full w-full" />
                           ) : (
-                            <img src={url} alt={imgMatch[1]} className="rounded-lg border border-gray-200 max-w-full" />
+                            <img src={url} alt={imgMatch[1]} width={600} height={400} loading="lazy" className="rounded-lg border border-gray-200 max-w-full" />
                           )}
                           <p className="text-center text-xs text-gray-400 mt-1">{imgMatch[1]}</p>
                         </div>

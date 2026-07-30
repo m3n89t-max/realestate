@@ -34,10 +34,10 @@ interface Row {
 function Cell({ label, value, highlight, nowrap }: { label: string; value: React.ReactNode; highlight?: boolean; nowrap?: boolean }) {
   return (
     <>
-      <td className="border border-gray-300 bg-blue-50 px-3 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap">
+      <th scope="row" className="border border-gray-300 bg-blue-50 px-3 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap">
         {label}
-      </td>
-      <td className={`border border-gray-300 px-3 py-2 text-xs ${highlight ? 'text-red-600 font-bold' : 'text-gray-800'} ${nowrap ? 'whitespace-nowrap' : ''}`}>
+      </th>
+      <td className={`border border-gray-300 px-3 py-2 text-xs ${highlight ? 'text-red-600 font-bold tabular-nums' : 'text-gray-800'} ${nowrap ? 'whitespace-nowrap' : ''}`}>
         {value || '-'}
       </td>
     </>
@@ -62,14 +62,15 @@ export default function PropertyInfoTable({ project, org, agentName, className =
   return (
     <div className={`w-full font-sans text-sm ${className}`}>
       <table className="w-full border-collapse border border-gray-400 text-xs">
+        <caption className="sr-only">중개대상물 확인 정보</caption>
         <tbody>
           {/* Row 1: 소재지 + 중개대상물 종류 */}
           <tr>
-            <td className="border border-gray-300 bg-blue-50 px-3 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap">소 재 지</td>
+            <th scope="row" className="border border-gray-300 bg-blue-50 px-3 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap">소 재 지</th>
             <td className="border border-gray-300 px-3 py-2 text-xs text-gray-800" colSpan={3}>
               {project.address}
             </td>
-            <td className="border border-gray-300 bg-blue-50 px-3 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap">중개대상물 종류</td>
+            <th scope="row" className="border border-gray-300 bg-blue-50 px-3 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap">중개대상물 종류</th>
             <td className="border border-gray-300 px-3 py-2 text-xs text-gray-800">
               {project.property_category || '-'}
             </td>
@@ -113,21 +114,21 @@ export default function PropertyInfoTable({ project, org, agentName, className =
 
           {/* Row 5: 가격 + 관리비 */}
           <tr>
-            <td className="border border-gray-300 bg-blue-50 px-3 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap">
+            <th scope="row" className="border border-gray-300 bg-blue-50 px-3 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap">
               {project.transaction_type === 'rent' ? '보증금/임대료' : project.transaction_type === 'lease' ? '전세보증금' : '매 매 가'}
-            </td>
-            <td className="border border-gray-300 px-3 py-2 text-xs text-red-600 font-bold">
+            </th>
+            <td className="border border-gray-300 px-3 py-2 text-xs text-red-600 font-bold tabular-nums">
               {project.transaction_type === 'rent'
                 ? `${formatPrice(project.deposit)} / ${formatPrice(project.monthly_rent)}`
                 : project.transaction_type === 'lease'
                 ? formatPrice(project.deposit)
                 : formatPrice(project.price)}
             </td>
-            <td className="border border-gray-300 bg-blue-50 px-3 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap">권 리 금</td>
+            <th scope="row" className="border border-gray-300 bg-blue-50 px-3 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap">권 리 금</th>
             <td className="border border-gray-300 px-3 py-2 text-xs text-gray-800">
               {project.key_money ? formatPrice(project.key_money) : '무권리'}
             </td>
-            <td className="border border-gray-300 bg-blue-50 px-3 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap">관 리 비</td>
+            <th scope="row" className="border border-gray-300 bg-blue-50 px-3 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap">관 리 비</th>
             <td className="border border-gray-300 px-3 py-2 text-xs text-gray-800 whitespace-pre-line">
               {project.management_fee_detail || '-'}
             </td>
@@ -136,7 +137,7 @@ export default function PropertyInfoTable({ project, org, agentName, className =
           {/* Row 6: 특징 */}
           {(project.features?.length ?? 0) > 0 && (
             <tr>
-              <td className="border border-gray-300 bg-blue-50 px-3 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap">특 장 점</td>
+              <th scope="row" className="border border-gray-300 bg-blue-50 px-3 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap">특 장 점</th>
               <td className="border border-gray-300 px-3 py-2 text-xs text-gray-800" colSpan={5}>
                 {project.features?.join(' · ')}
               </td>
@@ -146,7 +147,7 @@ export default function PropertyInfoTable({ project, org, agentName, className =
           {/* Row 7: 임대현황 */}
           {project.rental_status && (
             <tr>
-              <td className="border border-gray-300 bg-blue-50 px-3 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap">임대 현황</td>
+              <th scope="row" className="border border-gray-300 bg-blue-50 px-3 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap">임대 현황</th>
               <td className="border border-gray-300 px-3 py-2 text-xs text-gray-800 whitespace-pre-line" colSpan={5}>
                 {project.rental_status}
               </td>
