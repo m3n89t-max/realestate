@@ -1,0 +1,12 @@
+{
+  "package.json": [
+    {
+      "path": "src/app/(dashboard)/settings/page.tsx",
+      "batchIndex": 3,
+      "symbols": [
+        "dynamic",
+        "SettingsPage"
+      ]
+    }
+  ]
+}

@@ -107,7 +107,9 @@ export default function AppShell({
     <div className="flex h-screen overflow-hidden bg-slate-50 font-sans text-slate-900">
       {/* ────────── Mobile Overlay ────────── */}
       {isMobileMenuOpen && (
-        <div
+        <button
+          type="button"
+          aria-label="메뉴 닫기"
           className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm lg:hidden transition-opacity"
           onClick={() => setIsMobileMenuOpen(false)}
         />
@@ -138,10 +140,12 @@ export default function AppShell({
             </div>
           </Link>
           <button
+            type="button"
+            aria-label="메뉴 닫기"
             className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-50"
             onClick={() => setIsMobileMenuOpen(false)}
           >
-            <X size={18} />
+            <X size={18} aria-hidden="true" />
           </button>
         </div>
 
@@ -327,24 +331,26 @@ export default function AppShell({
         <header className="h-16 flex items-center justify-between px-4 lg:px-8 border-b border-slate-200 bg-white sticky top-0 z-20 shrink-0">
           <div className="flex items-center gap-3">
             <button
+              type="button"
+              aria-label="메뉴 열기"
               className="lg:hidden p-2 -ml-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
               onClick={() => setIsMobileMenuOpen(true)}
             >
-              <Menu size={20} />
+              <Menu size={20} aria-hidden="true" />
             </button>
           </div>
 
           <div className="flex items-center gap-3">
-            <button className="relative p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
-              <Bell size={19} />
-              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-brand-500 border-2 border-white"></span>
+            <button type="button" aria-label="알림" className="relative p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+              <Bell size={19} aria-hidden="true" />
+              <span aria-hidden="true" className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-brand-500 border-2 border-white"></span>
             </button>
 
-            <button className="flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-xl hover:bg-slate-100 transition-colors border border-transparent hover:border-slate-200">
+            <button type="button" aria-label="내 계정 메뉴" className="flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-xl hover:bg-slate-100 transition-colors border border-transparent hover:border-slate-200">
               <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center shrink-0">
                 <span className="text-[11px] font-bold text-white">나</span>
               </div>
-              <ChevronDown size={13} className="text-slate-400 hidden sm:block" />
+              <ChevronDown size={13} aria-hidden="true" className="text-slate-400 hidden sm:block" />
             </button>
           </div>
         </header>

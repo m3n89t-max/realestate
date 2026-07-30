@@ -1,0 +1,207 @@
+{
+  "src/app/(dashboard)/blog/page.tsx": [
+    {
+      "path": "src/lib/supabase/server.ts",
+      "batchIndex": 3,
+      "symbols": [
+        "createClient",
+        "createAdminClient"
+      ]
+    }
+  ],
+  "src/app/(dashboard)/projects/[id]/components/BlogTab.tsx": [
+    {
+      "path": "src/lib/utils.ts",
+      "batchIndex": 4,
+      "symbols": [
+        "cn",
+        "formatPrice",
+        "formatArea",
+        "formatDate",
+        "formatRelativeTime",
+        "getPropertyTypeLabel",
+        "getStatusColor",
+        "truncate"
+      ]
+    }
+  ],
+  "src/app/(dashboard)/projects/[id]/components/CardNewsTab.tsx": [
+    {
+      "path": "src/lib/utils.ts",
+      "batchIndex": 4,
+      "symbols": [
+        "cn",
+        "formatPrice",
+        "formatArea",
+        "formatDate",
+        "formatRelativeTime",
+        "getPropertyTypeLabel",
+        "getStatusColor",
+        "truncate"
+      ]
+    }
+  ],
+  "src/app/(dashboard)/projects/[id]/components/DocsTab.tsx": [
+    {
+      "path": "src/lib/utils.ts",
+      "batchIndex": 4,
+      "symbols": [
+        "cn",
+        "formatPrice",
+        "formatArea",
+        "formatDate",
+        "formatRelativeTime",
+        "getPropertyTypeLabel",
+        "getStatusColor",
+        "truncate"
+      ]
+    }
+  ],
+  "src/app/(dashboard)/projects/[id]/components/PackageTab.tsx": [
+    {
+      "path": "src/lib/utils.ts",
+      "batchIndex": 4,
+      "symbols": [
+        "cn",
+        "formatPrice",
+        "formatArea",
+        "formatDate",
+        "formatRelativeTime",
+        "getPropertyTypeLabel",
+        "getStatusColor",
+        "truncate"
+      ]
+    }
+  ],
+  "src/app/(dashboard)/projects/[id]/page.tsx": [
+    {
+      "path": "src/app/(dashboard)/projects/[id]/components/ShortsTab.tsx",
+      "batchIndex": 4,
+      "symbols": [
+        "ShortsTab"
+      ]
+    },
+    {
+      "path": "src/app/(dashboard)/projects/[id]/components/TasksTab.tsx",
+      "batchIndex": 4,
+      "symbols": [
+        "TasksTab"
+      ]
+    },
+    {
+      "path": "src/components/ui/StatusBadge.tsx",
+      "batchIndex": 3,
+      "symbols": [
+        "StatusBadge"
+      ]
+    },
+    {
+      "path": "src/lib/supabase/server.ts",
+      "batchIndex": 3,
+      "symbols": [
+        "createClient",
+        "createAdminClient"
+      ]
+    },
+    {
+      "path": "src/lib/utils.ts",
+      "batchIndex": 4,
+      "symbols": [
+        "cn",
+        "formatPrice",
+        "formatArea",
+        "formatDate",
+        "formatRelativeTime",
+        "getPropertyTypeLabel",
+        "getStatusColor",
+        "truncate"
+      ]
+    }
+  ],
+  "src/lib/supabase/client.ts": [
+    {
+      "path": "src/app/(dashboard)/projects/[id]/components/ShortsTab.tsx",
+      "batchIndex": 4,
+      "symbols": [
+        "ShortsTab"
+      ]
+    },
+    {
+      "path": "src/app/(dashboard)/projects/[id]/components/TasksTab.tsx",
+      "batchIndex": 4,
+      "symbols": [
+        "TasksTab"
+      ]
+    },
+    {
+      "path": "src/app/(dashboard)/projects/new/page.tsx",
+      "batchIndex": 4,
+      "symbols": [
+        "NewProjectPage"
+      ]
+    },
+    {
+      "path": "src/components/ui/AppShell.tsx",
+      "batchIndex": 4,
+      "symbols": [
+        "AppShell"
+      ]
+    }
+  ],
+  "src/lib/types.ts": [
+    {
+      "path": "src/app/(dashboard)/analysis/page.tsx",
+      "batchIndex": 3,
+      "symbols": [
+        "dynamic",
+        "AnalysisPage"
+      ]
+    },
+    {
+      "path": "src/app/(dashboard)/cardnews/page.tsx",
+      "batchIndex": 3,
+      "symbols": [
+        "dynamic",
+        "CardNewsPage"
+      ]
+    },
+    {
+      "path": "src/app/(dashboard)/projects/ProjectsListView.tsx",
+      "batchIndex": 4,
+      "symbols": [
+        "ProjectsListView"
+      ]
+    },
+    {
+      "path": "src/app/(dashboard)/projects/new/page.tsx",
+      "batchIndex": 4,
+      "symbols": [
+        "NewProjectPage"
+      ]
+    },
+    {
+      "path": "src/app/(dashboard)/projects/page.tsx",
+      "batchIndex": 4,
+      "symbols": [
+        "dynamic",
+        "ProjectsPage"
+      ]
+    },
+    {
+      "path": "src/app/(dashboard)/shorts/page.tsx",
+      "batchIndex": 3,
+      "symbols": [
+        "dynamic",
+        "ShortsPage"
+      ]
+    },
+    {
+      "path": "src/app/(dashboard)/tasks/page.tsx",
+      "batchIndex": 3,
+      "symbols": [
+        "dynamic",
+        "TasksPage"
+      ]
+    }
+  ]
+}

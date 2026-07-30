@@ -1,0 +1,165 @@
+{
+  "src/app/(dashboard)/analysis/page.tsx": [
+    {
+      "path": "src/lib/types.ts",
+      "batchIndex": 1,
+      "symbols": [
+        "PROPERTY_TYPE_LABELS",
+        "PROJECT_STATUS_LABELS",
+        "TASK_TYPE_LABELS",
+        "TASK_STATUS_LABELS",
+        "ROLE_LABELS"
+      ]
+    }
+  ],
+  "src/app/(dashboard)/cardnews/page.tsx": [
+    {
+      "path": "src/lib/types.ts",
+      "batchIndex": 1,
+      "symbols": [
+        "PROPERTY_TYPE_LABELS",
+        "PROJECT_STATUS_LABELS",
+        "TASK_TYPE_LABELS",
+        "TASK_STATUS_LABELS",
+        "ROLE_LABELS"
+      ]
+    }
+  ],
+  "src/app/(dashboard)/dashboard/page.tsx": [
+    {
+      "path": "src/lib/utils.ts",
+      "batchIndex": 4,
+      "symbols": [
+        "cn",
+        "formatPrice",
+        "formatArea",
+        "formatDate",
+        "formatRelativeTime",
+        "getPropertyTypeLabel",
+        "getStatusColor",
+        "truncate"
+      ]
+    }
+  ],
+  "src/app/(dashboard)/settings/page.tsx": [
+    {
+      "path": "package.json",
+      "batchIndex": 7,
+      "symbols": []
+    }
+  ],
+  "src/app/(dashboard)/shorts/page.tsx": [
+    {
+      "path": "src/lib/types.ts",
+      "batchIndex": 1,
+      "symbols": [
+        "PROPERTY_TYPE_LABELS",
+        "PROJECT_STATUS_LABELS",
+        "TASK_TYPE_LABELS",
+        "TASK_STATUS_LABELS",
+        "ROLE_LABELS"
+      ]
+    }
+  ],
+  "src/app/(dashboard)/tasks/page.tsx": [
+    {
+      "path": "src/lib/types.ts",
+      "batchIndex": 1,
+      "symbols": [
+        "PROPERTY_TYPE_LABELS",
+        "PROJECT_STATUS_LABELS",
+        "TASK_TYPE_LABELS",
+        "TASK_STATUS_LABELS",
+        "ROLE_LABELS"
+      ]
+    },
+    {
+      "path": "src/lib/utils.ts",
+      "batchIndex": 4,
+      "symbols": [
+        "cn",
+        "formatPrice",
+        "formatArea",
+        "formatDate",
+        "formatRelativeTime",
+        "getPropertyTypeLabel",
+        "getStatusColor",
+        "truncate"
+      ]
+    }
+  ],
+  "src/components/ui/StatusBadge.tsx": [
+    {
+      "path": "src/lib/utils.ts",
+      "batchIndex": 4,
+      "symbols": [
+        "cn",
+        "formatPrice",
+        "formatArea",
+        "formatDate",
+        "formatRelativeTime",
+        "getPropertyTypeLabel",
+        "getStatusColor",
+        "truncate"
+      ]
+    },
+    {
+      "path": "src/app/(dashboard)/projects/[id]/page.tsx",
+      "batchIndex": 1,
+      "symbols": [
+        "dynamic",
+        "ProjectDetailPage"
+      ]
+    }
+  ],
+  "src/components/ui/UsageMeter.tsx": [
+    {
+      "path": "src/lib/utils.ts",
+      "batchIndex": 4,
+      "symbols": [
+        "cn",
+        "formatPrice",
+        "formatArea",
+        "formatDate",
+        "formatRelativeTime",
+        "getPropertyTypeLabel",
+        "getStatusColor",
+        "truncate"
+      ]
+    }
+  ],
+  "src/lib/supabase/server.ts": [
+    {
+      "path": "src/app/(dashboard)/blog/page.tsx",
+      "batchIndex": 1,
+      "symbols": [
+        "dynamic",
+        "BlogPage"
+      ]
+    },
+    {
+      "path": "src/app/(dashboard)/layout.tsx",
+      "batchIndex": 4,
+      "symbols": [
+        "dynamic",
+        "DashboardLayout"
+      ]
+    },
+    {
+      "path": "src/app/(dashboard)/projects/[id]/page.tsx",
+      "batchIndex": 1,
+      "symbols": [
+        "dynamic",
+        "ProjectDetailPage"
+      ]
+    },
+    {
+      "path": "src/app/(dashboard)/projects/page.tsx",
+      "batchIndex": 4,
+      "symbols": [
+        "dynamic",
+        "ProjectsPage"
+      ]
+    }
+  ]
+}

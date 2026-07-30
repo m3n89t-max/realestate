@@ -1,0 +1,184 @@
+{
+  "projectRoot": "C:/Users/m3n89/Desktop/realestate/realestate-1",
+  "batchFiles": [
+    {
+      "path": ".claude/settings.local.json",
+      "language": "json",
+      "sizeLines": 18,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".npmrc",
+      "language": "unknown",
+      "sizeLines": 1,
+      "fileCategory": "code"
+    },
+    {
+      "path": ".ua/.understandignore",
+      "language": "unknown",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "next-env.d.ts",
+      "language": "typescript",
+      "sizeLines": 6,
+      "fileCategory": "code"
+    },
+    {
+      "path": "next.config.ts",
+      "language": "typescript",
+      "sizeLines": 39,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/commercial-engine/population-engine/src/sgis-client.ts",
+      "language": "typescript",
+      "sizeLines": 94,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/content-engine/blog-generator/prompt.ts",
+      "language": "typescript",
+      "sizeLines": 30,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/content-engine/cardnews-generator/prompt.ts",
+      "language": "typescript",
+      "sizeLines": 37,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/content-engine/commercial-analysis/prompt.ts",
+      "language": "typescript",
+      "sizeLines": 41,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/content-engine/location-analysis/prompt.ts",
+      "language": "typescript",
+      "sizeLines": 44,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/content-engine/shorts-generator/prompt.ts",
+      "language": "typescript",
+      "sizeLines": 16,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/shared/index.ts",
+      "language": "typescript",
+      "sizeLines": 94,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/shared/package.json",
+      "language": "json",
+      "sizeLines": 12,
+      "fileCategory": "config"
+    },
+    {
+      "path": "packages/shared/tsconfig.json",
+      "language": "json",
+      "sizeLines": 25,
+      "fileCategory": "config"
+    },
+    {
+      "path": "packages/shared/types/api.ts",
+      "language": "typescript",
+      "sizeLines": 309,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/shared/types/database.ts",
+      "language": "typescript",
+      "sizeLines": 291,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/shared/types/enums.ts",
+      "language": "typescript",
+      "sizeLines": 144,
+      "fileCategory": "code"
+    },
+    {
+      "path": "playwright.config.ts",
+      "language": "typescript",
+      "sizeLines": 51,
+      "fileCategory": "code"
+    },
+    {
+      "path": "postcss.config.js",
+      "language": "javascript",
+      "sizeLines": 6,
+      "fileCategory": "code"
+    },
+    {
+      "path": "public/agent-setup.bat",
+      "language": "batch",
+      "sizeLines": 14,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/build-agent-zip.js",
+      "language": "javascript",
+      "sizeLines": 116,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/build-agent.ps1",
+      "language": "powershell",
+      "sizeLines": 50,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/register_property.js",
+      "language": "javascript",
+      "sizeLines": 123,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/setup-local-agent.bat",
+      "language": "batch",
+      "sizeLines": 33,
+      "fileCategory": "script"
+    },
+    {
+      "path": "src/agent/main.ts",
+      "language": "typescript",
+      "sizeLines": 208,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    ".claude/settings.local.json": [],
+    ".npmrc": [],
+    ".ua/.understandignore": [],
+    "next-env.d.ts": [],
+    "next.config.ts": [],
+    "packages/commercial-engine/population-engine/src/sgis-client.ts": [],
+    "packages/content-engine/blog-generator/prompt.ts": [],
+    "packages/content-engine/cardnews-generator/prompt.ts": [],
+    "packages/content-engine/commercial-analysis/prompt.ts": [],
+    "packages/content-engine/location-analysis/prompt.ts": [],
+    "packages/content-engine/shorts-generator/prompt.ts": [],
+    "packages/shared/index.ts": [],
+    "packages/shared/package.json": [],
+    "packages/shared/tsconfig.json": [],
+    "packages/shared/types/api.ts": [],
+    "packages/shared/types/database.ts": [
+      "packages/shared/types/enums.ts"
+    ],
+    "packages/shared/types/enums.ts": [],
+    "playwright.config.ts": [],
+    "postcss.config.js": [],
+    "public/agent-setup.bat": [],
+    "scripts/build-agent-zip.js": [],
+    "scripts/build-agent.ps1": [],
+    "scripts/register_property.js": [],
+    "scripts/setup-local-agent.bat": [],
+    "src/agent/main.ts": []
+  }
+}

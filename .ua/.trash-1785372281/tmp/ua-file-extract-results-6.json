@@ -1,0 +1,1198 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 32,
+  "filesSkipped": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 32,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 0,
+      "failed": 0,
+      "skipped": 32
+    }
+  },
+  "results": [
+    {
+      "path": "supabase/migrations/000_full_setup.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 504,
+      "nonEmptyLines": 450,
+      "definitions": [
+        {
+          "name": "organizations",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "logo_url",
+            "phone",
+            "address",
+            "business_number",
+            "plan_type",
+            "plan_expires_at",
+            "monthly_project_limit",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 12,
+          "endLine": 25
+        },
+        {
+          "name": "users",
+          "kind": "table",
+          "fields": [
+            "id",
+            "email",
+            "full_name",
+            "avatar_url",
+            "created_at"
+          ],
+          "startLine": 27,
+          "endLine": 33
+        },
+        {
+          "name": "memberships",
+          "kind": "table",
+          "fields": [
+            "id",
+            "org_id",
+            "user_id",
+            "role",
+            "invited_at",
+            "joined_at"
+          ],
+          "startLine": 35,
+          "endLine": 43
+        },
+        {
+          "name": "projects",
+          "kind": "table",
+          "fields": [
+            "id",
+            "org_id",
+            "created_by",
+            "address",
+            "jibun_address",
+            "lat",
+            "lng",
+            "property_type",
+            "price",
+            "monthly_rent",
+            "area",
+            "floor",
+            "total_floors",
+            "direction",
+            "features",
+            "status",
+            "cover_image_url",
+            "note",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 45,
+          "endLine": 70
+        },
+        {
+          "name": "assets",
+          "kind": "table",
+          "fields": [
+            "id",
+            "project_id",
+            "org_id",
+            "type",
+            "category",
+            "file_name",
+            "file_url",
+            "file_size",
+            "mime_type",
+            "width",
+            "height",
+            "alt_text",
+            "is_cover",
+            "sort_order",
+            "created_at"
+          ],
+          "startLine": 72,
+          "endLine": 88
+        },
+        {
+          "name": "generated_contents",
+          "kind": "table",
+          "fields": [
+            "id",
+            "project_id",
+            "org_id",
+            "type",
+            "title",
+            "content",
+            "meta_description",
+            "tags",
+            "seo_score",
+            "faq",
+            "version",
+            "is_published",
+            "published_url",
+            "template_id",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 90,
+          "endLine": 110
+        },
+        {
+          "name": "location_analyses",
+          "kind": "table",
+          "fields": [
+            "id",
+            "project_id",
+            "advantages",
+            "recommended_targets",
+            "nearby_facilities",
+            "analysis_text",
+            "created_at"
+          ],
+          "startLine": 112,
+          "endLine": 121
+        },
+        {
+          "name": "documents",
+          "kind": "table",
+          "fields": [
+            "id",
+            "project_id",
+            "org_id",
+            "type",
+            "file_url",
+            "file_name",
+            "raw_text",
+            "summary",
+            "risk_items",
+            "created_at"
+          ],
+          "startLine": 123,
+          "endLine": 137
+        },
+        {
+          "name": "tasks",
+          "kind": "table",
+          "fields": [
+            "id",
+            "org_id",
+            "project_id",
+            "type",
+            "status",
+            "payload",
+            "result",
+            "error_code",
+            "error_message",
+            "retry_count",
+            "max_retries",
+            "agent_id",
+            "progress_pct",
+            "scheduled_at",
+            "started_at",
+            "completed_at",
+            "created_at"
+          ],
+          "startLine": 139,
+          "endLine": 161
+        },
+        {
+          "name": "task_logs",
+          "kind": "table",
+          "fields": [
+            "id",
+            "task_id",
+            "level",
+            "message",
+            "created_at"
+          ],
+          "startLine": 163,
+          "endLine": 169
+        },
+        {
+          "name": "usage_logs",
+          "kind": "table",
+          "fields": [
+            "id",
+            "org_id",
+            "year",
+            "month",
+            "project_count",
+            "generation_count",
+            "token_usage",
+            "video_render_count",
+            "doc_download_count"
+          ],
+          "startLine": 171,
+          "endLine": 182
+        },
+        {
+          "name": "templates",
+          "kind": "table",
+          "fields": [
+            "id",
+            "org_id",
+            "type",
+            "name",
+            "description",
+            "structure",
+            "variables",
+            "is_default",
+            "is_public",
+            "created_at"
+          ],
+          "startLine": 184,
+          "endLine": 195
+        },
+        {
+          "name": "agent_connections",
+          "kind": "table",
+          "fields": [
+            "id",
+            "org_id",
+            "agent_key",
+            "name",
+            "platform",
+            "version",
+            "status",
+            "last_seen_at",
+            "created_at"
+          ],
+          "startLine": 197,
+          "endLine": 208
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 13
+      }
+    },
+    {
+      "path": "supabase/migrations/001_initial_schema.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 304,
+      "nonEmptyLines": 270,
+      "definitions": [
+        {
+          "name": "organizations",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "logo_url",
+            "phone",
+            "address",
+            "business_number",
+            "plan_type",
+            "plan_expires_at",
+            "monthly_project_limit",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 12,
+          "endLine": 25
+        },
+        {
+          "name": "users",
+          "kind": "table",
+          "fields": [
+            "id",
+            "email",
+            "full_name",
+            "avatar_url",
+            "created_at"
+          ],
+          "startLine": 35,
+          "endLine": 41
+        },
+        {
+          "name": "memberships",
+          "kind": "table",
+          "fields": [
+            "id",
+            "org_id",
+            "user_id",
+            "role",
+            "invited_at",
+            "joined_at"
+          ],
+          "startLine": 50,
+          "endLine": 58
+        },
+        {
+          "name": "projects",
+          "kind": "table",
+          "fields": [
+            "id",
+            "org_id",
+            "created_by",
+            "address",
+            "jibun_address",
+            "lat",
+            "lng",
+            "property_type",
+            "price",
+            "monthly_rent",
+            "area",
+            "floor",
+            "total_floors",
+            "direction",
+            "features",
+            "status",
+            "cover_image_url",
+            "note",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 69,
+          "endLine": 94
+        },
+        {
+          "name": "assets",
+          "kind": "table",
+          "fields": [
+            "id",
+            "project_id",
+            "org_id",
+            "type",
+            "category",
+            "file_url",
+            "file_size",
+            "mime_type",
+            "width",
+            "height",
+            "alt_text",
+            "is_cover",
+            "sort_order",
+            "created_at"
+          ],
+          "startLine": 107,
+          "endLine": 123
+        },
+        {
+          "name": "generated_contents",
+          "kind": "table",
+          "fields": [
+            "id",
+            "project_id",
+            "org_id",
+            "type",
+            "title",
+            "content",
+            "meta_description",
+            "tags",
+            "seo_score",
+            "faq",
+            "version",
+            "is_published",
+            "published_url",
+            "template_id",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 135,
+          "endLine": 155
+        },
+        {
+          "name": "location_analyses",
+          "kind": "table",
+          "fields": [
+            "id",
+            "project_id",
+            "advantages",
+            "recommended_targets",
+            "nearby_facilities",
+            "analysis_text",
+            "created_at"
+          ],
+          "startLine": 165,
+          "endLine": 174
+        },
+        {
+          "name": "documents",
+          "kind": "table",
+          "fields": [
+            "id",
+            "project_id",
+            "org_id",
+            "type",
+            "file_url",
+            "file_name",
+            "raw_text",
+            "summary",
+            "risk_items",
+            "created_at"
+          ],
+          "startLine": 181,
+          "endLine": 195
+        },
+        {
+          "name": "tasks",
+          "kind": "table",
+          "fields": [
+            "id",
+            "org_id",
+            "project_id",
+            "type",
+            "status",
+            "payload",
+            "result",
+            "error_code",
+            "error_message",
+            "retry_count",
+            "max_retries",
+            "agent_id",
+            "scheduled_at",
+            "started_at",
+            "completed_at",
+            "created_at"
+          ],
+          "startLine": 203,
+          "endLine": 227
+        },
+        {
+          "name": "task_logs",
+          "kind": "table",
+          "fields": [
+            "id",
+            "task_id",
+            "level",
+            "message",
+            "created_at"
+          ],
+          "startLine": 237,
+          "endLine": 243
+        },
+        {
+          "name": "usage_logs",
+          "kind": "table",
+          "fields": [
+            "id",
+            "org_id",
+            "year",
+            "month",
+            "project_count",
+            "generation_count",
+            "token_usage",
+            "video_render_count",
+            "doc_download_count"
+          ],
+          "startLine": 250,
+          "endLine": 261
+        },
+        {
+          "name": "templates",
+          "kind": "table",
+          "fields": [
+            "id",
+            "org_id",
+            "type",
+            "name",
+            "description",
+            "structure",
+            "variables",
+            "is_default",
+            "is_public",
+            "created_at"
+          ],
+          "startLine": 269,
+          "endLine": 280
+        },
+        {
+          "name": "agent_connections",
+          "kind": "table",
+          "fields": [
+            "id",
+            "org_id",
+            "agent_key",
+            "name",
+            "platform",
+            "version",
+            "status",
+            "last_seen_at",
+            "created_at"
+          ],
+          "startLine": 290,
+          "endLine": 301
+        },
+        {
+          "name": "idx_organizations_plan_type",
+          "kind": "index",
+          "fields": [],
+          "startLine": 30,
+          "endLine": 30
+        },
+        {
+          "name": "idx_users_email",
+          "kind": "index",
+          "fields": [],
+          "startLine": 45,
+          "endLine": 45
+        },
+        {
+          "name": "idx_memberships_org_id",
+          "kind": "index",
+          "fields": [],
+          "startLine": 62,
+          "endLine": 62
+        },
+        {
+          "name": "idx_memberships_user_id",
+          "kind": "index",
+          "fields": [],
+          "startLine": 63,
+          "endLine": 63
+        },
+        {
+          "name": "idx_memberships_user_org",
+          "kind": "index",
+          "fields": [],
+          "startLine": 64,
+          "endLine": 64
+        },
+        {
+          "name": "idx_projects_org_id",
+          "kind": "index",
+          "fields": [],
+          "startLine": 98,
+          "endLine": 98
+        },
+        {
+          "name": "idx_projects_status",
+          "kind": "index",
+          "fields": [],
+          "startLine": 99,
+          "endLine": 99
+        },
+        {
+          "name": "idx_projects_org_status",
+          "kind": "index",
+          "fields": [],
+          "startLine": 100,
+          "endLine": 100
+        },
+        {
+          "name": "idx_projects_created_at",
+          "kind": "index",
+          "fields": [],
+          "startLine": 101,
+          "endLine": 101
+        },
+        {
+          "name": "idx_projects_address_gin",
+          "kind": "index",
+          "fields": [],
+          "startLine": 102,
+          "endLine": 102
+        },
+        {
+          "name": "idx_assets_project_id",
+          "kind": "index",
+          "fields": [],
+          "startLine": 127,
+          "endLine": 127
+        },
+        {
+          "name": "idx_assets_org_id",
+          "kind": "index",
+          "fields": [],
+          "startLine": 128,
+          "endLine": 128
+        },
+        {
+          "name": "idx_assets_project_type",
+          "kind": "index",
+          "fields": [],
+          "startLine": 129,
+          "endLine": 129
+        },
+        {
+          "name": "idx_assets_is_cover",
+          "kind": "index",
+          "fields": [],
+          "startLine": 130,
+          "endLine": 130
+        },
+        {
+          "name": "idx_generated_contents_project_id",
+          "kind": "index",
+          "fields": [],
+          "startLine": 159,
+          "endLine": 159
+        },
+        {
+          "name": "idx_generated_contents_org_type",
+          "kind": "index",
+          "fields": [],
+          "startLine": 160,
+          "endLine": 160
+        },
+        {
+          "name": "idx_location_analyses_project_id",
+          "kind": "index",
+          "fields": [],
+          "startLine": 176,
+          "endLine": 176
+        },
+        {
+          "name": "idx_documents_project_id",
+          "kind": "index",
+          "fields": [],
+          "startLine": 197,
+          "endLine": 197
+        },
+        {
+          "name": "idx_documents_org_id",
+          "kind": "index",
+          "fields": [],
+          "startLine": 198,
+          "endLine": 198
+        },
+        {
+          "name": "idx_tasks_org_id",
+          "kind": "index",
+          "fields": [],
+          "startLine": 229,
+          "endLine": 229
+        },
+        {
+          "name": "idx_tasks_status",
+          "kind": "index",
+          "fields": [],
+          "startLine": 230,
+          "endLine": 230
+        },
+        {
+          "name": "idx_tasks_pending_scheduled",
+          "kind": "index",
+          "fields": [],
+          "startLine": 231,
+          "endLine": 231
+        },
+        {
+          "name": "idx_task_logs_task_id",
+          "kind": "index",
+          "fields": [],
+          "startLine": 245,
+          "endLine": 245
+        },
+        {
+          "name": "idx_usage_logs_org_id",
+          "kind": "index",
+          "fields": [],
+          "startLine": 263,
+          "endLine": 263
+        },
+        {
+          "name": "idx_usage_logs_org_year_month",
+          "kind": "index",
+          "fields": [],
+          "startLine": 264,
+          "endLine": 264
+        },
+        {
+          "name": "idx_templates_org_id",
+          "kind": "index",
+          "fields": [],
+          "startLine": 284,
+          "endLine": 284
+        },
+        {
+          "name": "idx_templates_public",
+          "kind": "index",
+          "fields": [],
+          "startLine": 285,
+          "endLine": 285
+        },
+        {
+          "name": "idx_agent_connections_org_id",
+          "kind": "index",
+          "fields": [],
+          "startLine": 303,
+          "endLine": 303
+        },
+        {
+          "name": "idx_agent_connections_status",
+          "kind": "index",
+          "fields": [],
+          "startLine": 304,
+          "endLine": 304
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 42
+      }
+    },
+    {
+      "path": "supabase/migrations/002_rls_policies.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 151,
+      "nonEmptyLines": 133,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "supabase/migrations/003_functions.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 214,
+      "nonEmptyLines": 194,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "supabase/migrations/004_seed_data.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 101,
+      "nonEmptyLines": 95,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "supabase/migrations/005_task_extensions.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 90,
+      "nonEmptyLines": 80,
+      "definitions": [
+        {
+          "name": "idx_tasks_running_updated",
+          "kind": "index",
+          "fields": [],
+          "startLine": 89,
+          "endLine": 89
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 1
+      }
+    },
+    {
+      "path": "supabase/migrations/006_agent_rls.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 50,
+      "nonEmptyLines": 43,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "supabase/migrations/007_schema_fixes.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 106,
+      "nonEmptyLines": 95,
+      "definitions": [
+        {
+          "name": "idx_tasks_queued_scheduled",
+          "kind": "index",
+          "fields": [],
+          "startLine": 36,
+          "endLine": 36
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 1
+      }
+    },
+    {
+      "path": "supabase/migrations/0085_auto_org_on_signup.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 54,
+      "nonEmptyLines": 48,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "supabase/migrations/008_auto_org.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 78,
+      "nonEmptyLines": 68,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "supabase/migrations/009_backfill_orphan_users.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 35,
+      "nonEmptyLines": 32,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "supabase/migrations/0105_make_bucket_public.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 8,
+      "nonEmptyLines": 7,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "supabase/migrations/010_location_analyze_webhook.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 34,
+      "nonEmptyLines": 31,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "supabase/migrations/011_projects_parcel_codes.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 7,
+      "nonEmptyLines": 7,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "supabase/migrations/012_location_data.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 5,
+      "nonEmptyLines": 5,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "supabase/migrations/013_unlock_dev_org.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 12,
+      "nonEmptyLines": 11,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "supabase/migrations/014_commercial_data.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 7,
+      "nonEmptyLines": 5,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "supabase/migrations/015_add_price_fields.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 7,
+      "nonEmptyLines": 6,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "supabase/migrations/016_site_memo_fields.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 9,
+      "nonEmptyLines": 8,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "supabase/migrations/017_kakao_density.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 5,
+      "nonEmptyLines": 4,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "supabase/migrations/018_documents_storage_bucket.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 34,
+      "nonEmptyLines": 28,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "supabase/migrations/019_add_transaction_type.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 6,
+      "nonEmptyLines": 5,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "supabase/migrations/019_property_detail_fields.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 31,
+      "nonEmptyLines": 29,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "supabase/migrations/020_location_analyses_team5.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 17,
+      "nonEmptyLines": 15,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "supabase/migrations/021_add_population_data.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 3,
+      "nonEmptyLines": 3,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "supabase/migrations/022_canva_integration.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 9,
+      "nonEmptyLines": 8,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "supabase/migrations/023_fix_transaction_type_constraint.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 29,
+      "nonEmptyLines": 26,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "supabase/migrations/024_add_tourism_data.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 5,
+      "nonEmptyLines": 4,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "supabase/migrations/025_add_card_data.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 5,
+      "nonEmptyLines": 4,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "supabase/migrations/026_canva_template_sets.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 27,
+      "nonEmptyLines": 23,
+      "definitions": [
+        {
+          "name": "canva_template_sets",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "description",
+            "thumbnail_url",
+            "category",
+            "cta",
+            "gradient",
+            "accent_color",
+            "is_active",
+            "sort_order",
+            "created_at"
+          ],
+          "startLine": 4,
+          "endLine": 17
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 1
+      }
+    },
+    {
+      "path": "supabase/migrations/027_expand_property_type_check.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 11,
+      "nonEmptyLines": 9,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "supabase/migrations/20260316085140_add_titles_to_generated_contents.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 2,
+      "nonEmptyLines": 2,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    }
+  ]
+}

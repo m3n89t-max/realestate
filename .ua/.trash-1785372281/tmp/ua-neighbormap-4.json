@@ -1,0 +1,177 @@
+{
+  "src/app/(dashboard)/layout.tsx": [
+    {
+      "path": "src/lib/supabase/server.ts",
+      "batchIndex": 3,
+      "symbols": [
+        "createClient",
+        "createAdminClient"
+      ]
+    }
+  ],
+  "src/app/(dashboard)/projects/ProjectsListView.tsx": [
+    {
+      "path": "src/lib/types.ts",
+      "batchIndex": 1,
+      "symbols": [
+        "PROPERTY_TYPE_LABELS",
+        "PROJECT_STATUS_LABELS",
+        "TASK_TYPE_LABELS",
+        "TASK_STATUS_LABELS",
+        "ROLE_LABELS"
+      ]
+    }
+  ],
+  "src/app/(dashboard)/projects/[id]/components/ShortsTab.tsx": [
+    {
+      "path": "src/lib/supabase/client.ts",
+      "batchIndex": 1,
+      "symbols": [
+        "createClient"
+      ]
+    },
+    {
+      "path": "src/app/(dashboard)/projects/[id]/page.tsx",
+      "batchIndex": 1,
+      "symbols": [
+        "dynamic",
+        "ProjectDetailPage"
+      ]
+    }
+  ],
+  "src/app/(dashboard)/projects/[id]/components/TasksTab.tsx": [
+    {
+      "path": "src/lib/supabase/client.ts",
+      "batchIndex": 1,
+      "symbols": [
+        "createClient"
+      ]
+    },
+    {
+      "path": "src/app/(dashboard)/projects/[id]/page.tsx",
+      "batchIndex": 1,
+      "symbols": [
+        "dynamic",
+        "ProjectDetailPage"
+      ]
+    }
+  ],
+  "src/app/(dashboard)/projects/new/page.tsx": [
+    {
+      "path": "src/lib/supabase/client.ts",
+      "batchIndex": 1,
+      "symbols": [
+        "createClient"
+      ]
+    },
+    {
+      "path": "src/lib/types.ts",
+      "batchIndex": 1,
+      "symbols": [
+        "PROPERTY_TYPE_LABELS",
+        "PROJECT_STATUS_LABELS",
+        "TASK_TYPE_LABELS",
+        "TASK_STATUS_LABELS",
+        "ROLE_LABELS"
+      ]
+    }
+  ],
+  "src/app/(dashboard)/projects/page.tsx": [
+    {
+      "path": "src/lib/supabase/server.ts",
+      "batchIndex": 3,
+      "symbols": [
+        "createClient",
+        "createAdminClient"
+      ]
+    },
+    {
+      "path": "src/lib/types.ts",
+      "batchIndex": 1,
+      "symbols": [
+        "PROPERTY_TYPE_LABELS",
+        "PROJECT_STATUS_LABELS",
+        "TASK_TYPE_LABELS",
+        "TASK_STATUS_LABELS",
+        "ROLE_LABELS"
+      ]
+    }
+  ],
+  "src/components/ui/AppShell.tsx": [
+    {
+      "path": "src/lib/supabase/client.ts",
+      "batchIndex": 1,
+      "symbols": [
+        "createClient"
+      ]
+    }
+  ],
+  "src/lib/utils.ts": [
+    {
+      "path": "src/app/(dashboard)/dashboard/page.tsx",
+      "batchIndex": 3,
+      "symbols": [
+        "dynamic",
+        "DashboardPage"
+      ]
+    },
+    {
+      "path": "src/app/(dashboard)/projects/[id]/components/BlogTab.tsx",
+      "batchIndex": 1,
+      "symbols": [
+        "BlogTab"
+      ]
+    },
+    {
+      "path": "src/app/(dashboard)/projects/[id]/components/CardNewsTab.tsx",
+      "batchIndex": 1,
+      "symbols": [
+        "CardNewsTab"
+      ]
+    },
+    {
+      "path": "src/app/(dashboard)/projects/[id]/components/DocsTab.tsx",
+      "batchIndex": 1,
+      "symbols": [
+        "DocsTab"
+      ]
+    },
+    {
+      "path": "src/app/(dashboard)/projects/[id]/components/PackageTab.tsx",
+      "batchIndex": 1,
+      "symbols": [
+        "PackageTab"
+      ]
+    },
+    {
+      "path": "src/app/(dashboard)/projects/[id]/page.tsx",
+      "batchIndex": 1,
+      "symbols": [
+        "dynamic",
+        "ProjectDetailPage"
+      ]
+    },
+    {
+      "path": "src/app/(dashboard)/tasks/page.tsx",
+      "batchIndex": 3,
+      "symbols": [
+        "dynamic",
+        "TasksPage"
+      ]
+    },
+    {
+      "path": "src/components/ui/StatusBadge.tsx",
+      "batchIndex": 3,
+      "symbols": [
+        "StatusBadge"
+      ]
+    },
+    {
+      "path": "src/components/ui/UsageMeter.tsx",
+      "batchIndex": 3,
+      "symbols": [
+        "UsageMeter"
+      ]
+    }
+  ]
+}

@@ -189,27 +189,31 @@ function PlatformCard({
                         />
                         <button
                             type="button"
+                            aria-label={showPw ? '비밀번호 숨기기' : '비밀번호 표시'}
+                            aria-pressed={showPw}
                             onClick={() => setShowPw(!showPw)}
                             className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                         >
-                            {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
+                            {showPw ? <EyeOff size={15} aria-hidden="true" /> : <Eye size={15} aria-hidden="true" />}
                         </button>
                     </div>
                 </div>
 
                 {/* 상태 메시지 */}
+                <div aria-live="polite">
                 {status === 'success' && (
                     <div className="flex items-center gap-1.5 text-xs text-emerald-600">
-                        <CheckCircle size={13} />
+                        <CheckCircle size={13} aria-hidden="true" />
                         로컬에 안전하게 저장되었습니다.
                     </div>
                 )}
                 {status === 'error' && (
                     <div className="flex items-center gap-1.5 text-xs text-red-500">
-                        <AlertCircle size={13} />
+                        <AlertCircle size={13} aria-hidden="true" />
                         {errorMsg}
                     </div>
                 )}
+                </div>
 
                 {/* 버튼 */}
                 <div className="flex items-center gap-2 pt-1">
@@ -227,11 +231,13 @@ function PlatformCard({
                     </button>
                     {saved?.has_creds && (
                         <button
+                            type="button"
+                            aria-label="크레덴셜 삭제"
                             onClick={handleDelete}
                             disabled={loading}
                             className="p-2.5 rounded-xl border border-red-200 text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
                         >
-                            <Trash2 size={14} />
+                            <Trash2 size={14} aria-hidden="true" />
                         </button>
                     )}
                 </div>

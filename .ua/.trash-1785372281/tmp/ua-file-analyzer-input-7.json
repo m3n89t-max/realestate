@@ -1,0 +1,42 @@
+{
+  "projectRoot": "C:/Users/m3n89/Desktop/realestate/realestate-1",
+  "batchFiles": [
+    {
+      "path": ".env.local.example",
+      "language": "config",
+      "sizeLines": 37,
+      "fileCategory": "config"
+    },
+    {
+      "path": "package.json",
+      "language": "json",
+      "sizeLines": 132,
+      "fileCategory": "config"
+    },
+    {
+      "path": "tsconfig.agent.json",
+      "language": "json",
+      "sizeLines": 15,
+      "fileCategory": "config"
+    },
+    {
+      "path": "tsconfig.json",
+      "language": "json",
+      "sizeLines": 43,
+      "fileCategory": "config"
+    },
+    {
+      "path": "vercel.json",
+      "language": "json",
+      "sizeLines": 6,
+      "fileCategory": "config"
+    }
+  ],
+  "batchImportData": {
+    ".env.local.example": [],
+    "package.json": [],
+    "tsconfig.agent.json": [],
+    "tsconfig.json": [],
+    "vercel.json": []
+  }
+}

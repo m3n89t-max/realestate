@@ -123,8 +123,9 @@ function TCell({ children, colSpan }: { children: React.ReactNode; colSpan?: num
     </td>
   )
 }
-function TInput({ value, onChange, placeholder, type = 'text', className = '', disabled }: {
+function TInput({ value, onChange, placeholder, type = 'text', className = '', disabled, ariaLabel, inputMode }: {
   value: string; onChange: (v: string) => void; placeholder?: string; type?: string; className?: string; disabled?: boolean
+  ariaLabel?: string; inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode']
 }) {
   return (
     <input
@@ -132,8 +133,10 @@ function TInput({ value, onChange, placeholder, type = 'text', className = '', d
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
       type={type}
+      inputMode={inputMode}
+      aria-label={ariaLabel ?? placeholder}
       disabled={disabled}
-      className={`w-full text-sm border-0 outline-none bg-transparent px-1 py-0.5 placeholder:text-gray-300 disabled:text-gray-400 ${className}`}
+      className={`w-full text-sm border-0 bg-transparent px-1 py-0.5 rounded placeholder:text-gray-300 disabled:text-gray-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:bg-brand-50/40 ${className}`}
     />
   )
 }

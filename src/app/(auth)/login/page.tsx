@@ -134,16 +134,19 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-5">
             {mode === 'signup' && (
               <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                <label className="block text-sm font-medium text-stone-700 mb-2">Full Name</label>
+                <label htmlFor="fullName" className="block text-sm font-medium text-stone-700 mb-2">Full Name</label>
                 <div className="relative">
-                  <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 opacity-0" />
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] border-2 border-stone-400 rounded-sm" />
+                  <Mail size={18} aria-hidden="true" className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 opacity-0" />
+                  <div aria-hidden="true" className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] border-2 border-stone-400 rounded-sm" />
                   <input
+                    id="fullName"
+                    name="name"
                     type="text"
+                    autoComplete="name"
                     value={fullName}
                     onChange={e => setFullName(e.target.value)}
-                    placeholder="Your Name"
-                    className="w-full pl-12 pr-4 py-3.5 bg-white border border-stone-200 rounded-xl text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-400 focus:border-transparent transition-all"
+                    placeholder="e.g. Hong Gil-dong…"
+                    className="w-full pl-12 pr-4 py-3.5 bg-white border border-stone-200 rounded-xl text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-400 focus:border-transparent transition-colors"
                     required={mode === 'signup'}
                   />
                 </div>
@@ -151,15 +154,20 @@ export default function LoginPage() {
             )}
 
             <div>
-              <label className="block text-sm font-medium text-stone-700 mb-2">Email Address</label>
+              <label htmlFor="email" className="block text-sm font-medium text-stone-700 mb-2">Email Address</label>
               <div className="relative">
-                <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
+                <Mail size={18} aria-hidden="true" className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
                 <input
+                  id="email"
+                  name="email"
                   type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  spellCheck={false}
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   placeholder="name@company.com"
-                  className="w-full pl-12 pr-4 py-3.5 bg-white border border-stone-200 rounded-xl text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-400 focus:border-transparent transition-all"
+                  className="w-full pl-12 pr-4 py-3.5 bg-white border border-stone-200 rounded-xl text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-400 focus:border-transparent transition-colors"
                   required
                 />
               </div>
@@ -167,30 +175,30 @@ export default function LoginPage() {
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-medium text-stone-700">Password</label>
-                {mode === 'login' && (
-                  <button type="button" className="text-sm text-stone-500 hover:text-stone-900 font-medium">
-                    Forgot password?
-                  </button>
-                )}
+                <label htmlFor="password" className="block text-sm font-medium text-stone-700">Password</label>
               </div>
               <div className="relative">
-                <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
+                <Lock size={18} aria-hidden="true" className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
                 <input
+                  id="password"
+                  name="password"
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  placeholder="Min 6 characters"
-                  className="w-full pl-12 pr-12 py-3.5 bg-white border border-stone-200 rounded-xl text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-400 focus:border-transparent transition-all"
+                  placeholder={mode === 'login' ? 'Enter your password…' : 'Min 6 characters…'}
+                  className="w-full pl-12 pr-12 py-3.5 bg-white border border-stone-200 rounded-xl text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-400 focus:border-transparent transition-colors"
                   required
                   minLength={6}
                 />
                 <button
                   type="button"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
                 >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
                 </button>
               </div>
             </div>
@@ -201,7 +209,7 @@ export default function LoginPage() {
               className="w-full flex items-center justify-center py-3.5 mt-4 bg-stone-900 hover:bg-stone-800 text-white rounded-xl font-medium transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {loading ? (
-                <><Loader2 size={18} className="animate-spin mr-2" /> Processing...</>
+                <><Loader2 size={18} aria-hidden="true" className="animate-spin mr-2" /> Processing…</>
               ) : (
                 mode === 'login' ? 'Sign In' : 'Create Account'
               )}

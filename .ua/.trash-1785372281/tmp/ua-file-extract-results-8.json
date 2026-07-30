@@ -1,0 +1,1615 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 20,
+  "filesSkipped": [
+    ".npmrc",
+    ".ua/.understandignore",
+    "public/agent-setup.bat",
+    "scripts/build-agent.ps1",
+    "scripts/setup-local-agent.bat"
+  ],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 20,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 17,
+      "failed": 0,
+      "skipped": 3
+    }
+  },
+  "results": [
+    {
+      "path": ".claude/settings.local.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 18,
+      "nonEmptyLines": 18,
+      "sections": [
+        {
+          "heading": "permissions",
+          "level": 1,
+          "line": 2
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 1
+      }
+    },
+    {
+      "path": "next-env.d.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 6,
+      "nonEmptyLines": 5,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "next.config.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 39,
+      "nonEmptyLines": 37,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/commercial-engine/population-engine/src/sgis-client.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 94,
+      "nonEmptyLines": 76,
+      "classes": [
+        {
+          "name": "SGISClient",
+          "startLine": 1,
+          "endLine": 91,
+          "methods": [
+            "constructor",
+            "getAccessToken",
+            "getPopulationStat",
+            "getHouseholdStat"
+          ],
+          "properties": [
+            "serviceId",
+            "securityKey",
+            "accessToken",
+            "tokenExpiresAt"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "SGISClient",
+          "line": 1,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "constructor",
+          "callee": "console.warn",
+          "lineNumber": 12
+        },
+        {
+          "caller": "getAccessToken",
+          "callee": "Date.now",
+          "lineNumber": 20
+        },
+        {
+          "caller": "getAccessToken",
+          "callee": "fetch",
+          "lineNumber": 28
+        },
+        {
+          "caller": "getAccessToken",
+          "callee": "response.json",
+          "lineNumber": 34
+        },
+        {
+          "caller": "getAccessToken",
+          "callee": "parseInt",
+          "lineNumber": 41
+        },
+        {
+          "caller": "getAccessToken",
+          "callee": "console.error",
+          "lineNumber": 45
+        },
+        {
+          "caller": "getPopulationStat",
+          "callee": "this.getAccessToken",
+          "lineNumber": 55
+        },
+        {
+          "caller": "getPopulationStat",
+          "callee": "fetch",
+          "lineNumber": 58
+        },
+        {
+          "caller": "getPopulationStat",
+          "callee": "response.json",
+          "lineNumber": 63
+        },
+        {
+          "caller": "getHouseholdStat",
+          "callee": "this.getAccessToken",
+          "lineNumber": 76
+        },
+        {
+          "caller": "getHouseholdStat",
+          "callee": "fetch",
+          "lineNumber": 79
+        },
+        {
+          "caller": "getHouseholdStat",
+          "callee": "response.json",
+          "lineNumber": 84
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "packages/content-engine/blog-generator/prompt.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 30,
+      "nonEmptyLines": 21,
+      "exports": [
+        {
+          "name": "BLOG_GENERATOR_PROMPT",
+          "line": 1,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/content-engine/cardnews-generator/prompt.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 37,
+      "nonEmptyLines": 27,
+      "exports": [
+        {
+          "name": "CARDNEWS_GENERATOR_PROMPT",
+          "line": 1,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/content-engine/commercial-analysis/prompt.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 41,
+      "nonEmptyLines": 29,
+      "exports": [
+        {
+          "name": "COMMERCIAL_ANALYSIS_PROMPT",
+          "line": 1,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/content-engine/location-analysis/prompt.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 44,
+      "nonEmptyLines": 31,
+      "exports": [
+        {
+          "name": "LOCATION_ANALYSIS_PROMPT",
+          "line": 1,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/content-engine/shorts-generator/prompt.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 16,
+      "nonEmptyLines": 11,
+      "exports": [
+        {
+          "name": "SHORTS_GENERATOR_PROMPT",
+          "line": 1,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/shared/index.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 94,
+      "nonEmptyLines": 90,
+      "exports": [
+        {
+          "name": "TaskType",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "TaskStatus",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "ProjectStatus",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "PropertyType",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "MembershipRole",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "DocumentType",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "ContentType",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "AssetType",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "PlanType",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "AgentStatus",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "LogLevel",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "TemplateType",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "TaskTypeValue",
+          "line": 22,
+          "isDefault": false
+        },
+        {
+          "name": "TaskStatusValue",
+          "line": 22,
+          "isDefault": false
+        },
+        {
+          "name": "ProjectStatusValue",
+          "line": 22,
+          "isDefault": false
+        },
+        {
+          "name": "PropertyTypeValue",
+          "line": 22,
+          "isDefault": false
+        },
+        {
+          "name": "MembershipRoleValue",
+          "line": 22,
+          "isDefault": false
+        },
+        {
+          "name": "DocumentTypeValue",
+          "line": 22,
+          "isDefault": false
+        },
+        {
+          "name": "ContentTypeValue",
+          "line": 22,
+          "isDefault": false
+        },
+        {
+          "name": "AssetTypeValue",
+          "line": 22,
+          "isDefault": false
+        },
+        {
+          "name": "PlanTypeValue",
+          "line": 22,
+          "isDefault": false
+        },
+        {
+          "name": "AgentStatusValue",
+          "line": 22,
+          "isDefault": false
+        },
+        {
+          "name": "LogLevelValue",
+          "line": 22,
+          "isDefault": false
+        },
+        {
+          "name": "TemplateTypeValue",
+          "line": 22,
+          "isDefault": false
+        },
+        {
+          "name": "Organization",
+          "line": 38,
+          "isDefault": false
+        },
+        {
+          "name": "User",
+          "line": 38,
+          "isDefault": false
+        },
+        {
+          "name": "Membership",
+          "line": 38,
+          "isDefault": false
+        },
+        {
+          "name": "Project",
+          "line": 38,
+          "isDefault": false
+        },
+        {
+          "name": "Asset",
+          "line": 38,
+          "isDefault": false
+        },
+        {
+          "name": "GeneratedContent",
+          "line": 38,
+          "isDefault": false
+        },
+        {
+          "name": "SeoScore",
+          "line": 38,
+          "isDefault": false
+        },
+        {
+          "name": "FaqItem",
+          "line": 38,
+          "isDefault": false
+        },
+        {
+          "name": "LocationAnalysis",
+          "line": 38,
+          "isDefault": false
+        },
+        {
+          "name": "RecommendedTarget",
+          "line": 38,
+          "isDefault": false
+        },
+        {
+          "name": "NearbyFacilities",
+          "line": 38,
+          "isDefault": false
+        },
+        {
+          "name": "FacilityItem",
+          "line": 38,
+          "isDefault": false
+        },
+        {
+          "name": "Document",
+          "line": 38,
+          "isDefault": false
+        },
+        {
+          "name": "DocumentSummary",
+          "line": 38,
+          "isDefault": false
+        },
+        {
+          "name": "RiskItem",
+          "line": 38,
+          "isDefault": false
+        },
+        {
+          "name": "Task",
+          "line": 38,
+          "isDefault": false
+        },
+        {
+          "name": "TaskLog",
+          "line": 38,
+          "isDefault": false
+        },
+        {
+          "name": "UsageLog",
+          "line": 38,
+          "isDefault": false
+        },
+        {
+          "name": "Template",
+          "line": 38,
+          "isDefault": false
+        },
+        {
+          "name": "AgentConnection",
+          "line": 38,
+          "isDefault": false
+        },
+        {
+          "name": "ApiMeta",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "ApiResponse",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "CreateProjectRequest",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "GenerateContentRequest",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "SummarizeResponse",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "GenerateBlogRequest",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "GenerateBlogResponse",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "GenerateCardNewsRequest",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "CardSlide",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "GenerateCardNewsResponse",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "AnalyzeLocationRequest",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "AnalyzeLocationResponse",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "AnalyzeDocumentRequest",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "AnalyzeDocumentResponse",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "NormalizeParcelRequest",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "NormalizeParcelResponse",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "GenerateShortsScriptRequest",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "ShortsScene",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "GenerateShortsScriptResponse",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "SeumteoApiRequest",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "SeumteoApiResponse",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "ValidateLicenseResponse",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "WebhookAgentBaseRequest",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "WebhookHeartbeatRequest",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "WebhookTaskStartedRequest",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "WebhookTaskProgressRequest",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "WebhookTaskCompletedRequest",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "WebhookTaskFailedRequest",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "WebhookDocumentUploadedRequest",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "WebhookAgentRequest",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "WebhookAgentResponse",
+          "line": 62,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 75,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/shared/package.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 13,
+      "nonEmptyLines": 13,
+      "sections": [
+        {
+          "heading": "name",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "version",
+          "level": 1,
+          "line": 3
+        },
+        {
+          "heading": "private",
+          "level": 1,
+          "line": 4
+        },
+        {
+          "heading": "main",
+          "level": 1,
+          "line": 5
+        },
+        {
+          "heading": "types",
+          "level": 1,
+          "line": 6
+        },
+        {
+          "heading": "exports",
+          "level": 1,
+          "line": 7
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 6
+      }
+    },
+    {
+      "path": "packages/shared/tsconfig.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 26,
+      "nonEmptyLines": 26,
+      "sections": [
+        {
+          "heading": "compilerOptions",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "include",
+          "level": 1,
+          "line": 18
+        },
+        {
+          "heading": "exclude",
+          "level": 1,
+          "line": 22
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 3
+      }
+    },
+    {
+      "path": "packages/shared/types/api.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 309,
+      "nonEmptyLines": 278,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/shared/types/database.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 291,
+      "nonEmptyLines": 270,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/shared/types/enums.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 144,
+      "nonEmptyLines": 120,
+      "exports": [
+        {
+          "name": "TaskType",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "TaskStatus",
+          "line": 33,
+          "isDefault": false
+        },
+        {
+          "name": "ProjectStatus",
+          "line": 45,
+          "isDefault": false
+        },
+        {
+          "name": "PropertyType",
+          "line": 55,
+          "isDefault": false
+        },
+        {
+          "name": "MembershipRole",
+          "line": 67,
+          "isDefault": false
+        },
+        {
+          "name": "DocumentType",
+          "line": 77,
+          "isDefault": false
+        },
+        {
+          "name": "ContentType",
+          "line": 89,
+          "isDefault": false
+        },
+        {
+          "name": "AssetType",
+          "line": 101,
+          "isDefault": false
+        },
+        {
+          "name": "PlanType",
+          "line": 111,
+          "isDefault": false
+        },
+        {
+          "name": "AgentStatus",
+          "line": 120,
+          "isDefault": false
+        },
+        {
+          "name": "LogLevel",
+          "line": 129,
+          "isDefault": false
+        },
+        {
+          "name": "TemplateType",
+          "line": 138,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 12,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "playwright.config.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 51,
+      "nonEmptyLines": 45,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "postcss.config.js",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 6,
+      "nonEmptyLines": 6,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/build-agent-zip.js",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 116,
+      "nonEmptyLines": 102,
+      "functions": [
+        {
+          "name": "log",
+          "startLine": 16,
+          "endLine": 16,
+          "params": [
+            "msg"
+          ]
+        },
+        {
+          "name": "err",
+          "startLine": 17,
+          "endLine": 17,
+          "params": [
+            "msg"
+          ]
+        },
+        {
+          "name": "main",
+          "startLine": 19,
+          "endLine": 100,
+          "params": []
+        },
+        {
+          "name": "copyDir",
+          "startLine": 102,
+          "endLine": 114,
+          "params": [
+            "src",
+            "dest"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "log",
+          "callee": "console.log",
+          "lineNumber": 16
+        },
+        {
+          "caller": "err",
+          "callee": "console.error",
+          "lineNumber": 17
+        },
+        {
+          "caller": "err",
+          "callee": "process.exit",
+          "lineNumber": 17
+        },
+        {
+          "caller": "main",
+          "callee": "console.log",
+          "lineNumber": 20
+        },
+        {
+          "caller": "main",
+          "callee": "console.log",
+          "lineNumber": 21
+        },
+        {
+          "caller": "main",
+          "callee": "console.log",
+          "lineNumber": 22
+        },
+        {
+          "caller": "main",
+          "callee": "log",
+          "lineNumber": 25
+        },
+        {
+          "caller": "main",
+          "callee": "execSync",
+          "lineNumber": 27
+        },
+        {
+          "caller": "main",
+          "callee": "err",
+          "lineNumber": 29
+        },
+        {
+          "caller": "main",
+          "callee": "log",
+          "lineNumber": 33
+        },
+        {
+          "caller": "main",
+          "callee": "fs.existsSync",
+          "lineNumber": 34
+        },
+        {
+          "caller": "main",
+          "callee": "fs.rmSync",
+          "lineNumber": 34
+        },
+        {
+          "caller": "main",
+          "callee": "fs.mkdirSync",
+          "lineNumber": 35
+        },
+        {
+          "caller": "main",
+          "callee": "log",
+          "lineNumber": 38
+        },
+        {
+          "caller": "main",
+          "callee": "copyDir",
+          "lineNumber": 39
+        },
+        {
+          "caller": "main",
+          "callee": "path.join",
+          "lineNumber": 39
+        },
+        {
+          "caller": "main",
+          "callee": "path.join",
+          "lineNumber": 39
+        },
+        {
+          "caller": "main",
+          "callee": "log",
+          "lineNumber": 42
+        },
+        {
+          "caller": "main",
+          "callee": "copyDir",
+          "lineNumber": 43
+        },
+        {
+          "caller": "main",
+          "callee": "path.join",
+          "lineNumber": 43
+        },
+        {
+          "caller": "main",
+          "callee": "path.join",
+          "lineNumber": 43
+        },
+        {
+          "caller": "main",
+          "callee": "log",
+          "lineNumber": 46
+        },
+        {
+          "caller": "main",
+          "callee": "fs.writeFileSync",
+          "lineNumber": 62
+        },
+        {
+          "caller": "main",
+          "callee": "path.join",
+          "lineNumber": 63
+        },
+        {
+          "caller": "main",
+          "callee": "JSON.stringify",
+          "lineNumber": 64
+        },
+        {
+          "caller": "main",
+          "callee": "log",
+          "lineNumber": 68
+        },
+        {
+          "caller": "main",
+          "callee": "[\r\n    '# 부동산 AI OS 에이전트 환경변수',\r\n    '# 이 파일을 .env 로 복사하고 값을 입력하세요',\r\n    '',\r\n    'NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co',\r\n    'NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key',\r\n    'AGENT_KEY=your-agent-key',\r\n  ].join",
+          "lineNumber": 69
+        },
+        {
+          "caller": "main",
+          "callee": "fs.writeFileSync",
+          "lineNumber": 77
+        },
+        {
+          "caller": "main",
+          "callee": "path.join",
+          "lineNumber": 77
+        },
+        {
+          "caller": "main",
+          "callee": "log",
+          "lineNumber": 80
+        },
+        {
+          "caller": "main",
+          "callee": "path.join",
+          "lineNumber": 81
+        },
+        {
+          "caller": "main",
+          "callee": "fs.existsSync",
+          "lineNumber": 82
+        },
+        {
+          "caller": "main",
+          "callee": "fs.rmSync",
+          "lineNumber": 82
+        },
+        {
+          "caller": "main",
+          "callee": "execSync",
+          "lineNumber": 84
+        },
+        {
+          "caller": "main",
+          "callee": "log",
+          "lineNumber": 89
+        },
+        {
+          "caller": "main",
+          "callee": "console.log",
+          "lineNumber": 92
+        },
+        {
+          "caller": "main",
+          "callee": "console.log",
+          "lineNumber": 93
+        },
+        {
+          "caller": "main",
+          "callee": "console.log",
+          "lineNumber": 94
+        },
+        {
+          "caller": "main",
+          "callee": "console.log",
+          "lineNumber": 95
+        },
+        {
+          "caller": "main",
+          "callee": "console.log",
+          "lineNumber": 96
+        },
+        {
+          "caller": "main",
+          "callee": "console.log",
+          "lineNumber": 97
+        },
+        {
+          "caller": "main",
+          "callee": "console.log",
+          "lineNumber": 98
+        },
+        {
+          "caller": "main",
+          "callee": "console.log",
+          "lineNumber": 99
+        },
+        {
+          "caller": "copyDir",
+          "callee": "fs.existsSync",
+          "lineNumber": 103
+        },
+        {
+          "caller": "copyDir",
+          "callee": "fs.mkdirSync",
+          "lineNumber": 104
+        },
+        {
+          "caller": "copyDir",
+          "callee": "fs.readdirSync",
+          "lineNumber": 105
+        },
+        {
+          "caller": "copyDir",
+          "callee": "path.join",
+          "lineNumber": 106
+        },
+        {
+          "caller": "copyDir",
+          "callee": "path.join",
+          "lineNumber": 107
+        },
+        {
+          "caller": "copyDir",
+          "callee": "entry.isDirectory",
+          "lineNumber": 108
+        },
+        {
+          "caller": "copyDir",
+          "callee": "copyDir",
+          "lineNumber": 109
+        },
+        {
+          "caller": "copyDir",
+          "callee": "fs.copyFileSync",
+          "lineNumber": 111
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/register_property.js",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 123,
+      "nonEmptyLines": 103,
+      "functions": [
+        {
+          "name": "run",
+          "startLine": 46,
+          "endLine": 121,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 47
+        },
+        {
+          "caller": "run",
+          "callee": "supabase\r\n        .from('memberships')\r\n        .select('user_id')\r\n        .eq('org_id', orgId)\r\n        .eq('role', 'owner')\r\n        .limit(1)\r\n        .single",
+          "lineNumber": 51
+        },
+        {
+          "caller": "run",
+          "callee": "supabase\r\n        .from('memberships')\r\n        .select('user_id')\r\n        .eq('org_id', orgId)\r\n        .eq('role', 'owner')\r\n        .limit",
+          "lineNumber": 51
+        },
+        {
+          "caller": "run",
+          "callee": "supabase\r\n        .from('memberships')\r\n        .select('user_id')\r\n        .eq('org_id', orgId)\r\n        .eq",
+          "lineNumber": 51
+        },
+        {
+          "caller": "run",
+          "callee": "supabase\r\n        .from('memberships')\r\n        .select('user_id')\r\n        .eq",
+          "lineNumber": 51
+        },
+        {
+          "caller": "run",
+          "callee": "supabase\r\n        .from('memberships')\r\n        .select",
+          "lineNumber": 51
+        },
+        {
+          "caller": "run",
+          "callee": "supabase\r\n        .from",
+          "lineNumber": 51
+        },
+        {
+          "caller": "run",
+          "callee": "console.error",
+          "lineNumber": 60
+        },
+        {
+          "caller": "run",
+          "callee": "process.exit",
+          "lineNumber": 61
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 65
+        },
+        {
+          "caller": "run",
+          "callee": "supabase\r\n        .from('projects')\r\n        .insert({\r\n            ...propertyData,\r\n            org_id: orgId,\r\n            created_by: userId,\r\n            cover_image_url: imageUrls[0]\r\n        })\r\n        .select()\r\n        .single",
+          "lineNumber": 68
+        },
+        {
+          "caller": "run",
+          "callee": "supabase\r\n        .from('projects')\r\n        .insert({\r\n            ...propertyData,\r\n            org_id: orgId,\r\n            created_by: userId,\r\n            cover_image_url: imageUrls[0]\r\n        })\r\n        .select",
+          "lineNumber": 68
+        },
+        {
+          "caller": "run",
+          "callee": "supabase\r\n        .from('projects')\r\n        .insert",
+          "lineNumber": 68
+        },
+        {
+          "caller": "run",
+          "callee": "supabase\r\n        .from",
+          "lineNumber": 68
+        },
+        {
+          "caller": "run",
+          "callee": "console.error",
+          "lineNumber": 80
+        },
+        {
+          "caller": "run",
+          "callee": "process.exit",
+          "lineNumber": 81
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 85
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 88
+        },
+        {
+          "caller": "run",
+          "callee": "imageUrls.map",
+          "lineNumber": 89
+        },
+        {
+          "caller": "run",
+          "callee": "supabase\r\n        .from('assets')\r\n        .insert",
+          "lineNumber": 99
+        },
+        {
+          "caller": "run",
+          "callee": "supabase\r\n        .from",
+          "lineNumber": 99
+        },
+        {
+          "caller": "run",
+          "callee": "console.warn",
+          "lineNumber": 104
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 106
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 110
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 114
+        },
+        {
+          "caller": "run",
+          "callee": "console.warn",
+          "lineNumber": 116
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 119
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 120
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/agent/main.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 208,
+      "nonEmptyLines": 191,
+      "functions": [
+        {
+          "name": "createIconBuffer",
+          "startLine": 8,
+          "endLine": 39,
+          "params": []
+        },
+        {
+          "name": "hasConfig",
+          "startLine": 47,
+          "endLine": 55,
+          "params": []
+        },
+        {
+          "name": "startAgent",
+          "startLine": 110,
+          "endLine": 117,
+          "params": []
+        },
+        {
+          "name": "createTray",
+          "startLine": 119,
+          "endLine": 149,
+          "params": []
+        },
+        {
+          "name": "showSetupWindow",
+          "startLine": 151,
+          "endLine": 164,
+          "params": []
+        },
+        {
+          "name": "showMainUI",
+          "startLine": 166,
+          "endLine": 181,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "createIconBuffer",
+          "callee": "Buffer.from",
+          "lineNumber": 10
+        },
+        {
+          "caller": "chunk",
+          "callee": "Buffer.from",
+          "lineNumber": 18
+        },
+        {
+          "caller": "chunk",
+          "callee": "Buffer.alloc",
+          "lineNumber": 19
+        },
+        {
+          "caller": "chunk",
+          "callee": "l.writeUInt32BE",
+          "lineNumber": 19
+        },
+        {
+          "caller": "chunk",
+          "callee": "Buffer.alloc",
+          "lineNumber": 20
+        },
+        {
+          "caller": "chunk",
+          "callee": "cr.writeUInt32BE",
+          "lineNumber": 20
+        },
+        {
+          "caller": "chunk",
+          "callee": "crc32",
+          "lineNumber": 20
+        },
+        {
+          "caller": "chunk",
+          "callee": "Buffer.concat",
+          "lineNumber": 20
+        },
+        {
+          "caller": "chunk",
+          "callee": "Buffer.concat",
+          "lineNumber": 21
+        },
+        {
+          "caller": "createIconBuffer",
+          "callee": "Buffer.alloc",
+          "lineNumber": 24
+        },
+        {
+          "caller": "createIconBuffer",
+          "callee": "ihdrData.writeUInt32BE",
+          "lineNumber": 25
+        },
+        {
+          "caller": "createIconBuffer",
+          "callee": "ihdrData.writeUInt32BE",
+          "lineNumber": 25
+        },
+        {
+          "caller": "createIconBuffer",
+          "callee": "Buffer.alloc",
+          "lineNumber": 29
+        },
+        {
+          "caller": "createIconBuffer",
+          "callee": "chunk",
+          "lineNumber": 37
+        },
+        {
+          "caller": "createIconBuffer",
+          "callee": "zlib.deflateSync",
+          "lineNumber": 37
+        },
+        {
+          "caller": "createIconBuffer",
+          "callee": "Buffer.concat",
+          "lineNumber": 38
+        },
+        {
+          "caller": "createIconBuffer",
+          "callee": "chunk",
+          "lineNumber": 38
+        },
+        {
+          "caller": "createIconBuffer",
+          "callee": "chunk",
+          "lineNumber": 38
+        },
+        {
+          "caller": "createIconBuffer",
+          "callee": "Buffer.alloc",
+          "lineNumber": 38
+        },
+        {
+          "caller": "hasConfig",
+          "callee": "fs.existsSync",
+          "lineNumber": 48
+        },
+        {
+          "caller": "hasConfig",
+          "callee": "JSON.parse",
+          "lineNumber": 50
+        },
+        {
+          "caller": "hasConfig",
+          "callee": "fs.readFileSync",
+          "lineNumber": 50
+        },
+        {
+          "caller": "startAgent",
+          "callee": "import",
+          "lineNumber": 112
+        },
+        {
+          "caller": "startAgent",
+          "callee": "agent.start",
+          "lineNumber": 113
+        },
+        {
+          "caller": "startAgent",
+          "callee": "console.error",
+          "lineNumber": 115
+        },
+        {
+          "caller": "createTray",
+          "callee": "path.join",
+          "lineNumber": 122
+        },
+        {
+          "caller": "createTray",
+          "callee": "path.join",
+          "lineNumber": 123
+        },
+        {
+          "caller": "createTray",
+          "callee": "iconCandidates.find",
+          "lineNumber": 125
+        },
+        {
+          "caller": "createTray",
+          "callee": "fs.existsSync",
+          "lineNumber": 125
+        },
+        {
+          "caller": "createTray",
+          "callee": "nativeImage.createFromPath",
+          "lineNumber": 127
+        },
+        {
+          "caller": "createTray",
+          "callee": "nativeImage.createFromBuffer",
+          "lineNumber": 128
+        },
+        {
+          "caller": "createTray",
+          "callee": "createIconBuffer",
+          "lineNumber": 128
+        },
+        {
+          "caller": "createTray",
+          "callee": "Menu.buildFromTemplate",
+          "lineNumber": 130
+        },
+        {
+          "caller": "createTray",
+          "callee": "mainWindow.show",
+          "lineNumber": 135
+        },
+        {
+          "caller": "createTray",
+          "callee": "showMainUI",
+          "lineNumber": 137
+        },
+        {
+          "caller": "createTray",
+          "callee": "app.quit",
+          "lineNumber": 144
+        },
+        {
+          "caller": "createTray",
+          "callee": "tray.setToolTip",
+          "lineNumber": 147
+        },
+        {
+          "caller": "createTray",
+          "callee": "tray.setContextMenu",
+          "lineNumber": 148
+        },
+        {
+          "caller": "showSetupWindow",
+          "callee": "mainWindow.loadFile",
+          "lineNumber": 162
+        },
+        {
+          "caller": "showSetupWindow",
+          "callee": "path.join",
+          "lineNumber": 162
+        },
+        {
+          "caller": "showSetupWindow",
+          "callee": "mainWindow.on",
+          "lineNumber": 163
+        },
+        {
+          "caller": "showMainUI",
+          "callee": "mainWindow.loadURL",
+          "lineNumber": 175
+        },
+        {
+          "caller": "showMainUI",
+          "callee": "mainWindow.on",
+          "lineNumber": 176
+        },
+        {
+          "caller": "showMainUI",
+          "callee": "(mainWindow as any).on",
+          "lineNumber": 177
+        },
+        {
+          "caller": "showMainUI",
+          "callee": "event.preventDefault",
+          "lineNumber": 178
+        },
+        {
+          "caller": "showMainUI",
+          "callee": "mainWindow?.hide",
+          "lineNumber": 179
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 6,
+        "classCount": 0
+      }
+    }
+  ]
+}

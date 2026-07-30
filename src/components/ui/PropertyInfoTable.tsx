@@ -175,6 +175,14 @@ export default function PropertyInfoTable({ project, org, agentName, className =
 
 /** 블로그/네이버 삽입용 HTML 문자열 생성 */
 export function buildPropertyInfoTableHtml(project: Project, org?: Organization | null, agentName?: string): string {
+  // 사용자 입력값을 HTML에 삽입하기 전 이스케이프 (< & 등이 표를 깨뜨리지 않도록)
+  const esc = (s: unknown): string =>
+    String(s ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+
   const txType = TX_LABEL[project.transaction_type ?? 'sale'] ?? '매매'
 
   const priceValue = project.transaction_type === 'rent'
@@ -189,11 +197,11 @@ export function buildPropertyInfoTableHtml(project: Project, org?: Organization 
   const agencyRows = org ? `
     <tr>
       <td colspan="6" style="border:1px solid #bbb;padding:8px 12px;background:#f5f5f5;font-size:12px;color:#444;line-height:1.8;">
-        ${org.name ? `■ 상호: ${org.name}&nbsp;&nbsp;` : ''}
-        ${org.business_number ? `■ 중개등록번호: ${org.business_number}&nbsp;&nbsp;` : ''}
-        ${org.address ? `■ 주소: ${org.address}&nbsp;&nbsp;` : ''}
-        ${org.phone ? `■ 전화번호: ${org.phone}&nbsp;&nbsp;` : ''}
-        ${agentName ? `■ 개업공인중개사: ${agentName}` : ''}
+        ${org.name ? `■ 상호: ${esc(org.name)}&nbsp;&nbsp;` : ''}
+        ${org.business_number ? `■ 중개등록번호: ${esc(org.business_number)}&nbsp;&nbsp;` : ''}
+        ${org.address ? `■ 주소: ${esc(org.address)}&nbsp;&nbsp;` : ''}
+        ${org.phone ? `■ 전화번호: ${esc(org.phone)}&nbsp;&nbsp;` : ''}
+        ${agentName ? `■ 개업공인중개사: ${esc(agentName)}` : ''}
       </td>
     </tr>` : ''
 
@@ -201,13 +209,13 @@ export function buildPropertyInfoTableHtml(project: Project, org?: Organization 
   <tbody>
     <tr>
       <td style="border:1px solid #bbb;padding:6px 10px;background:#dbeafe;font-weight:bold;white-space:nowrap;">소재지</td>
-      <td style="border:1px solid #bbb;padding:6px 10px;" colspan="3">${project.address}</td>
+      <td style="border:1px solid #bbb;padding:6px 10px;" colspan="3">${esc(project.address)}</td>
       <td style="border:1px solid #bbb;padding:6px 10px;background:#dbeafe;font-weight:bold;white-space:nowrap;">중개대상물 종류</td>
-      <td style="border:1px solid #bbb;padding:6px 10px;">${project.property_category || '-'}</td>
+      <td style="border:1px solid #bbb;padding:6px 10px;">${esc(project.property_category) || '-'}</td>
     </tr>
     <tr>
       <td style="border:1px solid #bbb;padding:6px 10px;background:#dbeafe;font-weight:bold;">주용도</td>
-      <td style="border:1px solid #bbb;padding:6px 10px;">${project.main_use || '-'}</td>
+      <td style="border:1px solid #bbb;padding:6px 10px;">${esc(project.main_use) || '-'}</td>
       <td style="border:1px solid #bbb;padding:6px 10px;background:#dbeafe;font-weight:bold;">해당층/총층</td>
       <td style="border:1px solid #bbb;padding:6px 10px;">${project.floor || project.total_floors ? `${project.floor ?? '-'}층 / ${project.total_floors ?? '-'}층` : '-'}</td>
       <td style="border:1px solid #bbb;padding:6px 10px;background:#dbeafe;font-weight:bold;">거래형태</td>
@@ -217,7 +225,7 @@ export function buildPropertyInfoTableHtml(project: Project, org?: Organization 
       <td style="border:1px solid #bbb;padding:6px 10px;background:#dbeafe;font-weight:bold;">대지면적</td>
       <td style="border:1px solid #bbb;padding:6px 10px;">${formatArea(project.land_area)}</td>
       <td style="border:1px solid #bbb;padding:6px 10px;background:#dbeafe;font-weight:bold;">사용승인일</td>
-      <td style="border:1px solid #bbb;padding:6px 10px;">${project.approval_date || '-'}</td>
+      <td style="border:1px solid #bbb;padding:6px 10px;">${esc(project.approval_date) || '-'}</td>
       <td style="border:1px solid #bbb;padding:6px 10px;background:#dbeafe;font-weight:bold;">연면적</td>
       <td style="border:1px solid #bbb;padding:6px 10px;">${formatArea(project.total_area)}</td>
     </tr>
@@ -233,15 +241,15 @@ export function buildPropertyInfoTableHtml(project: Project, org?: Organization 
       <td style="border:1px solid #bbb;padding:6px 10px;background:#dbeafe;font-weight:bold;">${priceLabel}</td>
       <td style="border:1px solid #bbb;padding:6px 10px;color:#dc2626;font-weight:bold;">${priceValue}</td>
       <td style="border:1px solid #bbb;padding:6px 10px;background:#dbeafe;font-weight:bold;">입주가능일</td>
-      <td style="border:1px solid #bbb;padding:6px 10px;">${project.move_in_date || '협의'}</td>
+      <td style="border:1px solid #bbb;padding:6px 10px;">${esc(project.move_in_date) || '협의'}</td>
       <td style="border:1px solid #bbb;padding:6px 10px;background:#dbeafe;font-weight:bold;">방향</td>
-      <td style="border:1px solid #bbb;padding:6px 10px;">${project.direction || '-'}</td>
+      <td style="border:1px solid #bbb;padding:6px 10px;">${esc(project.direction) || '-'}</td>
     </tr>
     <tr>
       <td style="border:1px solid #bbb;padding:6px 10px;background:#dbeafe;font-weight:bold;">권리금</td>
       <td style="border:1px solid #bbb;padding:6px 10px;">${project.key_money ? formatPrice(project.key_money) : '무권리'}</td>
       <td style="border:1px solid #bbb;padding:6px 10px;background:#dbeafe;font-weight:bold;">관리비</td>
-      <td style="border:1px solid #bbb;padding:6px 10px;white-space:pre-line;" colspan="3">${project.management_fee_detail || '-'}</td>
+      <td style="border:1px solid #bbb;padding:6px 10px;white-space:pre-line;" colspan="3">${esc(project.management_fee_detail) || '-'}</td>
     </tr>
     ${agencyRows}
   </tbody>

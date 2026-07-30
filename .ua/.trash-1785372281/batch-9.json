@@ -1,0 +1,653 @@
+{
+  "nodes": [
+    {
+      "id": "file:src/agent/setup.html",
+      "type": "file",
+      "name": "setup.html",
+      "filePath": "src/agent/setup.html",
+      "summary": "Electron 로컬 자동화 에이전트의 초기 설정 UI로, agent_key 입력과 연결 상태를 안내하는 단일 HTML 페이지다.",
+      "tags": ["markup", "agent", "setup-ui", "electron", "credential"],
+      "complexity": "complex",
+      "languageNotes": "인라인 스타일과 스크립트를 포함한 독립 실행형 설정 페이지."
+    },
+    {
+      "id": "file:src/app/globals.css",
+      "type": "file",
+      "name": "globals.css",
+      "filePath": "src/app/globals.css",
+      "summary": "Tailwind 디렉티브와 전역 CSS 변수·기본 스타일을 정의하는 앱 전역 스타일시트다.",
+      "tags": ["markup", "css", "tailwind", "global-styles", "theme"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/app/(auth)/layout.tsx",
+      "type": "file",
+      "name": "layout.tsx",
+      "filePath": "src/app/(auth)/layout.tsx",
+      "summary": "인증 불필요 라우트 그룹(login, onboarding)의 레이아웃으로 force-dynamic 렌더링을 강제한다.",
+      "tags": ["layout", "auth", "next-app-router", "force-dynamic"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/app/(dashboard)/settings/credentials/CredentialForm.tsx",
+      "type": "file",
+      "name": "CredentialForm.tsx",
+      "filePath": "src/app/(dashboard)/settings/credentials/CredentialForm.tsx",
+      "summary": "플랫폼별 로그인 credential(아이디/비밀번호)을 입력·저장·삭제하는 Client Component로, 로컬 에이전트 credentials API와 통신한다.",
+      "tags": ["component", "client-component", "credential", "form", "settings"],
+      "complexity": "complex",
+      "languageNotes": "useState/useEffect 기반 상태 관리와 fetch를 통한 credential CRUD 처리."
+    },
+    {
+      "id": "file:src/app/(dashboard)/settings/credentials/page.tsx",
+      "type": "file",
+      "name": "page.tsx",
+      "filePath": "src/app/(dashboard)/settings/credentials/page.tsx",
+      "summary": "설정 > 크리덴셜 페이지의 서버 컴포넌트로, CredentialForm을 렌더링하고 페이지 메타데이터를 제공한다.",
+      "tags": ["page", "settings", "credential", "next-app-router"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/app/(dashboard)/studio/page.tsx",
+      "type": "file",
+      "name": "page.tsx",
+      "filePath": "src/app/(dashboard)/studio/page.tsx",
+      "summary": "대시보드 스튜디오 라우트의 플레이스홀더 페이지 컴포넌트다.",
+      "tags": ["page", "dashboard", "studio", "next-app-router"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/app/(dashboard)/usage/page.tsx",
+      "type": "file",
+      "name": "page.tsx",
+      "filePath": "src/app/(dashboard)/usage/page.tsx",
+      "summary": "대시보드 사용량(usage) 라우트의 플레이스홀더 페이지 컴포넌트다.",
+      "tags": ["page", "dashboard", "usage", "next-app-router"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/app/api/agent/credentials/route.ts",
+      "type": "file",
+      "name": "route.ts",
+      "filePath": "src/app/api/agent/credentials/route.ts",
+      "summary": "로컬 에이전트 credential을 사용자 홈 디렉터리의 파일로 읽고 쓰는 Next.js API 라우트로, GET(마스킹 조회)/POST(저장)/DELETE(삭제)를 제공한다.",
+      "tags": ["api-handler", "credential", "route-handler", "filesystem", "agent"],
+      "complexity": "moderate",
+      "languageNotes": "서버에 크레덴셜을 저장하지 않고 로컬 파일시스템(os.homedir)에 보관하며 응답 시 마스킹 처리."
+    },
+    {
+      "id": "file:src/app/api/canva/auth/route.ts",
+      "type": "file",
+      "name": "route.ts",
+      "filePath": "src/app/api/canva/auth/route.ts",
+      "summary": "Canva OAuth 인증 시작 라우트로, PKCE code_verifier/challenge와 state를 생성해 쿠키에 저장하고 Canva 인증 페이지로 리다이렉트한다.",
+      "tags": ["api-handler", "oauth", "canva", "pkce", "route-handler"],
+      "complexity": "moderate",
+      "languageNotes": "crypto 모듈로 PKCE 챌린지 생성 및 base64url 인코딩 구현."
+    },
+    {
+      "id": "file:src/app/api/geocode/route.ts",
+      "type": "file",
+      "name": "route.ts",
+      "filePath": "src/app/api/geocode/route.ts",
+      "summary": "카카오 지오코딩 API를 프록시하는 라우트로, 주소를 위경도 좌표로 변환하고 키워드 검색으로 폴백한다.",
+      "tags": ["api-handler", "geocoding", "kakao", "proxy", "route-handler"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:src/app/api/map/route.ts",
+      "type": "file",
+      "name": "route.ts",
+      "filePath": "src/app/api/map/route.ts",
+      "summary": "카카오 정적 지도 이미지를 서버에서 대신 가져와 바이너리로 반환하는 프록시 라우트다.",
+      "tags": ["api-handler", "kakao", "map", "proxy", "route-handler"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/app/api/test-sgis/route.ts",
+      "type": "file",
+      "name": "route.ts",
+      "filePath": "src/app/api/test-sgis/route.ts",
+      "summary": "SGIS(통계지리정보원) API 인증·좌표변환·역지오코딩 연동을 점검하는 진단용 테스트 라우트다.",
+      "tags": ["api-handler", "sgis", "diagnostic", "test", "route-handler"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:src/app/layout.tsx",
+      "type": "file",
+      "name": "layout.tsx",
+      "filePath": "src/app/layout.tsx",
+      "summary": "앱 전역 루트 레이아웃으로 HTML 골격, 폰트, 전역 CSS, 메타데이터를 설정하고 모든 라우트를 감싼다.",
+      "tags": ["layout", "entry-point", "root-layout", "next-app-router", "metadata"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/app/map-test/page.tsx",
+      "type": "file",
+      "name": "page.tsx",
+      "filePath": "src/app/map-test/page.tsx",
+      "summary": "카카오 지도 SDK 로딩과 마커·오버레이 렌더링을 검증하는 개발용 테스트 페이지다.",
+      "tags": ["page", "kakao", "map", "test", "client-component"],
+      "complexity": "moderate",
+      "languageNotes": "동적 스크립트 주입으로 카카오 지도 SDK를 로드하고 useEffect에서 초기화."
+    },
+    {
+      "id": "file:src/app/page.tsx",
+      "type": "file",
+      "name": "page.tsx",
+      "filePath": "src/app/page.tsx",
+      "summary": "루트 경로 진입 시 대시보드로 리다이렉트하는 최상위 페이지 컴포넌트다.",
+      "tags": ["page", "entry-point", "redirect", "next-app-router"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/lib/sgis-client.ts",
+      "type": "file",
+      "name": "sgis-client.ts",
+      "filePath": "src/lib/sgis-client.ts",
+      "summary": "SGIS 통계지리정보원 API 클라이언트로 액세스 토큰 발급, 인구·가구 통계 조회, WGS84 좌표의 행정구역 코드 변환을 제공한다.",
+      "tags": ["service", "sgis", "api-client", "population", "geocoding"],
+      "complexity": "moderate",
+      "languageNotes": "토큰 만료 시각을 캐싱해 불필요한 재발급을 방지하는 클래스 기반 클라이언트."
+    },
+    {
+      "id": "config:supabase/config.toml",
+      "type": "config",
+      "name": "config.toml",
+      "filePath": "supabase/config.toml",
+      "summary": "Supabase 로컬 스택 전반(api, db, studio, auth, storage)과 모든 Edge Function의 JWT 검증 설정을 정의하는 프로젝트 구성 파일이다.",
+      "tags": ["configuration", "supabase", "edge-functions", "infrastructure"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:supabase/functions/analyze-commercial/config.toml",
+      "type": "config",
+      "name": "config.toml",
+      "filePath": "supabase/functions/analyze-commercial/config.toml",
+      "summary": "analyze-commercial Edge Function의 개별 설정 파일이다.",
+      "tags": ["configuration", "supabase", "edge-function"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:supabase/functions/generate-card-news/config.toml",
+      "type": "config",
+      "name": "config.toml",
+      "filePath": "supabase/functions/generate-card-news/config.toml",
+      "summary": "generate-card-news Edge Function의 개별 설정 파일이다.",
+      "tags": ["configuration", "supabase", "edge-function"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:supabase/functions/tsconfig.json",
+      "type": "config",
+      "name": "tsconfig.json",
+      "filePath": "supabase/functions/tsconfig.json",
+      "summary": "Deno 런타임인 Supabase Edge Functions 전용 TypeScript 컴파일러 설정으로, 메인 앱의 tsconfig와 분리된다.",
+      "tags": ["configuration", "typescript", "deno", "supabase", "build-system"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:tailwind.config.ts",
+      "type": "config",
+      "name": "tailwind.config.ts",
+      "filePath": "tailwind.config.ts",
+      "summary": "Tailwind CSS 설정 파일로 콘텐츠 경로, 커스텀 테마 색상·폰트 확장을 정의한다.",
+      "tags": ["configuration", "tailwind", "styling", "build-system"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:tests/example.spec.ts",
+      "type": "file",
+      "name": "example.spec.ts",
+      "filePath": "tests/example.spec.ts",
+      "summary": "Playwright E2E 테스트 스캐폴딩 예제로 기본 페이지 접근을 검증하는 샘플 스펙이다.",
+      "tags": ["test", "e2e", "playwright", "scaffold"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/app/(auth)/layout.tsx:AuthLayout",
+      "type": "function",
+      "name": "AuthLayout",
+      "filePath": "src/app/(auth)/layout.tsx",
+      "lineRange": [3, 5],
+      "summary": "인증 라우트 그룹의 자식 요소를 그대로 렌더링하는 레이아웃 컴포넌트다.",
+      "tags": ["layout", "auth", "component"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/app/(dashboard)/settings/credentials/CredentialForm.tsx:PlatformCard",
+      "type": "function",
+      "name": "PlatformCard",
+      "filePath": "src/app/(dashboard)/settings/credentials/CredentialForm.tsx",
+      "lineRange": [59, 241],
+      "summary": "단일 플랫폼 카드 UI로 credential 입력·저장·삭제와 로딩/상태 표시를 처리하는 내부 컴포넌트다.",
+      "tags": ["component", "credential", "form", "client-component"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:src/app/(dashboard)/settings/credentials/CredentialForm.tsx:CredentialForm",
+      "type": "function",
+      "name": "CredentialForm",
+      "filePath": "src/app/(dashboard)/settings/credentials/CredentialForm.tsx",
+      "lineRange": [246, 316],
+      "summary": "저장된 credential 목록을 API에서 불러와 플랫폼별 PlatformCard를 렌더링하는 최상위 폼 컴포넌트다.",
+      "tags": ["component", "credential", "form", "client-component"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/app/(dashboard)/settings/credentials/page.tsx:CredentialsPage",
+      "type": "function",
+      "name": "CredentialsPage",
+      "filePath": "src/app/(dashboard)/settings/credentials/page.tsx",
+      "lineRange": [9, 35],
+      "summary": "크리덴셜 설정 페이지의 서버 컴포넌트로 헤더와 CredentialForm을 배치한다.",
+      "tags": ["page", "settings", "credential"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/app/(dashboard)/studio/page.tsx:StudioPage",
+      "type": "function",
+      "name": "StudioPage",
+      "filePath": "src/app/(dashboard)/studio/page.tsx",
+      "lineRange": [3, 21],
+      "summary": "스튜디오 라우트의 플레이스홀더 페이지 컴포넌트다.",
+      "tags": ["page", "studio", "component"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/app/(dashboard)/usage/page.tsx:UsagePage",
+      "type": "function",
+      "name": "UsagePage",
+      "filePath": "src/app/(dashboard)/usage/page.tsx",
+      "lineRange": [3, 21],
+      "summary": "사용량 라우트의 플레이스홀더 페이지 컴포넌트다.",
+      "tags": ["page", "usage", "component"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/app/api/agent/credentials/route.ts:GET",
+      "type": "function",
+      "name": "GET",
+      "filePath": "src/app/api/agent/credentials/route.ts",
+      "lineRange": [60, 77],
+      "summary": "로컬 파일에 저장된 credential을 읽어 아이디·비밀번호를 마스킹한 목록으로 반환한다.",
+      "tags": ["api-handler", "credential", "route-handler"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/app/api/agent/credentials/route.ts:POST",
+      "type": "function",
+      "name": "POST",
+      "filePath": "src/app/api/agent/credentials/route.ts",
+      "lineRange": [83, 105],
+      "summary": "요청 본문의 credential을 검증해 로컬 credential 저장소 파일에 기록한다.",
+      "tags": ["api-handler", "credential", "route-handler"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/app/api/agent/credentials/route.ts:DELETE",
+      "type": "function",
+      "name": "DELETE",
+      "filePath": "src/app/api/agent/credentials/route.ts",
+      "lineRange": [111, 128],
+      "summary": "지정된 플랫폼의 credential 항목을 로컬 저장소에서 삭제한다.",
+      "tags": ["api-handler", "credential", "route-handler"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/app/api/canva/auth/route.ts:GET",
+      "type": "function",
+      "name": "GET",
+      "filePath": "src/app/api/canva/auth/route.ts",
+      "lineRange": [8, 41],
+      "summary": "PKCE code_verifier/challenge와 state를 생성해 쿠키에 저장하고 Canva OAuth 인증 URL로 리다이렉트한다.",
+      "tags": ["api-handler", "oauth", "pkce", "route-handler"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/app/api/geocode/route.ts:GET",
+      "type": "function",
+      "name": "GET",
+      "filePath": "src/app/api/geocode/route.ts",
+      "lineRange": [9, 70],
+      "summary": "카카오 주소 검색 API로 좌표를 조회하고 실패 시 키워드 검색으로 폴백해 위경도를 반환한다.",
+      "tags": ["api-handler", "geocoding", "kakao", "route-handler"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/app/api/map/route.ts:GET",
+      "type": "function",
+      "name": "GET",
+      "filePath": "src/app/api/map/route.ts",
+      "lineRange": [5, 39],
+      "summary": "쿼리 좌표로 카카오 정적 지도 이미지를 서버에서 가져와 바이너리 응답으로 프록시한다.",
+      "tags": ["api-handler", "kakao", "map", "route-handler"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/app/api/test-sgis/route.ts:GET",
+      "type": "function",
+      "name": "GET",
+      "filePath": "src/app/api/test-sgis/route.ts",
+      "lineRange": [3, 64],
+      "summary": "SGIS API의 인증·좌표변환·역지오코딩 호출을 순차 점검해 진단 결과를 반환한다.",
+      "tags": ["api-handler", "sgis", "diagnostic", "route-handler"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/app/layout.tsx:RootLayout",
+      "type": "function",
+      "name": "RootLayout",
+      "filePath": "src/app/layout.tsx",
+      "lineRange": [14, 44],
+      "summary": "전역 HTML 골격과 폰트·언어 속성을 설정하고 모든 페이지 자식을 감싸는 루트 레이아웃 컴포넌트다.",
+      "tags": ["layout", "root-layout", "component"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/app/map-test/page.tsx:KakaoMapTestPage",
+      "type": "function",
+      "name": "KakaoMapTestPage",
+      "filePath": "src/app/map-test/page.tsx",
+      "lineRange": [17, 141],
+      "summary": "카카오 지도 SDK를 동적 로드해 지도를 초기화하고 샘플 마커·커스텀 오버레이를 렌더링하는 테스트 페이지 컴포넌트다.",
+      "tags": ["page", "kakao", "map", "client-component"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/app/page.tsx:RootPage",
+      "type": "function",
+      "name": "RootPage",
+      "filePath": "src/app/page.tsx",
+      "lineRange": [3, 5],
+      "summary": "루트 경로 접근 시 대시보드로 서버 리다이렉트를 수행한다.",
+      "tags": ["page", "redirect", "entry-point"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:src/lib/sgis-client.ts:SGISClient",
+      "type": "class",
+      "name": "SGISClient",
+      "filePath": "src/lib/sgis-client.ts",
+      "lineRange": [1, 135],
+      "summary": "SGIS 인증 토큰 발급·캐싱과 인구·가구 통계 조회, WGS84 좌표의 행정구역 코드 변환을 담당하는 API 클라이언트 클래스다.",
+      "tags": ["service", "api-client", "sgis", "population"],
+      "complexity": "moderate"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:src/app/(dashboard)/settings/credentials/page.tsx",
+      "target": "file:src/app/(dashboard)/settings/credentials/CredentialForm.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/app/layout.tsx",
+      "target": "file:src/app/globals.css",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/app/(auth)/layout.tsx",
+      "target": "function:src/app/(auth)/layout.tsx:AuthLayout",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/app/(auth)/layout.tsx",
+      "target": "function:src/app/(auth)/layout.tsx:AuthLayout",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/(dashboard)/settings/credentials/CredentialForm.tsx",
+      "target": "function:src/app/(dashboard)/settings/credentials/CredentialForm.tsx:PlatformCard",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/app/(dashboard)/settings/credentials/CredentialForm.tsx",
+      "target": "function:src/app/(dashboard)/settings/credentials/CredentialForm.tsx:CredentialForm",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/app/(dashboard)/settings/credentials/CredentialForm.tsx",
+      "target": "function:src/app/(dashboard)/settings/credentials/CredentialForm.tsx:CredentialForm",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/(dashboard)/settings/credentials/CredentialForm.tsx",
+      "target": "file:src/app/api/agent/credentials/route.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:src/app/(dashboard)/settings/credentials/page.tsx",
+      "target": "function:src/app/(dashboard)/settings/credentials/page.tsx:CredentialsPage",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/app/(dashboard)/settings/credentials/page.tsx",
+      "target": "function:src/app/(dashboard)/settings/credentials/page.tsx:CredentialsPage",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/(dashboard)/studio/page.tsx",
+      "target": "function:src/app/(dashboard)/studio/page.tsx:StudioPage",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/app/(dashboard)/studio/page.tsx",
+      "target": "function:src/app/(dashboard)/studio/page.tsx:StudioPage",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/(dashboard)/usage/page.tsx",
+      "target": "function:src/app/(dashboard)/usage/page.tsx:UsagePage",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/app/(dashboard)/usage/page.tsx",
+      "target": "function:src/app/(dashboard)/usage/page.tsx:UsagePage",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/api/agent/credentials/route.ts",
+      "target": "function:src/app/api/agent/credentials/route.ts:GET",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/app/api/agent/credentials/route.ts",
+      "target": "function:src/app/api/agent/credentials/route.ts:POST",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/app/api/agent/credentials/route.ts",
+      "target": "function:src/app/api/agent/credentials/route.ts:DELETE",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/app/api/agent/credentials/route.ts",
+      "target": "function:src/app/api/agent/credentials/route.ts:GET",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/api/agent/credentials/route.ts",
+      "target": "function:src/app/api/agent/credentials/route.ts:POST",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/api/agent/credentials/route.ts",
+      "target": "function:src/app/api/agent/credentials/route.ts:DELETE",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/api/canva/auth/route.ts",
+      "target": "function:src/app/api/canva/auth/route.ts:GET",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/app/api/canva/auth/route.ts",
+      "target": "function:src/app/api/canva/auth/route.ts:GET",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/api/geocode/route.ts",
+      "target": "function:src/app/api/geocode/route.ts:GET",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/app/api/geocode/route.ts",
+      "target": "function:src/app/api/geocode/route.ts:GET",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/api/map/route.ts",
+      "target": "function:src/app/api/map/route.ts:GET",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/app/api/map/route.ts",
+      "target": "function:src/app/api/map/route.ts:GET",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/api/test-sgis/route.ts",
+      "target": "function:src/app/api/test-sgis/route.ts:GET",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/app/api/test-sgis/route.ts",
+      "target": "function:src/app/api/test-sgis/route.ts:GET",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/api/test-sgis/route.ts",
+      "target": "file:src/lib/sgis-client.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:src/app/layout.tsx",
+      "target": "function:src/app/layout.tsx:RootLayout",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/app/layout.tsx",
+      "target": "function:src/app/layout.tsx:RootLayout",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/map-test/page.tsx",
+      "target": "function:src/app/map-test/page.tsx:KakaoMapTestPage",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/app/map-test/page.tsx",
+      "target": "function:src/app/map-test/page.tsx:KakaoMapTestPage",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/page.tsx",
+      "target": "function:src/app/page.tsx:RootPage",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/app/page.tsx",
+      "target": "function:src/app/page.tsx:RootPage",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/sgis-client.ts",
+      "target": "class:src/lib/sgis-client.ts:SGISClient",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/lib/sgis-client.ts",
+      "target": "class:src/lib/sgis-client.ts:SGISClient",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "config:tailwind.config.ts",
+      "target": "file:src/app/globals.css",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:tailwind.config.ts",
+      "target": "file:src/app/layout.tsx",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    }
+  ]
+}

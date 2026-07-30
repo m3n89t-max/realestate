@@ -1,0 +1,237 @@
+{
+  "projectRoot": "C:/Users/m3n89/Desktop/realestate/realestate-1",
+  "batchFiles": [
+    {
+      "path": "supabase/functions/_shared/auth.ts",
+      "language": "typescript",
+      "sizeLines": 48,
+      "fileCategory": "code"
+    },
+    {
+      "path": "supabase/functions/_shared/cors.ts",
+      "language": "typescript",
+      "sizeLines": 12,
+      "fileCategory": "code"
+    },
+    {
+      "path": "supabase/functions/_shared/gemini.ts",
+      "language": "typescript",
+      "sizeLines": 163,
+      "fileCategory": "code"
+    },
+    {
+      "path": "supabase/functions/_shared/masking.ts",
+      "language": "typescript",
+      "sizeLines": 31,
+      "fileCategory": "code"
+    },
+    {
+      "path": "supabase/functions/_shared/openai.ts",
+      "language": "typescript",
+      "sizeLines": 90,
+      "fileCategory": "code"
+    },
+    {
+      "path": "supabase/functions/_shared/response.ts",
+      "language": "typescript",
+      "sizeLines": 44,
+      "fileCategory": "code"
+    },
+    {
+      "path": "supabase/functions/_shared/seo-prompt.ts",
+      "language": "typescript",
+      "sizeLines": 350,
+      "fileCategory": "code"
+    },
+    {
+      "path": "supabase/functions/_shared/shorts-prompt.ts",
+      "language": "typescript",
+      "sizeLines": 76,
+      "fileCategory": "code"
+    },
+    {
+      "path": "supabase/functions/analyze-commercial/index.ts",
+      "language": "typescript",
+      "sizeLines": 283,
+      "fileCategory": "code"
+    },
+    {
+      "path": "supabase/functions/analyze-document/index.ts",
+      "language": "typescript",
+      "sizeLines": 112,
+      "fileCategory": "code"
+    },
+    {
+      "path": "supabase/functions/analyze-jeju-card/index.ts",
+      "language": "typescript",
+      "sizeLines": 200,
+      "fileCategory": "code"
+    },
+    {
+      "path": "supabase/functions/analyze-location/index.ts",
+      "language": "typescript",
+      "sizeLines": 477,
+      "fileCategory": "code"
+    },
+    {
+      "path": "supabase/functions/analyze-tourism/index.ts",
+      "language": "typescript",
+      "sizeLines": 211,
+      "fileCategory": "code"
+    },
+    {
+      "path": "supabase/functions/collect-population/index.ts",
+      "language": "typescript",
+      "sizeLines": 310,
+      "fileCategory": "code"
+    },
+    {
+      "path": "supabase/functions/collect-real-price/index.ts",
+      "language": "typescript",
+      "sizeLines": 196,
+      "fileCategory": "code"
+    },
+    {
+      "path": "supabase/functions/download-building-register/index.ts",
+      "language": "typescript",
+      "sizeLines": 250,
+      "fileCategory": "code"
+    },
+    {
+      "path": "supabase/functions/download-cadastral-map/index.ts",
+      "language": "typescript",
+      "sizeLines": 172,
+      "fileCategory": "code"
+    },
+    {
+      "path": "supabase/functions/generate-blog/index.ts",
+      "language": "typescript",
+      "sizeLines": 273,
+      "fileCategory": "code"
+    },
+    {
+      "path": "supabase/functions/generate-card-image/index.ts",
+      "language": "typescript",
+      "sizeLines": 57,
+      "fileCategory": "code"
+    },
+    {
+      "path": "supabase/functions/generate-card-news/index.ts",
+      "language": "typescript",
+      "sizeLines": 287,
+      "fileCategory": "code"
+    },
+    {
+      "path": "supabase/functions/generate-shorts-script/index.ts",
+      "language": "typescript",
+      "sizeLines": 151,
+      "fileCategory": "code"
+    },
+    {
+      "path": "supabase/functions/normalize-parcel/index.ts",
+      "language": "typescript",
+      "sizeLines": 393,
+      "fileCategory": "code"
+    },
+    {
+      "path": "supabase/functions/seumteo-api/index.ts",
+      "language": "typescript",
+      "sizeLines": 125,
+      "fileCategory": "code"
+    },
+    {
+      "path": "supabase/functions/validate-license/index.ts",
+      "language": "typescript",
+      "sizeLines": 65,
+      "fileCategory": "code"
+    },
+    {
+      "path": "supabase/functions/webhook-agent/index.ts",
+      "language": "typescript",
+      "sizeLines": 305,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "supabase/functions/_shared/auth.ts": [],
+    "supabase/functions/_shared/cors.ts": [],
+    "supabase/functions/_shared/gemini.ts": [],
+    "supabase/functions/_shared/masking.ts": [],
+    "supabase/functions/_shared/openai.ts": [],
+    "supabase/functions/_shared/response.ts": [],
+    "supabase/functions/_shared/seo-prompt.ts": [],
+    "supabase/functions/_shared/shorts-prompt.ts": [],
+    "supabase/functions/analyze-commercial/index.ts": [
+      "supabase/functions/_shared/cors.ts"
+    ],
+    "supabase/functions/analyze-document/index.ts": [
+      "supabase/functions/_shared/auth.ts",
+      "supabase/functions/_shared/cors.ts",
+      "supabase/functions/_shared/gemini.ts",
+      "supabase/functions/_shared/masking.ts"
+    ],
+    "supabase/functions/analyze-jeju-card/index.ts": [
+      "supabase/functions/_shared/cors.ts"
+    ],
+    "supabase/functions/analyze-location/index.ts": [
+      "supabase/functions/_shared/cors.ts",
+      "supabase/functions/_shared/gemini.ts"
+    ],
+    "supabase/functions/analyze-tourism/index.ts": [
+      "supabase/functions/_shared/cors.ts"
+    ],
+    "supabase/functions/collect-population/index.ts": [
+      "supabase/functions/_shared/cors.ts"
+    ],
+    "supabase/functions/collect-real-price/index.ts": [
+      "supabase/functions/_shared/cors.ts"
+    ],
+    "supabase/functions/download-building-register/index.ts": [
+      "supabase/functions/_shared/cors.ts"
+    ],
+    "supabase/functions/download-cadastral-map/index.ts": [
+      "supabase/functions/_shared/cors.ts"
+    ],
+    "supabase/functions/generate-blog/index.ts": [
+      "supabase/functions/_shared/auth.ts",
+      "supabase/functions/_shared/cors.ts",
+      "supabase/functions/_shared/gemini.ts",
+      "supabase/functions/_shared/masking.ts",
+      "supabase/functions/_shared/openai.ts",
+      "supabase/functions/_shared/seo-prompt.ts"
+    ],
+    "supabase/functions/generate-card-image/index.ts": [
+      "supabase/functions/_shared/auth.ts",
+      "supabase/functions/_shared/cors.ts"
+    ],
+    "supabase/functions/generate-card-news/index.ts": [
+      "supabase/functions/_shared/auth.ts",
+      "supabase/functions/_shared/cors.ts",
+      "supabase/functions/_shared/gemini.ts"
+    ],
+    "supabase/functions/generate-shorts-script/index.ts": [
+      "supabase/functions/_shared/auth.ts",
+      "supabase/functions/_shared/cors.ts",
+      "supabase/functions/_shared/gemini.ts",
+      "supabase/functions/_shared/masking.ts",
+      "supabase/functions/_shared/response.ts",
+      "supabase/functions/_shared/shorts-prompt.ts"
+    ],
+    "supabase/functions/normalize-parcel/index.ts": [
+      "supabase/functions/_shared/auth.ts",
+      "supabase/functions/_shared/cors.ts",
+      "supabase/functions/_shared/response.ts"
+    ],
+    "supabase/functions/seumteo-api/index.ts": [
+      "supabase/functions/_shared/auth.ts",
+      "supabase/functions/_shared/cors.ts"
+    ],
+    "supabase/functions/validate-license/index.ts": [
+      "supabase/functions/_shared/auth.ts",
+      "supabase/functions/_shared/cors.ts"
+    ],
+    "supabase/functions/webhook-agent/index.ts": [
+      "supabase/functions/_shared/cors.ts"
+    ]
+  }
+}

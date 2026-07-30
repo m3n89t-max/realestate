@@ -1,0 +1,311 @@
+{
+  "nodes": [
+    {
+      "id": "file:src/app/(dashboard)/projects/[id]/page.tsx",
+      "type": "file",
+      "name": "page.tsx",
+      "filePath": "src/app/(dashboard)/projects/[id]/page.tsx",
+      "summary": "매물 상세 페이지. URL searchParam tab으로 개요·서류·입지분석·카드뉴스·블로그·쇼츠·패키지·작업현황 탭을 전환하며 서버에서 매물 데이터를 로드하는 진입점.",
+      "tags": ["entry-point", "server-component", "dashboard", "tabs"],
+      "complexity": "complex",
+      "languageNotes": "force-dynamic를 export하고 다수의 탭 컴포넌트를 조립하는 App Router Server Component."
+    },
+    {
+      "id": "function:src/app/(dashboard)/projects/[id]/page.tsx:ProjectDetailPage",
+      "type": "function",
+      "name": "ProjectDetailPage",
+      "filePath": "src/app/(dashboard)/projects/[id]/page.tsx",
+      "lineRange": [38, 306],
+      "summary": "매물·입지분석 데이터를 서버에서 조회하고 활성 탭에 해당하는 컴포넌트를 렌더링하는 매물 상세 최상위 컴포넌트.",
+      "tags": ["server-component", "orchestration", "tabs", "data-fetching"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:src/components/KakaoMap.tsx",
+      "type": "file",
+      "name": "KakaoMap.tsx",
+      "filePath": "src/components/KakaoMap.tsx",
+      "summary": "카카오 지도 렌더링 컴포넌트. 매물 좌표·POI 마커·히트맵을 표시하고 배후인구 등 오버레이를 그리는 재사용 지도 UI.",
+      "tags": ["map", "kakao-api", "component", "visualization"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:src/components/KakaoMap.tsx:drawHeatmap",
+      "type": "function",
+      "name": "drawHeatmap",
+      "filePath": "src/components/KakaoMap.tsx",
+      "lineRange": [39, 60],
+      "summary": "지도 위에 밀집도 히트맵 레이어를 그리는 헬퍼 함수.",
+      "tags": ["map", "heatmap", "visualization"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/KakaoMap.tsx:KakaoMap",
+      "type": "function",
+      "name": "KakaoMap",
+      "filePath": "src/components/KakaoMap.tsx",
+      "lineRange": [62, 592],
+      "summary": "카카오 지도 SDK를 초기화하고 매물 위치·POI 마커·히트맵·배후인구 오버레이를 렌더링하는 지도 컴포넌트.",
+      "tags": ["map", "kakao-api", "client-component", "visualization"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:src/components/ui/PropertyInfoTable.tsx",
+      "type": "file",
+      "name": "PropertyInfoTable.tsx",
+      "filePath": "src/components/ui/PropertyInfoTable.tsx",
+      "summary": "매물 기본정보 표 컴포넌트와 블로그 삽입용 HTML 테이블 빌더. 가격·면적을 평 단위 등으로 포맷해 표시한다.",
+      "tags": ["component", "property", "table", "reusable"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/components/ui/PropertyInfoTable.tsx:PropertyInfoTable",
+      "type": "function",
+      "name": "PropertyInfoTable",
+      "filePath": "src/components/ui/PropertyInfoTable.tsx",
+      "lineRange": [54, 174],
+      "summary": "매물의 가격·면적·거래유형 등 기본정보를 표 형태로 렌더링하는 재사용 컴포넌트.",
+      "tags": ["component", "property", "table"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/components/ui/PropertyInfoTable.tsx:buildPropertyInfoTableHtml",
+      "type": "function",
+      "name": "buildPropertyInfoTableHtml",
+      "filePath": "src/components/ui/PropertyInfoTable.tsx",
+      "lineRange": [177, 249],
+      "summary": "SEO 블로그에 삽입할 매물 정보표를 HTML 문자열로 생성하는 유틸 함수.",
+      "tags": ["utility", "html", "serialization", "seo"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:src/lib/content/card-news.ts",
+      "type": "file",
+      "name": "card-news.ts",
+      "filePath": "src/lib/content/card-news.ts",
+      "summary": "카드뉴스 슬라이드 데이터를 매물 정보로부터 조립하는 콘텐츠 생성 유틸.",
+      "tags": ["content-generation", "card-news", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/content/card-news.ts:generateCardNews",
+      "type": "function",
+      "name": "generateCardNews",
+      "filePath": "src/lib/content/card-news.ts",
+      "lineRange": [3, 51],
+      "summary": "매물 데이터를 입력받아 카드뉴스 슬라이드 구성(제목·본문·순서)을 생성하는 함수.",
+      "tags": ["content-generation", "card-news", "utility"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:src/lib/content/seo-blog.ts",
+      "type": "file",
+      "name": "seo-blog.ts",
+      "filePath": "src/lib/content/seo-blog.ts",
+      "summary": "SEO 블로그 본문 구조를 생성하고 SEO 점수를 산정하는 콘텐츠 생성 유틸.",
+      "tags": ["content-generation", "seo", "blog", "utility"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/lib/content/seo-blog.ts:generateSeoBlog",
+      "type": "function",
+      "name": "generateSeoBlog",
+      "filePath": "src/lib/content/seo-blog.ts",
+      "lineRange": [4, 60],
+      "summary": "매물·입지 데이터로 H1/H2 구조의 SEO 블로그 본문을 조립하고 calculateSeoScore로 점수를 산정하는 함수.",
+      "tags": ["content-generation", "seo", "blog"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:src/lib/content/seo-scorer.ts",
+      "type": "file",
+      "name": "seo-scorer.ts",
+      "filePath": "src/lib/content/seo-scorer.ts",
+      "summary": "블로그 본문의 글자 수·H2 개수·FAQ·해시태그 등 SEO 조건 충족도를 점수화하는 유틸.",
+      "tags": ["seo", "scoring", "validation", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/content/seo-scorer.ts:calculateSeoScore",
+      "type": "function",
+      "name": "calculateSeoScore",
+      "filePath": "src/lib/content/seo-scorer.ts",
+      "lineRange": [3, 39],
+      "summary": "블로그 본문을 검사해 SEO 기준(글자 수·헤딩·FAQ·해시태그 등) 충족 여부를 종합 점수로 반환하는 함수.",
+      "tags": ["seo", "scoring", "validation"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/lib/content/shorts-script.ts",
+      "type": "file",
+      "name": "shorts-script.ts",
+      "filePath": "src/lib/content/shorts-script.ts",
+      "summary": "유튜브 쇼츠 스크립트(15/30/60초 씬 구성)를 매물 정보로부터 생성하는 콘텐츠 유틸.",
+      "tags": ["content-generation", "shorts", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/content/shorts-script.ts:generateShortsScript",
+      "type": "function",
+      "name": "generateShortsScript",
+      "filePath": "src/lib/content/shorts-script.ts",
+      "lineRange": [3, 36],
+      "summary": "매물 데이터로 쇼츠 영상용 씬별 스크립트를 생성하는 함수.",
+      "tags": ["content-generation", "shorts", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/lib/effective-catchment.ts",
+      "type": "file",
+      "name": "effective-catchment.ts",
+      "filePath": "src/lib/effective-catchment.ts",
+      "summary": "거주 배후인구와 상권 등급 기반 유동인구를 합산해 유효 배후인구를 계산하는 순수 도메인 유틸.",
+      "tags": ["utility", "population", "domain-logic", "calculation"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/effective-catchment.ts:effectiveCatchment",
+      "type": "function",
+      "name": "effectiveCatchment",
+      "filePath": "src/lib/effective-catchment.ts",
+      "lineRange": [30, 46],
+      "summary": "거주 인구와 상권 등급별 배수를 적용해 유효 배후인구(거주+유동)를 산출하는 계산 함수.",
+      "tags": ["utility", "population", "calculation"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/lib/hooks/useProjects.ts",
+      "type": "file",
+      "name": "useProjects.ts",
+      "filePath": "src/lib/hooks/useProjects.ts",
+      "summary": "매물 목록을 Supabase에서 조회·구독하는 커스텀 React hook.",
+      "tags": ["hook", "data-fetching", "supabase", "project"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/lib/hooks/useProjects.ts:useProjects",
+      "type": "function",
+      "name": "useProjects",
+      "filePath": "src/lib/hooks/useProjects.ts",
+      "lineRange": [8, 90],
+      "summary": "조직의 매물 목록을 로드하고 로딩·에러 상태를 관리하는 커스텀 hook.",
+      "tags": ["hook", "data-fetching", "project"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:src/lib/hooks/useTasks.ts",
+      "type": "file",
+      "name": "useTasks.ts",
+      "filePath": "src/lib/hooks/useTasks.ts",
+      "summary": "자동화 작업(tasks) 목록을 조회하고 Realtime 변경을 구독하는 커스텀 React hook.",
+      "tags": ["hook", "data-fetching", "realtime", "task-queue"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/lib/hooks/useTasks.ts:useTasks",
+      "type": "function",
+      "name": "useTasks",
+      "filePath": "src/lib/hooks/useTasks.ts",
+      "lineRange": [8, 117],
+      "summary": "tasks 테이블을 로드하고 Supabase Realtime으로 상태 변화를 실시간 반영하는 커스텀 hook.",
+      "tags": ["hook", "realtime", "task-queue"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:src/lib/supabase/client.ts",
+      "type": "file",
+      "name": "client.ts",
+      "filePath": "src/lib/supabase/client.ts",
+      "summary": "브라우저용 Supabase 클라이언트를 생성하는 팩토리. 클라이언트 컴포넌트 전반에서 사용된다.",
+      "tags": ["supabase", "factory", "client", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/supabase/client.ts:createClient",
+      "type": "function",
+      "name": "createClient",
+      "filePath": "src/lib/supabase/client.ts",
+      "lineRange": [3, 8],
+      "summary": "환경변수 기반으로 브라우저용 Supabase 클라이언트 인스턴스를 생성해 반환하는 팩토리 함수.",
+      "tags": ["supabase", "factory", "client"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/lib/types.ts",
+      "type": "file",
+      "name": "types.ts",
+      "filePath": "src/lib/types.ts",
+      "summary": "프로젝트 전역 도메인 타입과 라벨 상수(Project, GeneratedContent, Task 등 및 PROPERTY_TYPE_LABELS 등)를 정의하는 타입 정의 모듈.",
+      "tags": ["type-definition", "domain-model", "constants", "shared"],
+      "complexity": "complex",
+      "languageNotes": "다수의 유니온 타입(BlogTone, TransactionType 등)과 라벨 매핑 상수를 함께 export한다."
+    }
+  ],
+  "edges": [
+    {"source": "file:src/app/(dashboard)/projects/[id]/page.tsx", "target": "function:src/app/(dashboard)/projects/[id]/page.tsx:ProjectDetailPage", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:src/app/(dashboard)/projects/[id]/page.tsx", "target": "function:src/app/(dashboard)/projects/[id]/page.tsx:ProjectDetailPage", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:src/app/(dashboard)/projects/[id]/page.tsx", "target": "file:src/app/(dashboard)/projects/[id]/components/AnalysisTab.tsx", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:src/app/(dashboard)/projects/[id]/page.tsx", "target": "file:src/app/(dashboard)/projects/[id]/components/BlogTab.tsx", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:src/app/(dashboard)/projects/[id]/page.tsx", "target": "file:src/app/(dashboard)/projects/[id]/components/CardNewsTab.tsx", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:src/app/(dashboard)/projects/[id]/page.tsx", "target": "file:src/app/(dashboard)/projects/[id]/components/DocsTab.tsx", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:src/app/(dashboard)/projects/[id]/page.tsx", "target": "file:src/app/(dashboard)/projects/[id]/components/PackageTab.tsx", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:src/app/(dashboard)/projects/[id]/page.tsx", "target": "file:src/app/(dashboard)/projects/[id]/components/PhotoGallery.tsx", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:src/app/(dashboard)/projects/[id]/page.tsx", "target": "file:src/app/(dashboard)/projects/[id]/components/ProjectActions.tsx", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:src/app/(dashboard)/projects/[id]/page.tsx", "target": "file:src/app/(dashboard)/projects/[id]/components/ProjectEditForm.tsx", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:src/app/(dashboard)/projects/[id]/page.tsx", "target": "file:src/app/(dashboard)/projects/[id]/components/ShortsTab.tsx", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:src/app/(dashboard)/projects/[id]/page.tsx", "target": "file:src/app/(dashboard)/projects/[id]/components/TasksTab.tsx", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:src/app/(dashboard)/projects/[id]/page.tsx", "target": "file:src/components/ui/StatusBadge.tsx", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:src/app/(dashboard)/projects/[id]/page.tsx", "target": "file:src/lib/supabase/server.ts", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:src/app/(dashboard)/projects/[id]/page.tsx", "target": "file:src/lib/utils.ts", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "function:src/app/(dashboard)/projects/[id]/page.tsx:ProjectDetailPage", "target": "function:src/lib/supabase/server.ts:createClient", "type": "calls", "direction": "forward", "weight": 0.8},
+
+    {"source": "file:src/components/KakaoMap.tsx", "target": "function:src/components/KakaoMap.tsx:drawHeatmap", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:src/components/KakaoMap.tsx", "target": "function:src/components/KakaoMap.tsx:KakaoMap", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:src/components/KakaoMap.tsx", "target": "function:src/components/KakaoMap.tsx:KakaoMap", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:src/components/KakaoMap.tsx", "target": "file:src/lib/effective-catchment.ts", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:src/components/KakaoMap.tsx", "target": "file:src/lib/types.ts", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "function:src/components/KakaoMap.tsx:KakaoMap", "target": "function:src/lib/effective-catchment.ts:effectiveCatchment", "type": "calls", "direction": "forward", "weight": 0.8},
+
+    {"source": "file:src/components/ui/PropertyInfoTable.tsx", "target": "function:src/components/ui/PropertyInfoTable.tsx:PropertyInfoTable", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:src/components/ui/PropertyInfoTable.tsx", "target": "function:src/components/ui/PropertyInfoTable.tsx:buildPropertyInfoTableHtml", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:src/components/ui/PropertyInfoTable.tsx", "target": "function:src/components/ui/PropertyInfoTable.tsx:PropertyInfoTable", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:src/components/ui/PropertyInfoTable.tsx", "target": "function:src/components/ui/PropertyInfoTable.tsx:buildPropertyInfoTableHtml", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:src/components/ui/PropertyInfoTable.tsx", "target": "file:src/lib/types.ts", "type": "imports", "direction": "forward", "weight": 0.7},
+
+    {"source": "file:src/lib/content/card-news.ts", "target": "function:src/lib/content/card-news.ts:generateCardNews", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:src/lib/content/card-news.ts", "target": "function:src/lib/content/card-news.ts:generateCardNews", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:src/lib/content/card-news.ts", "target": "file:src/lib/types.ts", "type": "imports", "direction": "forward", "weight": 0.7},
+
+    {"source": "file:src/lib/content/seo-blog.ts", "target": "function:src/lib/content/seo-blog.ts:generateSeoBlog", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:src/lib/content/seo-blog.ts", "target": "function:src/lib/content/seo-blog.ts:generateSeoBlog", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:src/lib/content/seo-blog.ts", "target": "file:src/lib/content/seo-scorer.ts", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:src/lib/content/seo-blog.ts", "target": "file:src/lib/types.ts", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "function:src/lib/content/seo-blog.ts:generateSeoBlog", "target": "function:src/lib/content/seo-scorer.ts:calculateSeoScore", "type": "calls", "direction": "forward", "weight": 0.8},
+
+    {"source": "file:src/lib/content/seo-scorer.ts", "target": "function:src/lib/content/seo-scorer.ts:calculateSeoScore", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:src/lib/content/seo-scorer.ts", "target": "function:src/lib/content/seo-scorer.ts:calculateSeoScore", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:src/lib/content/seo-scorer.ts", "target": "file:src/lib/types.ts", "type": "imports", "direction": "forward", "weight": 0.7},
+
+    {"source": "file:src/lib/content/shorts-script.ts", "target": "function:src/lib/content/shorts-script.ts:generateShortsScript", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:src/lib/content/shorts-script.ts", "target": "function:src/lib/content/shorts-script.ts:generateShortsScript", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:src/lib/content/shorts-script.ts", "target": "file:src/lib/types.ts", "type": "imports", "direction": "forward", "weight": 0.7},
+
+    {"source": "file:src/lib/effective-catchment.ts", "target": "function:src/lib/effective-catchment.ts:effectiveCatchment", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:src/lib/effective-catchment.ts", "target": "function:src/lib/effective-catchment.ts:effectiveCatchment", "type": "exports", "direction": "forward", "weight": 0.8},
+
+    {"source": "file:src/lib/hooks/useProjects.ts", "target": "function:src/lib/hooks/useProjects.ts:useProjects", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:src/lib/hooks/useProjects.ts", "target": "function:src/lib/hooks/useProjects.ts:useProjects", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:src/lib/hooks/useProjects.ts", "target": "file:src/lib/supabase/client.ts", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:src/lib/hooks/useProjects.ts", "target": "file:src/lib/types.ts", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "function:src/lib/hooks/useProjects.ts:useProjects", "target": "function:src/lib/supabase/client.ts:createClient", "type": "calls", "direction": "forward", "weight": 0.8},
+
+    {"source": "file:src/lib/hooks/useTasks.ts", "target": "function:src/lib/hooks/useTasks.ts:useTasks", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:src/lib/hooks/useTasks.ts", "target": "function:src/lib/hooks/useTasks.ts:useTasks", "type": "exports", "direction": "forward", "weight": 0.8},
+    {"source": "file:src/lib/hooks/useTasks.ts", "target": "file:src/lib/supabase/client.ts", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "file:src/lib/hooks/useTasks.ts", "target": "file:src/lib/types.ts", "type": "imports", "direction": "forward", "weight": 0.7},
+    {"source": "function:src/lib/hooks/useTasks.ts:useTasks", "target": "function:src/lib/supabase/client.ts:createClient", "type": "calls", "direction": "forward", "weight": 0.8},
+
+    {"source": "file:src/lib/supabase/client.ts", "target": "function:src/lib/supabase/client.ts:createClient", "type": "contains", "direction": "forward", "weight": 1.0},
+    {"source": "file:src/lib/supabase/client.ts", "target": "function:src/lib/supabase/client.ts:createClient", "type": "exports", "direction": "forward", "weight": 0.8}
+  ]
+}

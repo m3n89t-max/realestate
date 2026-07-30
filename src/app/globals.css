@@ -117,3 +117,39 @@
   #print-area { display: block !important; }
   @page { margin: 15mm; }
 }
+
+/* ── 전역 접근성·인터랙션 기본값 (Web Interface Guidelines) ── */
+
+/* 키보드 포커스: 명시적 ring이 없는 인터랙티브 요소에도 보이는 포커스 제공 */
+a:focus-visible,
+button:focus-visible,
+[role='button']:focus-visible,
+select:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px theme('colors.brand.500');
+  border-radius: 0.5rem;
+}
+
+/* 터치: 더블탭 줌 지연 제거 */
+button,
+a,
+[role='button'],
+label,
+select,
+summary {
+  touch-action: manipulation;
+}
+
+/* 모션 감소 선호 존중: 애니메이션·트랜지션 최소화 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

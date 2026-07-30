@@ -1,0 +1,231 @@
+{
+  "projectRoot": "C:/Users/m3n89/Desktop/realestate/realestate-1",
+  "batchFiles": [
+    {
+      "path": "supabase/migrations/000_full_setup.sql",
+      "language": "sql",
+      "sizeLines": 504,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/001_initial_schema.sql",
+      "language": "sql",
+      "sizeLines": 304,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/002_rls_policies.sql",
+      "language": "sql",
+      "sizeLines": 151,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/003_functions.sql",
+      "language": "sql",
+      "sizeLines": 214,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/004_seed_data.sql",
+      "language": "sql",
+      "sizeLines": 101,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/005_task_extensions.sql",
+      "language": "sql",
+      "sizeLines": 90,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/006_agent_rls.sql",
+      "language": "sql",
+      "sizeLines": 50,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/007_schema_fixes.sql",
+      "language": "sql",
+      "sizeLines": 106,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/0085_auto_org_on_signup.sql",
+      "language": "sql",
+      "sizeLines": 54,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/008_auto_org.sql",
+      "language": "sql",
+      "sizeLines": 78,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/009_backfill_orphan_users.sql",
+      "language": "sql",
+      "sizeLines": 35,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/0105_make_bucket_public.sql",
+      "language": "sql",
+      "sizeLines": 8,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/010_location_analyze_webhook.sql",
+      "language": "sql",
+      "sizeLines": 34,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/011_projects_parcel_codes.sql",
+      "language": "sql",
+      "sizeLines": 7,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/012_location_data.sql",
+      "language": "sql",
+      "sizeLines": 5,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/013_unlock_dev_org.sql",
+      "language": "sql",
+      "sizeLines": 12,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/014_commercial_data.sql",
+      "language": "sql",
+      "sizeLines": 7,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/015_add_price_fields.sql",
+      "language": "sql",
+      "sizeLines": 7,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/016_site_memo_fields.sql",
+      "language": "sql",
+      "sizeLines": 9,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/017_kakao_density.sql",
+      "language": "sql",
+      "sizeLines": 5,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/018_documents_storage_bucket.sql",
+      "language": "sql",
+      "sizeLines": 34,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/019_add_transaction_type.sql",
+      "language": "sql",
+      "sizeLines": 6,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/019_property_detail_fields.sql",
+      "language": "sql",
+      "sizeLines": 31,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/020_location_analyses_team5.sql",
+      "language": "sql",
+      "sizeLines": 17,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/021_add_population_data.sql",
+      "language": "sql",
+      "sizeLines": 3,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/022_canva_integration.sql",
+      "language": "sql",
+      "sizeLines": 9,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/023_fix_transaction_type_constraint.sql",
+      "language": "sql",
+      "sizeLines": 29,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/024_add_tourism_data.sql",
+      "language": "sql",
+      "sizeLines": 5,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/025_add_card_data.sql",
+      "language": "sql",
+      "sizeLines": 5,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/026_canva_template_sets.sql",
+      "language": "sql",
+      "sizeLines": 27,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/027_expand_property_type_check.sql",
+      "language": "sql",
+      "sizeLines": 11,
+      "fileCategory": "data"
+    },
+    {
+      "path": "supabase/migrations/20260316085140_add_titles_to_generated_contents.sql",
+      "language": "sql",
+      "sizeLines": 1,
+      "fileCategory": "data"
+    }
+  ],
+  "batchImportData": {
+    "supabase/migrations/000_full_setup.sql": [],
+    "supabase/migrations/001_initial_schema.sql": [],
+    "supabase/migrations/002_rls_policies.sql": [],
+    "supabase/migrations/003_functions.sql": [],
+    "supabase/migrations/004_seed_data.sql": [],
+    "supabase/migrations/005_task_extensions.sql": [],
+    "supabase/migrations/006_agent_rls.sql": [],
+    "supabase/migrations/007_schema_fixes.sql": [],
+    "supabase/migrations/0085_auto_org_on_signup.sql": [],
+    "supabase/migrations/008_auto_org.sql": [],
+    "supabase/migrations/009_backfill_orphan_users.sql": [],
+    "supabase/migrations/0105_make_bucket_public.sql": [],
+    "supabase/migrations/010_location_analyze_webhook.sql": [],
+    "supabase/migrations/011_projects_parcel_codes.sql": [],
+    "supabase/migrations/012_location_data.sql": [],
+    "supabase/migrations/013_unlock_dev_org.sql": [],
+    "supabase/migrations/014_commercial_data.sql": [],
+    "supabase/migrations/015_add_price_fields.sql": [],
+    "supabase/migrations/016_site_memo_fields.sql": [],
+    "supabase/migrations/017_kakao_density.sql": [],
+    "supabase/migrations/018_documents_storage_bucket.sql": [],
+    "supabase/migrations/019_add_transaction_type.sql": [],
+    "supabase/migrations/019_property_detail_fields.sql": [],
+    "supabase/migrations/020_location_analyses_team5.sql": [],
+    "supabase/migrations/021_add_population_data.sql": [],
+    "supabase/migrations/022_canva_integration.sql": [],
+    "supabase/migrations/023_fix_transaction_type_constraint.sql": [],
+    "supabase/migrations/024_add_tourism_data.sql": [],
+    "supabase/migrations/025_add_card_data.sql": [],
+    "supabase/migrations/026_canva_template_sets.sql": [],
+    "supabase/migrations/027_expand_property_type_check.sql": [],
+    "supabase/migrations/20260316085140_add_titles_to_generated_contents.sql": []
+  }
+}
