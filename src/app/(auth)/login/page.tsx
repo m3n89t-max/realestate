@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Building2, Mail, Lock, Loader2, Eye, EyeOff, CheckCircle, ArrowRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -22,6 +22,15 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [mode, setMode] = useState<'login' | 'signup'>('login')
 
+  // 인증 콜백 실패(/auth/confirm) 시 ?error= 안내 표시
+  useEffect(() => {
+    const err = new URLSearchParams(window.location.search).get('error')
+    if (err) {
+      toast.error(err)
+      window.history.replaceState({}, '', '/login')
+    }
+  }, [])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -33,20 +42,39 @@ export default function LoginPage() {
         router.push('/dashboard')
         router.refresh()
       } else {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            data: {
-              full_name: fullName,
-            }
+            data: { full_name: fullName },
+            emailRedirectTo: `${window.location.origin}/auth/confirm`,
           }
         })
         if (error) throw error
-        toast.success('가입 확인 이메일을 발송했습니다')
+
+        // 이미 가입된 이메일: Supabase는 열거 방지를 위해 에러 대신
+        // identities가 빈 user를 반환한다.
+        if (data.user && (data.user.identities?.length ?? 0) === 0) {
+          toast.error('이미 가입된 이메일입니다. 로그인해주세요.')
+          setMode('login')
+        } else if (data.session) {
+          // 이메일 확인 비활성 → 즉시 로그인 완료
+          toast.success('가입이 완료되었습니다')
+          router.push('/dashboard')
+          router.refresh()
+        } else {
+          // 이메일 확인 필요 → 메일의 링크로 완료
+          toast.success('확인 이메일을 보냈습니다. 메일의 링크를 눌러 가입을 완료해주세요.')
+          setMode('login')
+        }
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '오류가 발생했습니다'
+      let message = err instanceof Error ? err.message : '오류가 발생했습니다'
+      // 흔한 Supabase 에러 메시지를 한국어로 안내
+      if (/already registered/i.test(message)) message = '이미 가입된 이메일입니다. 로그인해주세요.'
+      else if (/invalid login credentials/i.test(message)) message = '이메일 또는 비밀번호가 올바르지 않습니다.'
+      else if (/email not confirmed/i.test(message)) message = '이메일 인증이 완료되지 않았습니다. 메일의 링크를 확인해주세요.'
+      else if (/password/i.test(message) && /6/.test(message)) message = '비밀번호는 6자 이상이어야 합니다.'
       toast.error(message)
     } finally {
       setLoading(false)
