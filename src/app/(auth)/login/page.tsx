@@ -58,14 +58,22 @@ export default function LoginPage() {
           toast.error('이미 가입된 이메일입니다. 로그인해주세요.')
           setMode('login')
         } else if (data.session) {
-          // 이메일 확인 비활성 → 즉시 로그인 완료
+          // 세션 즉시 발급됨 → 로그인 완료
           toast.success('가입이 완료되었습니다')
           router.push('/dashboard')
           router.refresh()
         } else {
-          // 이메일 확인 필요 → 메일의 링크로 완료
-          toast.success('확인 이메일을 보냈습니다. 메일의 링크를 눌러 가입을 완료해주세요.')
-          setMode('login')
+          // 세션 미발급이지만 DB 트리거로 이메일이 자동확인된 상태 → 즉시 로그인 시도
+          const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password })
+          if (!signInErr) {
+            toast.success('가입이 완료되었습니다')
+            router.push('/dashboard')
+            router.refresh()
+          } else {
+            // 이메일 확인이 켜져 있고 자동확인도 아닌 경우 → 메일 링크 안내(폴백)
+            toast.success('확인 이메일을 보냈습니다. 메일의 링크를 눌러 가입을 완료해주세요.')
+            setMode('login')
+          }
         }
       }
     } catch (err: unknown) {
