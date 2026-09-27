@@ -1,6 +1,6 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { handleCors } from '../_shared/cors.ts'
 import { corsHeaders } from '../_shared/cors.ts'
+import { assertNoSupabaseError, authorizeDocumentDownloadRequest, markOwnedTaskFailed } from '../_shared/document-download-auth.ts'
 
 /**
  * 건축물대장 다운로드 Edge Function
@@ -13,56 +13,69 @@ Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
   if (corsResponse) return corsResponse
 
+  let adminClient:
+    | Awaited<
+      ReturnType<typeof authorizeDocumentDownloadRequest>
+    >['adminClient']
+    | null = null
+  let orgId = ''
+  let projectId = ''
+  let taskId: string | null = null
+
   try {
     const body = await req.json()
-
-    // Webhook payload 또는 직접 호출 지원
-    const task    = body.record ?? body
-    const task_id = task.id
-    const payload = task.payload ?? {}
-
-    const project_id = payload.project_id ?? task.project_id
-
-    if (!project_id) throw new Error('project_id가 없습니다')
+    const authorization = await authorizeDocumentDownloadRequest(
+      req,
+      body,
+      ['building_register', 'download_building_register'],
+    )
+    adminClient = authorization.adminClient
+    orgId = authorization.orgId
+    projectId = authorization.projectId
+    taskId = authorization.taskId
 
     const apiKey = Deno.env.get('BUILDING_API_KEY')
-    if (!apiKey) throw new Error('BUILDING_API_KEY 환경변수가 설정되지 않았습니다')
-
-    const adminClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
-
-    // payload에 코드가 없으면 projects 테이블에서 조회
-    let sigungu_code = payload.sigungu_code ?? ''
-    let bjdong_code  = payload.bjdong_code  ?? ''
-    let bun          = payload.bun ?? ''
-    let ji           = payload.ji  ?? ''
-
-    if (!sigungu_code || !bjdong_code) {
-      const { data: projData } = await adminClient
-        .from('projects')
-        .select('sigungu_code, bjdong_code, bun, ji')
-        .eq('id', project_id)
-        .single()
-      sigungu_code = projData?.sigungu_code ?? ''
-      bjdong_code  = projData?.bjdong_code  ?? ''
-      bun          = bun || projData?.bun || '0'
-      ji           = ji  || projData?.ji  || '0'
+    if (!apiKey) {
+      throw new Error('BUILDING_API_KEY 환경변수가 설정되지 않았습니다')
     }
 
-    bun = (bun || '0').padStart(4, '0')
-    ji  = (ji  || '0').padStart(4, '0')
+    const { data: project, error: projectError } = await adminClient
+      .from('projects')
+      .select('sigungu_code, bjdong_code, bun, ji')
+      .eq('id', projectId)
+      .eq('org_id', orgId)
+      .single()
+    assertNoSupabaseError(projectError, '프로젝트 지번 코드 조회 실패')
+    if (!project) throw new Error('프로젝트를 찾을 수 없습니다')
 
-    if (!sigungu_code) throw new Error('sigungu_code가 없습니다 (매물 주소 정규화 먼저 실행)')
-    if (!bjdong_code)  throw new Error('bjdong_code가 없습니다 (매물 주소 정규화 먼저 실행)')
+    let sigungu_code = project.sigungu_code ?? ''
+    let bjdong_code = project.bjdong_code ?? ''
+    let bun = project.bun ?? ''
+    let ji = project.ji ?? ''
+
+    bun = (bun || '0').padStart(4, '0')
+    ji = (ji || '0').padStart(4, '0')
+
+    if (!sigungu_code) {
+      throw new Error('sigungu_code가 없습니다 (매물 주소 정규화 먼저 실행)')
+    }
+    if (!bjdong_code) {
+      throw new Error('bjdong_code가 없습니다 (매물 주소 정규화 먼저 실행)')
+    }
 
     // task → running
-    if (task_id) {
-      await adminClient.from('tasks').update({
+    if (taskId) {
+      const { data, error } = await adminClient.from('tasks').update({
         status: 'running',
         started_at: new Date().toISOString(),
-      }).eq('id', task_id)
+      })
+        .eq('id', taskId)
+        .eq('org_id', orgId)
+        .eq('project_id', projectId)
+        .select('id')
+        .single()
+      assertNoSupabaseError(error, '작업 실행 상태 저장 실패')
+      if (!data) throw new Error('실행할 소유 작업을 찾을 수 없습니다')
     }
 
     // ── 건축HUB API 호출 ──────────────────────────────────────
@@ -71,7 +84,7 @@ Deno.serve(async (req) => {
     // 1. 표제부 (기본 정보)
     const titleRes = await callBuildingApi(apiKey, 'getBrTitleInfo', {
       sigunguCd: sigungu_code,
-      bjdongCd:  bjdong_code,
+      bjdongCd: bjdong_code,
       bun,
       ji,
     })
@@ -80,7 +93,7 @@ Deno.serve(async (req) => {
     // 2. 층별개요
     const floorRes = await callBuildingApi(apiKey, 'getBrFlrOulnInfo', {
       sigunguCd: sigungu_code,
-      bjdongCd:  bjdong_code,
+      bjdongCd: bjdong_code,
       bun,
       ji,
     })
@@ -89,68 +102,110 @@ Deno.serve(async (req) => {
     // 3. 전유부 (집합건물인 경우)
     const expRes = await callBuildingApi(apiKey, 'getBrExposPublcInfo', {
       sigunguCd: sigungu_code,
-      bjdongCd:  bjdong_code,
+      bjdongCd: bjdong_code,
       bun,
       ji,
     }).catch(() => null)
     if (expRes) results.exclusive = expRes
 
     // ── documents 테이블에 저장 ───────────────────────────────
-    const { data: projectData } = await adminClient
-      .from('projects')
-      .select('org_id')
-      .eq('id', project_id)
-      .single()
+    const { data: existingDoc, error: documentReadError } = await adminClient
+      .from('documents')
+      .select('id')
+      .eq('project_id', projectId)
+      .eq('org_id', orgId)
+      .eq('type', 'building_register')
+      .maybeSingle()
+    assertNoSupabaseError(documentReadError, '기존 건축물대장 조회 실패')
 
-    let docId: string | null = null
-    if (projectData) {
-      const { data: savedDoc } = await adminClient.from('documents').upsert({
-        project_id,
-        org_id:    projectData.org_id,
-        type:      'building_register',
-        status:    'completed',
-        raw_data:  results,
-        raw_text:  formatRawText(results),
-        summary:   formatSummary(results.title),
-        fetched_at: new Date().toISOString(),
-      }, { onConflict: 'project_id,type' }).select('id').single()
-      docId = savedDoc?.id ?? null
+    const documentValues = {
+      project_id: projectId,
+      org_id: orgId,
+      type: 'building_register',
+      status: 'completed',
+      raw_data: results,
+      raw_text: formatRawText(results),
+      summary: formatSummary(results.title),
+      fetched_at: new Date().toISOString(),
     }
+
+    const documentWrite = existingDoc
+      ? adminClient.from('documents').update(documentValues)
+        .eq('id', existingDoc.id)
+        .eq('project_id', projectId)
+        .eq('org_id', orgId)
+        .select('id')
+        .single()
+      : adminClient.from('documents').insert(documentValues).select('id')
+        .single()
+    const { data: savedDoc, error: documentWriteError } = await documentWrite
+    assertNoSupabaseError(documentWriteError, '건축물대장 저장 실패')
+    if (!savedDoc) throw new Error('건축물대장 저장 결과가 없습니다')
+    const docId = savedDoc.id
 
     // ── AI 요약 자동 실행 ──────────────────────────────────────
     if (docId) {
       try {
         const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-        await fetch(`${supabaseUrl}/functions/v1/analyze-document`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        const analyzeResponse = await fetch(
+          `${supabaseUrl}/functions/v1/analyze-document`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+            },
+            body: JSON.stringify({ document_id: docId }),
           },
-          body: JSON.stringify({ document_id: docId }),
-        })
+        )
+        if (!analyzeResponse.ok) {
+          throw new Error(`AI 요약 요청 실패 (${analyzeResponse.status})`)
+        }
         console.log('[download-building-register] AI 요약 자동 실행 완료')
       } catch (aiErr) {
-        console.warn('[download-building-register] AI 요약 실패 (비필수):', aiErr)
+        console.warn(
+          '[download-building-register] AI 요약 실패 (비필수):',
+          aiErr,
+        )
       }
     }
 
     // task → success
-    if (task_id) {
-      await adminClient.from('tasks').update({
-        status:       'success',
-        result:       { api_data: results, doc_id: docId },
+    if (taskId) {
+      const { data, error } = await adminClient.from('tasks').update({
+        status: 'success',
+        result: { api_data: results, doc_id: docId },
         completed_at: new Date().toISOString(),
-      }).eq('id', task_id)
+      })
+        .eq('id', taskId)
+        .eq('org_id', orgId)
+        .eq('project_id', projectId)
+        .select('id')
+        .single()
+      assertNoSupabaseError(error, '작업 성공 상태 저장 실패')
+      if (!data) throw new Error('완료할 소유 작업을 찾을 수 없습니다')
     }
 
-    return new Response(JSON.stringify({ success: true, data: results, doc_id: docId }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-
+    return new Response(
+      JSON.stringify({ success: true, data: results, doc_id: docId }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
+    )
   } catch (err) {
     const msg = err instanceof Error ? err.message : '건축물대장 조회 실패'
     console.error('[download-building-register]', msg)
+
+    if (adminClient && taskId) {
+      try {
+        await markOwnedTaskFailed(adminClient, taskId, orgId, projectId, msg)
+      } catch (taskError) {
+        console.error(
+          '[download-building-register] 실패 작업 상태 저장 오류:',
+          taskError instanceof Error ? taskError.message : '알 수 없는 오류',
+        )
+      }
+    }
 
     return new Response(JSON.stringify({ error: msg }), {
       status: 400,
@@ -163,9 +218,11 @@ Deno.serve(async (req) => {
 async function callBuildingApi(
   apiKey: string,
   operation: string,
-  params: Record<string, string>
+  params: Record<string, string>,
 ): Promise<any> {
-  const url = new URL(`https://apis.data.go.kr/1613000/BldRgstHubService/${operation}`)
+  const url = new URL(
+    `https://apis.data.go.kr/1613000/BldRgstHubService/${operation}`,
+  )
   url.searchParams.set('serviceKey', apiKey)
   url.searchParams.set('numOfRows', '100')
   url.searchParams.set('pageNo', '1')
@@ -180,7 +237,9 @@ async function callBuildingApi(
   const json = await res.json()
   const resultCode = json?.response?.header?.resultCode
   if (resultCode && resultCode !== '00') {
-    throw new Error(`API 결과코드 ${resultCode}: ${json?.response?.header?.resultMsg}`)
+    throw new Error(
+      `API 결과코드 ${resultCode}: ${json?.response?.header?.resultMsg}`,
+    )
   }
 
   return json?.response?.body?.items?.item ?? []
@@ -207,8 +266,12 @@ function formatRawText(results: Record<string, any>): string {
     lines.push(`착공일: ${t.stcnsDay ?? '-'}`)
     lines.push(`지상층수: ${t.grndFlrCnt ?? '-'}층`)
     lines.push(`지하층수: ${t.ugrndFlrCnt ?? '-'}층`)
-    lines.push(`승강기: ${t.rideUseElvtCnt ?? 0}대(승용) + ${t.emgenUseElvtCnt ?? 0}대(비상)`)
-    lines.push(`주차대수: 기계식 ${t.indrMechUtcnt ?? 0}대 + 옥외 ${t.oudrMechUtcnt ?? 0}대 + 자주식 ${t.indrAutoUtcnt ?? 0}대`)
+    lines.push(
+      `승강기: ${t.rideUseElvtCnt ?? 0}대(승용) + ${t.emgenUseElvtCnt ?? 0}대(비상)`,
+    )
+    lines.push(
+      `주차대수: 기계식 ${t.indrMechUtcnt ?? 0}대 + 옥외 ${t.oudrMechUtcnt ?? 0}대 + 자주식 ${t.indrAutoUtcnt ?? 0}대`,
+    )
     lines.push(`위반건축물: ${t.vltnBldYn === 'Y' ? '있음 ⚠️' : '없음'}`)
     lines.push(`현장관리인: ${t.siteMgmtSttus ?? '-'}`)
   }
@@ -216,14 +279,18 @@ function formatRawText(results: Record<string, any>): string {
   if (Array.isArray(results.floors) && results.floors.length > 0) {
     lines.push('\n[층별개요]')
     for (const f of results.floors.slice(0, 20)) {
-      lines.push(`  ${f.flrNoNm ?? f.flrNo}층: ${f.mainPurpsCdNm ?? '-'} ${f.area ?? '-'}㎡`)
+      lines.push(
+        `  ${f.flrNoNm ?? f.flrNo}층: ${f.mainPurpsCdNm ?? '-'} ${f.area ?? '-'}㎡`,
+      )
     }
   }
 
   if (Array.isArray(results.exclusive) && results.exclusive.length > 0) {
     lines.push('\n[전유부]')
     for (const e of results.exclusive.slice(0, 10)) {
-      lines.push(`  ${e.flrNoNm}층 ${e.hoNm ?? ''}: ${e.mainPurpsCdNm ?? '-'} ${e.area ?? '-'}㎡`)
+      lines.push(
+        `  ${e.flrNoNm}층 ${e.hoNm ?? ''}: ${e.mainPurpsCdNm ?? '-'} ${e.area ?? '-'}㎡`,
+      )
     }
   }
 
