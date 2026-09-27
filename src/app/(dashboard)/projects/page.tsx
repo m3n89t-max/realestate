@@ -1,10 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Plus } from 'lucide-react'
-import type { PropertyType } from '@/lib/types'
 import ProjectsListView from './ProjectsListView'
 
 interface SearchParams {

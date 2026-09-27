@@ -1,16 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Building2, Mail, Lock, Loader2, Eye, EyeOff, CheckCircle, ArrowRight } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { ArrowRight, Building2, CheckCircle2, Eye, EyeOff, Lock, Loader2, Mail } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { createClient } from '@/lib/supabase/client'
 
-const FEATURES = [
-  { icon: <Building2 size={18} />, title: 'SEO 블로그 자동 생성', desc: '지번 입력만으로 1,500자 완성' },
-  { icon: <CheckCircle size={18} />, title: '인스타·카카오 카드뉴스', desc: '6장 자동 생성 및 편집' },
-  { icon: <CheckCircle size={18} />, title: '건축물대장 자동 수집', desc: '정부24 서류 즉시 다운로드' },
-]
+const valuePoints = ['매물 정보를 한 곳에서 관리', '반복 콘텐츠 제작을 AI로 자동화', '에이전트 작업 상태를 실시간 확인']
 
 export default function LoginPage() {
   const router = useRouter()
@@ -22,251 +18,46 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [mode, setMode] = useState<'login' | 'signup'>('login')
 
-  // 인증 콜백 실패(/auth/confirm) 시 ?error= 안내 표시
-  useEffect(() => {
-    const err = new URLSearchParams(window.location.search).get('error')
-    if (err) {
-      toast.error(err)
-      window.history.replaceState({}, '', '/login')
-    }
-  }, [])
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
+  useEffect(() => { const error = new URLSearchParams(window.location.search).get('error'); if (error) { toast.error(error); window.history.replaceState({}, '', '/login') } }, [])
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault(); setLoading(true)
     try {
       if (mode === 'login') {
-        const { error } = await supabase.auth.signInWithPassword({ email, password })
-        if (error) throw error
-        toast.success('로그인되었습니다')
-        router.push('/dashboard')
-        router.refresh()
+        const { error } = await supabase.auth.signInWithPassword({ email, password }); if (error) throw error
+        toast.success('로그인되었습니다'); router.push('/dashboard'); router.refresh()
       } else {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { full_name: fullName },
-            emailRedirectTo: `${window.location.origin}/auth/confirm`,
-          }
-        })
-        if (error) throw error
-
-        // 이미 가입된 이메일: Supabase는 열거 방지를 위해 에러 대신
-        // identities가 빈 user를 반환한다.
-        if (data.user && (data.user.identities?.length ?? 0) === 0) {
-          toast.error('이미 가입된 이메일입니다. 로그인해주세요.')
-          setMode('login')
-        } else if (data.session) {
-          // 세션 즉시 발급됨 → 로그인 완료
-          toast.success('가입이 완료되었습니다')
-          router.push('/dashboard')
-          router.refresh()
-        } else {
-          toast.success('확인 이메일을 보냈습니다. 메일의 링크를 눌러 가입을 완료해주세요.')
-          setMode('login')
-        }
+        const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: fullName }, emailRedirectTo: `${window.location.origin}/auth/confirm` } }); if (error) throw error
+        if (data.user && (data.user.identities?.length ?? 0) === 0) { toast.error('이미 가입된 이메일입니다. 로그인해주세요.'); setMode('login') }
+        else if (data.session) { toast.success('가입이 완료되었습니다'); router.push('/dashboard'); router.refresh() }
+        else { toast.success('확인 이메일을 보냈습니다. 메일의 링크를 눌러 가입을 완료해주세요.'); setMode('login') }
       }
-    } catch (err: unknown) {
-      let message = err instanceof Error ? err.message : '오류가 발생했습니다'
-      // 흔한 Supabase 에러 메시지를 한국어로 안내
+    } catch (error: unknown) {
+      let message = error instanceof Error ? error.message : '오류가 발생했습니다'
       if (/already registered/i.test(message)) message = '이미 가입된 이메일입니다. 로그인해주세요.'
       else if (/invalid login credentials/i.test(message)) message = '이메일 또는 비밀번호가 올바르지 않습니다.'
       else if (/email not confirmed/i.test(message)) message = '이메일 인증이 완료되지 않았습니다. 메일의 링크를 확인해주세요.'
       else if (/password/i.test(message) && /6/.test(message)) message = '비밀번호는 6자 이상이어야 합니다.'
       toast.error(message)
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }
 
-  return (
-    <div className="min-h-screen flex font-sans">
-      {/* 왼쪽 브랜드/히어로 패널 (참고 사진의 감성적인 디자인 적용) */}
-      <div
-        className="hidden lg:flex lg:w-[60%] flex-col relative overflow-hidden bg-stone-900"
-        style={{
-          backgroundImage: 'linear-gradient(to right, rgba(28,25,23,0.9) 0%, rgba(28,25,23,0.4) 100%), url("https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?ixlib=rb-4.0.3&auto=format&fit=crop&w=2075&q=80")',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center'
-        }}
-      >
-        <div className="relative z-10 flex flex-col h-full p-16 justify-between">
-          {/* 상단 로고 */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/20">
-              <Building2 size={20} className="text-stone-100" />
-            </div>
-            <span className="text-stone-100 font-medium tracking-wide text-lg">RealEstate AI OS</span>
-          </div>
-
-          {/* 메인 카피 */}
-          <div className="max-w-2xl mt-12">
-            <h1 className="text-5xl lg:text-7xl font-light text-stone-50 leading-[1.1] tracking-tight mb-6">
-              A Smart Space <span className="font-serif italic text-stone-300">for</span><br />
-              <span className="font-medium text-white">Efficient Growth</span>
-            </h1>
-            <p className="text-stone-300 text-lg leading-relaxed max-w-xl font-light mb-10">
-              A space dedicated to your real estate business, guided by automated AI workflows, offering the support you deserve.
-            </p>
-            <button
-              onClick={() => document.getElementById('auth-form')?.scrollIntoView({ behavior: 'smooth' })}
-              className="bg-stone-100 text-stone-900 px-8 py-3.5 rounded-full font-medium hover:bg-white transition-all flex items-center gap-2"
-            >
-              Get Started Today
-              <ArrowRight size={18} />
-            </button>
-          </div>
-
-          {/* 하단 특징 카드 (사진의 3개 하단 카드 레이아웃) */}
-          <div className="grid grid-cols-3 gap-6 mt-16">
-            {FEATURES.map((feature, idx) => (
-              <div
-                key={idx}
-                className="bg-black/20 backdrop-blur-md border border-white/10 rounded-2xl p-6 transition-transform hover:-translate-y-1"
-              >
-                <div className="w-10 h-10 bg-stone-100/10 rounded-full flex items-center justify-center text-stone-200 mb-4">
-                  {feature.icon}
-                </div>
-                <h3 className="text-stone-100 font-medium mb-2">{feature.title}</h3>
-                <p className="text-stone-400 text-sm leading-relaxed">{feature.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
+  return <main className="min-h-screen bg-[#faf9f5] p-4 lg:grid lg:grid-cols-[minmax(0,1.05fr)_minmax(440px,.95fr)] lg:p-6">
+    <section className="hidden min-h-[calc(100vh-48px)] flex-col justify-between rounded-xl bg-slate-950 p-10 text-white lg:flex xl:p-14">
+      <div className="flex items-center gap-2.5"><span className="grid size-9 place-items-center rounded-lg bg-brand-600"><Building2 size={18} /></span><span className="font-bold tracking-[-0.025em]">RealEstate AI OS</span></div>
+      <div className="max-w-xl"><p className="text-xs font-semibold tracking-[0.16em] text-brand-300">REAL ESTATE OPERATIONS</p><h1 className="mt-5 text-5xl font-bold leading-[1.12] tracking-[-0.05em]">매물 운영의 흐름을<br /><span className="text-brand-300">더 정확하게.</span></h1><p className="mt-6 max-w-md text-base leading-7 text-slate-300">부동산 실무자가 매물 관리부터 AI 콘텐츠 제작, 자동화 작업까지 한 화면에서 운영하는 업무 공간입니다.</p></div>
+      <div className="border-t border-slate-700 pt-6"><p className="mb-4 text-xs font-semibold text-slate-400">하나의 운영 흐름</p><div className="grid grid-cols-3 gap-4">{valuePoints.map((point, index) => <div key={point}><span className="text-sm font-bold text-brand-300">0{index + 1}</span><p className="mt-2 text-sm leading-5 text-slate-300">{point}</p></div>)}</div></div>
+    </section>
+    <section className="flex min-h-[calc(100vh-32px)] items-center justify-center bg-[#faf9f5] px-4 py-10 lg:min-h-[calc(100vh-48px)] lg:px-12">
+      <div className="w-full max-w-[400px]"><div className="mb-10 flex items-center gap-2.5 lg:hidden"><span className="grid size-9 place-items-center rounded-lg bg-brand-700 text-white"><Building2 size={18} /></span><span className="font-bold tracking-[-0.025em] text-slate-900">RealEstate AI OS</span></div><div className="mb-8"><p className="text-xs font-semibold tracking-[0.12em] text-brand-700">{mode === 'login' ? 'WELCOME BACK' : 'START YOUR WORKSPACE'}</p><h2 className="mt-2 text-3xl font-bold tracking-[-0.04em] text-slate-950">{mode === 'login' ? '업무 공간에 로그인' : '무료로 시작하기'}</h2><p className="mt-2 text-sm leading-6 text-slate-500">{mode === 'login' ? '계정 정보를 입력해 운영 현황을 확인하세요.' : '부동산 업무 자동화를 위한 계정을 만드세요.'}</p></div>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {mode === 'signup' && <div><label htmlFor="fullName" className="label">이름</label><div className="relative"><Building2 size={17} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input id="fullName" name="name" type="text" autoComplete="name" value={fullName} onChange={event => setFullName(event.target.value)} placeholder="이름을 입력하세요" className="input pl-10" required /></div></div>}
+          <div><label htmlFor="email" className="label">이메일</label><div className="relative"><Mail size={17} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input id="email" name="email" type="email" inputMode="email" autoComplete="email" spellCheck={false} value={email} onChange={event => setEmail(event.target.value)} placeholder="name@company.com" className="input pl-10" required /></div></div>
+          <div><label htmlFor="password" className="label">비밀번호</label><div className="relative"><Lock size={17} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input id="password" name="password" type={showPassword ? 'text' : 'password'} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={event => setPassword(event.target.value)} placeholder={mode === 'login' ? '비밀번호를 입력하세요' : '6자 이상 입력하세요'} className="input pl-10 pr-11" required minLength={6} /><button type="button" aria-label={showPassword ? '비밀번호 숨기기' : '비밀번호 보기'} aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)} className="absolute right-0 top-0 grid size-11 place-items-center text-slate-400 hover:text-slate-700">{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></div></div>
+          <button type="submit" disabled={loading} className="btn-primary mt-2 w-full">{loading ? <><Loader2 size={17} className="animate-spin" />처리 중</> : <>{mode === 'login' ? '로그인' : '계정 만들기'}<ArrowRight size={16} /></>}</button>
+        </form>
+        {mode === 'signup' && <div className="mt-5 space-y-2 border-l-2 border-brand-200 pl-3">{['카드 등록 없이 시작', '언제든 설정에서 관리 가능'].map(item => <p key={item} className="flex items-center gap-2 text-xs text-slate-500"><CheckCircle2 size={14} className="text-brand-600" />{item}</p>)}</div>}
+        <div className="mt-8 border-t border-slate-200 pt-6 text-center text-sm text-slate-500">{mode === 'login' ? '아직 계정이 없으신가요?' : '이미 계정이 있으신가요?'} <button type="button" onClick={() => setMode(mode === 'login' ? 'signup' : 'login')} className="font-semibold text-brand-700 hover:text-brand-800 hover:underline">{mode === 'login' ? '무료 계정 만들기' : '로그인하기'}</button></div>
       </div>
-
-      {/* 오른쪽 로그인 폼 패널 */}
-      <div className="flex-1 flex flex-col justify-center p-8 lg:p-16 bg-stone-50" id="auth-form">
-        <div className="w-full max-w-md mx-auto">
-          {/* 모바일 로고 */}
-          <div className="lg:hidden flex items-center gap-3 mb-10">
-            <div className="w-10 h-10 bg-stone-900 rounded-xl flex items-center justify-center">
-              <Building2 size={20} className="text-stone-100" />
-            </div>
-            <span className="text-stone-900 font-medium tracking-wide text-lg">RealEstate AI OS</span>
-          </div>
-
-          <div className="mb-10">
-            <h2 className="text-3xl font-light text-stone-900 mb-3">
-              {mode === 'login' ? 'Welcome Back' : 'Create Account'}
-            </h2>
-            <p className="text-stone-500">
-              {mode === 'login'
-                ? 'Please enter your details to access your dashboard.'
-                : 'Sign up to start automating your real estate workflows.'}
-            </p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {mode === 'signup' && (
-              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                <label htmlFor="fullName" className="block text-sm font-medium text-stone-700 mb-2">Full Name</label>
-                <div className="relative">
-                  <Mail size={18} aria-hidden="true" className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 opacity-0" />
-                  <div aria-hidden="true" className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] border-2 border-stone-400 rounded-sm" />
-                  <input
-                    id="fullName"
-                    name="name"
-                    type="text"
-                    autoComplete="name"
-                    value={fullName}
-                    onChange={e => setFullName(e.target.value)}
-                    placeholder="e.g. Hong Gil-dong…"
-                    className="w-full pl-12 pr-4 py-3.5 bg-white border border-stone-200 rounded-xl text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-400 focus:border-transparent transition-colors"
-                    required={mode === 'signup'}
-                  />
-                </div>
-              </div>
-            )}
-
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-stone-700 mb-2">Email Address</label>
-              <div className="relative">
-                <Mail size={18} aria-hidden="true" className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  inputMode="email"
-                  autoComplete="email"
-                  spellCheck={false}
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="name@company.com"
-                  className="w-full pl-12 pr-4 py-3.5 bg-white border border-stone-200 rounded-xl text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-400 focus:border-transparent transition-colors"
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label htmlFor="password" className="block text-sm font-medium text-stone-700">Password</label>
-              </div>
-              <div className="relative">
-                <Lock size={18} aria-hidden="true" className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder={mode === 'login' ? 'Enter your password…' : 'Min 6 characters…'}
-                  className="w-full pl-12 pr-12 py-3.5 bg-white border border-stone-200 rounded-xl text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-400 focus:border-transparent transition-colors"
-                  required
-                  minLength={6}
-                />
-                <button
-                  type="button"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  aria-pressed={showPassword}
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
-                >
-                  {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
-                </button>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex items-center justify-center py-3.5 mt-4 bg-stone-900 hover:bg-stone-800 text-white rounded-xl font-medium transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {loading ? (
-                <><Loader2 size={18} aria-hidden="true" className="animate-spin mr-2" /> Processing…</>
-              ) : (
-                mode === 'login' ? 'Sign In' : 'Create Account'
-              )}
-            </button>
-          </form>
-
-          {mode === 'signup' && (
-            <div className="mt-6 flex flex-wrap gap-4">
-              {['No credit card required', '30-day free trial', 'Cancel anytime'].map(t => (
-                <div key={t} className="flex items-center gap-1.5 text-sm text-stone-500">
-                  <CheckCircle size={14} className="text-stone-400" />
-                  {t}
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="mt-10 pt-8 border-t border-stone-200">
-            <p className="text-center text-stone-500">
-              {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
-              <button
-                onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
-                className="font-semibold text-stone-900 hover:underline"
-              >
-                {mode === 'login' ? 'Create a free account' : 'Sign in here'}
-              </button>
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+    </section>
+  </main>
 }

@@ -3,198 +3,172 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ChevronLeft, ChevronRight, MapPin, Maximize2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, MapPin } from 'lucide-react'
 import { formatPrice, formatArea, getPropertyTypeLabel } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 
 interface PropertyCardProps {
-    id: string
-    address: string
-    price?: number
-    monthly_rent?: number
-    area?: number
-    floor?: number
-    total_floors?: number
-    property_type?: string
-    features?: string[]
-    status: string
-    cover_image_url?: string
-    images?: string[]
-    direction?: string
-    onHover?: (id: string | null) => void
-    isHighlighted?: boolean
+  id: string
+  address: string
+  price?: number
+  monthly_rent?: number
+  area?: number
+  floor?: number
+  total_floors?: number
+  property_type?: string
+  features?: string[]
+  status: string
+  cover_image_url?: string
+  images?: string[]
+  direction?: string
+  onHover?: (id: string | null) => void
+  isHighlighted?: boolean
 }
 
 export default function PropertyCard({
-    id,
-    address,
-    price,
-    monthly_rent,
-    area,
-    floor,
-    total_floors,
-    property_type,
-    features,
-    status,
-    cover_image_url,
-    images = [],
-    direction,
-    onHover,
-    isHighlighted = false,
+  id,
+  address,
+  price,
+  monthly_rent,
+  area,
+  floor,
+  total_floors,
+  property_type,
+  features,
+  status,
+  cover_image_url,
+  images = [],
+  direction,
+  onHover,
+  isHighlighted = false,
 }: PropertyCardProps) {
-    const [currentImage, setCurrentImage] = useState(0)
-    const allImages = cover_image_url
-        ? [cover_image_url, ...images.filter(img => img !== cover_image_url)]
-        : images
+  const [currentImage, setCurrentImage] = useState(0)
+  const allImages = cover_image_url
+    ? [cover_image_url, ...images.filter((image) => image !== cover_image_url)]
+    : images
+  const displayImages = allImages.length > 0 ? allImages : ['/images/default-property.png']
+  const hasMultipleImages = displayImages.length > 1
+  const href = `/projects/${id}`
 
-    const displayImages = allImages.length > 0 ? allImages : ['/images/default-property.png']
-    const hasMultipleImages = displayImages.length > 1
+  const nextImage = () => setCurrentImage((previous) => (previous + 1) % displayImages.length)
+  const previousImage = () =>
+    setCurrentImage((previous) => (previous - 1 + displayImages.length) % displayImages.length)
 
-    const nextImage = (e: React.MouseEvent) => {
-        e.preventDefault()
-        e.stopPropagation()
-        setCurrentImage(prev => (prev + 1) % displayImages.length)
-    }
-
-    const prevImage = (e: React.MouseEvent) => {
-        e.preventDefault()
-        e.stopPropagation()
-        setCurrentImage(prev => (prev - 1 + displayImages.length) % displayImages.length)
-    }
-
-    return (
-        <Link
-            href={`/projects/${id}`}
+  return (
+    <article
+      className={cn(
+        'group overflow-hidden rounded-xl border bg-white transition-all duration-200',
+        isHighlighted
+          ? 'border-brand-400 shadow-hover'
+          : 'border-slate-200 shadow-card hover:border-brand-300 hover:shadow-hover',
+      )}
+      onMouseEnter={() => onHover?.(id)}
+      onMouseLeave={() => onHover?.(null)}
+    >
+      <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
+        <Link href={href} aria-label={`${address || '매물'} 사진과 상세 정보 보기`} className="absolute inset-0">
+          <Image
+            src={displayImages[currentImage]}
+            alt={address || '매물 사진'}
+            fill
             className={cn(
-                'group block rounded-2xl bg-white border transition-all duration-300',
-                isHighlighted
-                    ? 'border-brand-400 shadow-lg shadow-brand-100 scale-[1.02]'
-                    : 'border-gray-100 shadow-sm hover:shadow-md hover:border-gray-200'
+              'object-cover transition-transform duration-500',
+              allImages.length > 0 ? 'group-hover:scale-[1.03]' : 'opacity-80',
             )}
-            onMouseEnter={() => onHover?.(id)}
-            onMouseLeave={() => onHover?.(null)}
-        >
-            {/* 이미지 영역 */}
-            <div className="relative aspect-[4/3] rounded-t-2xl overflow-hidden bg-gray-100">
-                <Image
-                    src={displayImages[currentImage]}
-                    alt={address || '매물 사진'}
-                    fill
-                    className={cn(
-                        "object-cover transition-transform duration-500",
-                        allImages.length > 0 ? "group-hover:scale-105" : "opacity-80"
-                    )}
-                    sizes="(max-width: 768px) 100vw, 300px"
-                />
-
-                {allImages.length === 0 && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/10">
-                        <span className="px-3 py-1.5 bg-white/90 text-gray-700 text-xs font-semibold rounded-full shadow-sm">
-                            대표사진 없음
-                        </span>
-                    </div>
-                )}
-
-                {/* 이미지 네비게이션 */}
-                {hasMultipleImages && (
-                    <>
-                        <button
-                            onClick={prevImage}
-                            className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/90 hover:bg-white flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                            <ChevronLeft size={14} className="text-gray-700" />
-                        </button>
-                        <button
-                            onClick={nextImage}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/90 hover:bg-white flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                            <ChevronRight size={14} className="text-gray-700" />
-                        </button>
-                        {/* 인디케이터 */}
-                        <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex gap-1">
-                            {displayImages.map((_, i) => (
-                                <span
-                                    key={i}
-                                    className={cn(
-                                        'w-1.5 h-1.5 rounded-full transition-colors',
-                                        i === currentImage ? 'bg-white' : 'bg-white/50'
-                                    )}
-                                />
-                            ))}
-                        </div>
-                    </>
-                )}
-
-                {/* 상태 배지 */}
-                {status === 'completed' && (
-                    <span className="absolute top-3 left-3 px-2.5 py-1 bg-emerald-500 text-white text-xs font-semibold rounded-full">
-                        완료
-                    </span>
-                )}
-                {status === 'draft' && (
-                    <span className="absolute top-3 left-3 px-2.5 py-1 bg-gray-700/80 text-white text-xs font-semibold rounded-full">
-                        작성중
-                    </span>
-                )}
-            </div>
-
-            {/* 카드 정보 */}
-            <div className="p-4">
-                {/* 가격 */}
-                <p className="text-lg font-bold text-gray-900">
-                    {price ? formatPrice(price) : '가격 미정'}
-                    {monthly_rent ? (
-                        <span className="text-sm font-medium text-gray-400 ml-1.5">/ 월 {monthly_rent.toLocaleString()}만</span>
-                    ) : null}
-                </p>
-
-                {/* 주소 */}
-                <div className="flex items-center gap-1 mt-1.5">
-                    <MapPin size={13} className="text-gray-400 flex-shrink-0" />
-                    <p className="text-sm text-gray-500 truncate">{address}</p>
-                </div>
-
-                {/* 스펙 */}
-                <div className="flex items-center gap-2 mt-2 text-xs text-gray-400">
-                    {property_type && (
-                        <span>{getPropertyTypeLabel(property_type)}</span>
-                    )}
-                    {area && (
-                        <>
-                            <span className="w-0.5 h-0.5 rounded-full bg-gray-300" />
-                            <span>{formatArea(area)}</span>
-                        </>
-                    )}
-                    {floor && (
-                        <>
-                            <span className="w-0.5 h-0.5 rounded-full bg-gray-300" />
-                            <span>{floor}층{total_floors ? `/${total_floors}층` : ''}</span>
-                        </>
-                    )}
-                    {direction && (
-                        <>
-                            <span className="w-0.5 h-0.5 rounded-full bg-gray-300" />
-                            <span>{direction}</span>
-                        </>
-                    )}
-                </div>
-
-                {/* 특징 태그 */}
-                {features && features.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-3">
-                        {features.slice(0, 3).map(f => (
-                            <span key={f} className="px-2 py-0.5 bg-brand-50 text-brand-600 text-[11px] font-medium rounded-md">
-                                {f}
-                            </span>
-                        ))}
-                        {features.length > 3 && (
-                            <span className="px-2 py-0.5 bg-gray-50 text-gray-400 text-[11px] font-medium rounded-md">
-                                +{features.length - 3}
-                            </span>
-                        )}
-                    </div>
-                )}
-            </div>
+            sizes="(max-width: 768px) 100vw, 300px"
+          />
         </Link>
-    )
+
+        {allImages.length === 0 && (
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/10">
+            <span className="rounded-md bg-white/95 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-card">
+              대표사진 없음
+            </span>
+          </div>
+        )}
+
+        {hasMultipleImages && (
+          <>
+            <button
+              type="button"
+              onClick={previousImage}
+              aria-label="이전 사진"
+              className="absolute left-2 top-1/2 z-10 grid size-11 -translate-y-1/2 place-items-center rounded-lg bg-white/95 text-slate-700 shadow-card transition-colors hover:bg-white focus:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+            >
+              <ChevronLeft size={17} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={nextImage}
+              aria-label="다음 사진"
+              className="absolute right-2 top-1/2 z-10 grid size-11 -translate-y-1/2 place-items-center rounded-lg bg-white/95 text-slate-700 shadow-card transition-colors hover:bg-white focus:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+            >
+              <ChevronRight size={17} aria-hidden="true" />
+            </button>
+            <div aria-hidden="true" className="absolute bottom-2.5 left-1/2 flex -translate-x-1/2 gap-1">
+              {displayImages.map((_, index) => (
+                <span
+                  key={index}
+                  className={cn(
+                    'size-1.5 rounded-full transition-colors',
+                    index === currentImage ? 'bg-white' : 'bg-white/50',
+                  )}
+                />
+              ))}
+            </div>
+          </>
+        )}
+
+        {status === 'completed' && (
+          <span className="absolute left-3 top-3 rounded-md bg-emerald-700 px-2 py-1 text-xs font-semibold text-white">
+            완료
+          </span>
+        )}
+        {status === 'draft' && (
+          <span className="absolute left-3 top-3 rounded-md bg-slate-800/90 px-2 py-1 text-xs font-semibold text-white">
+            작성 중
+          </span>
+        )}
+      </div>
+
+      <div className="p-4">
+        <Link href={href} className="block rounded-sm focus-visible:outline-none">
+          <h3 className="text-lg font-bold tracking-[-0.03em] text-slate-950">
+            {price ? formatPrice(price) : '가격 미정'}
+            {monthly_rent ? (
+              <span className="ml-1.5 text-sm font-medium text-slate-600">
+                / 월 {monthly_rent.toLocaleString()}만
+              </span>
+            ) : null}
+          </h3>
+          <span className="mt-1.5 flex items-center gap-1 text-sm text-slate-600">
+            <MapPin size={13} aria-hidden="true" className="shrink-0 text-slate-500" />
+            <span className="truncate">{address}</span>
+          </span>
+        </Link>
+
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-600">
+          {property_type && <span>{getPropertyTypeLabel(property_type)}</span>}
+          {area && <span>· {formatArea(area)}</span>}
+          {floor && <span>· {floor}층{total_floors ? `/${total_floors}층` : ''}</span>}
+          {direction && <span>· {direction}</span>}
+        </div>
+
+        {features && features.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1">
+            {features.slice(0, 3).map((feature) => (
+              <span key={feature} className="rounded-md bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-800">
+                {feature}
+              </span>
+            ))}
+            {features.length > 3 && (
+              <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                +{features.length - 3}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    </article>
+  )
 }
