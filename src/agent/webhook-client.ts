@@ -24,8 +24,21 @@ async function sendWebhook(config: AgentConfig, payload: Record<string, unknown>
                 continue;
             }
 
-            return await res.json();
+            const responseBody = await res.json().catch(() => ({})) as Record<string, unknown>;
+            if (!res.ok) {
+                const message = typeof responseBody.error === 'string'
+                    ? responseBody.error
+                    : `웹훅 요청 실패 (${res.status})`;
+                throw new Error(`[HTTP_${res.status}] ${message}`);
+            }
+            if (typeof responseBody.error === 'string') {
+                throw new Error(responseBody.error);
+            }
+            return responseBody;
         } catch (err: any) {
+            if (typeof err?.message === 'string' && err.message.startsWith('[HTTP_4')) {
+                throw err;
+            }
             if (attempt < MAX_RETRIES) {
                 console.warn(`[Webhook] 네트워크 오류, ${attempt + 1}차 재시도: ${err.message}`);
                 await sleep(BACKOFF_MS[attempt]);

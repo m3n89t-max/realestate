@@ -5,6 +5,7 @@ import { RefreshCw, AlertCircle, CheckCircle, Clock, XCircle, Loader2 } from 'lu
 import StatusBadge from '@/components/ui/StatusBadge'
 import { formatRelativeTime } from '@/lib/utils'
 import type { TaskType } from '@/lib/types'
+import { redirect } from 'next/navigation'
 
 const TASK_TYPE_LABELS: Record<TaskType, string> = {
   naver_upload: '네이버 업로드',
@@ -26,6 +27,7 @@ const ERROR_GUIDES: Record<string, string> = {
 export default async function TasksPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
   const { data: membership } = await supabase
     .from('memberships')
@@ -42,7 +44,7 @@ export default async function TasksPage() {
     .order('created_at', { ascending: false })
     .limit(100)
 
-  const pendingCount = (tasks ?? []).filter(t => ['pending', 'running', 'retrying'].includes(t.status)).length
+  const pendingCount = (tasks ?? []).filter(t => ['queued', 'running', 'retrying'].includes(t.status)).length
   const failedCount = (tasks ?? []).filter(t => t.status === 'failed').length
 
   const StatusIcon = ({ status }: { status: string }) => {
@@ -50,7 +52,7 @@ export default async function TasksPage() {
       case 'success': return <CheckCircle size={16} className="text-green-500" />
       case 'failed': return <XCircle size={16} className="text-red-500" />
       case 'running': return <Loader2 size={16} className="text-blue-500 animate-spin" />
-      case 'pending': return <Clock size={16} className="text-yellow-500" />
+      case 'queued': return <Clock size={16} className="text-yellow-500" />
       case 'retrying': return <RefreshCw size={16} className="text-orange-500" />
       default: return <Clock size={16} className="text-gray-400" />
     }

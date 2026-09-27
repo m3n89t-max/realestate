@@ -88,7 +88,8 @@ Deno.serve(async (req) => {
   let task_id: string | null = null
 
   const authHeader = req.headers.get('Authorization') ?? ''
-  const isServiceRole = authHeader.includes(Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? 'never-match')
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  const isServiceRole = serviceRoleKey.length > 0 && authHeader === `Bearer ${serviceRoleKey}`
 
   const supabaseClient = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
@@ -114,20 +115,38 @@ Deno.serve(async (req) => {
     }
 
     if (!project_id) throw new Error('project_id가 필요합니다')
+    if (isServiceRole && (!orgId || !task_id)) {
+      throw new Error('서비스 역할 요청에는 task_id와 org_id가 필요합니다')
+    }
 
     if (task_id) {
-      await supabaseClient.from('tasks')
+      const { data: startedTask, error: taskError } = await supabaseClient.from('tasks')
         .update({ status: 'running', started_at: new Date().toISOString() })
         .eq('id', task_id)
+        .eq('org_id', orgId!)
+        .eq('project_id', project_id)
+        .eq('type', 'location_analyze')
+        .in('status', ['queued', 'retrying'])
+        .select('id')
+        .maybeSingle()
+      if (taskError || !startedTask) throw new Error('유효한 입지분석 작업을 찾을 수 없습니다')
+    }
+
+    let projectQuery = supabaseClient.from('projects').select('*').eq('id', project_id)
+    let photoQuery = supabaseClient.from('assets').select('id', { count: 'exact', head: true }).eq('project_id', project_id)
+    if (orgId) {
+      projectQuery = projectQuery.eq('org_id', orgId)
+      photoQuery = photoQuery.eq('org_id', orgId)
     }
 
     const [{ data: project }, { count: photoCount }] = await Promise.all([
-      supabaseClient.from('projects').select('*').eq('id', project_id).single(),
-      supabaseClient.from('assets').select('id', { count: 'exact', head: true }).eq('project_id', project_id),
+      projectQuery.single(),
+      photoQuery,
     ])
     if (!project) throw new Error('프로젝트를 찾을 수 없습니다')
 
     if (!orgId) orgId = project.org_id
+    if (project.org_id !== orgId) throw new Error('프로젝트 조직이 작업 조직과 일치하지 않습니다')
 
     let lat = project.lat
     let lng = project.lng
@@ -144,7 +163,7 @@ Deno.serve(async (req) => {
         if (geoData.documents?.length > 0) {
           lat = parseFloat(geoData.documents[0].y)
           lng = parseFloat(geoData.documents[0].x)
-          await supabaseClient.from('projects').update({ lat, lng }).eq('id', project_id)
+          await supabaseClient.from('projects').update({ lat, lng }).eq('id', project_id).eq('org_id', orgId)
         }
       }
     }
@@ -185,7 +204,7 @@ Deno.serve(async (req) => {
         )
         if (Object.keys(collected).length > 0) {
           poi_data = collected
-          await supabaseClient.from('projects').update({ poi_data }).eq('id', project_id)
+          await supabaseClient.from('projects').update({ poi_data }).eq('id', project_id).eq('org_id', orgId)
           console.log('[analyze-location] POI 수집 완료:', Object.keys(collected).length, '카테고리')
         }
       }
@@ -434,7 +453,7 @@ ${analysisInstructions}
         status:       'success',
         result:       analysis,
         completed_at: new Date().toISOString(),
-      }).eq('id', task_id)
+      }).eq('id', task_id).eq('org_id', orgId).eq('project_id', project_id)
     }
 
     if (orgId) {
@@ -454,9 +473,7 @@ ${analysisInstructions}
     const message = error instanceof Error ? error.message : '입지 분석에 실패했습니다'
 
     try {
-      const body = await req.clone().json()
-      const tid = body.record?.id || body.task_id
-      if (tid) {
+      if (task_id && orgId) {
         const adminClient = createClient(
           Deno.env.get('SUPABASE_URL') ?? '',
           Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -465,7 +482,7 @@ ${analysisInstructions}
           status:        'failed',
           error_message: message,
           completed_at:  new Date().toISOString(),
-        }).eq('id', tid)
+        }).eq('id', task_id).eq('org_id', orgId)
       }
     } catch { /* ignore */ }
 

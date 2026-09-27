@@ -44,7 +44,6 @@ const AGENT_TASK_TYPES = [
     'upload_instagram',
     'poi_analysis',
     'location_analysis',
-    'location_analyze',
     'commercial_analysis',
     'blog_generation',
     'cardnews_generation',
@@ -306,17 +305,26 @@ class LocalAgent {
     private async handleNewTask(task: any) {
         // 에이전트 담당 타입인지 확인
         if (!AGENT_TASK_TYPES.includes(task.type)) return;
-        if (task.status !== 'pending' && task.status !== 'retrying') return;
+        if (task.status !== 'queued' && task.status !== 'retrying') return;
         if (this.isProcessing) return; // 현재 작업 중이면 스킵
 
+        // Realtime과 폴링이 동시에 들어와도 claim을 하나만 수행한다.
+        this.isProcessing = true;
+
         // Optimistic Lock — 다른 에이전트가 먼저 claim 하면 실패
-        const claimed = await this.claimTask(task.id);
+        let claimed = false;
+        try {
+            claimed = await this.claimTask(task.id);
+        } catch (error) {
+            this.isProcessing = false;
+            throw error;
+        }
         if (!claimed) {
+            this.isProcessing = false;
             console.log(`[Agent] 작업 ${task.id} claim 실패 (이미 다른 에이전트가 처리 중)`);
             return;
         }
 
-        this.isProcessing = true;
         console.log(`[Agent] 📋 작업 시작: ${task.type} (${task.id})`);
 
         try {
@@ -454,7 +462,7 @@ class LocalAgent {
                 started_at: new Date().toISOString(),
             })
             .eq('id', taskId)
-            .in('status', ['pending', 'retrying'])
+            .in('status', ['queued', 'retrying'])
             .select();
         if (error || !data || data.length === 0) return false;
         return true;

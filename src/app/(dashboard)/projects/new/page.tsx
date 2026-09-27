@@ -299,15 +299,28 @@ export default function NewProjectPage() {
     if (!projectId) return
     setSubmitting(true)
     try {
-      await supabase.from('projects').update({ status: 'active' }).eq('id', projectId)
-      toast('AI 입지 분석 중... 잠시 기다려주세요', { duration: 8000 })
+      const { error: updateError } = await supabase
+        .from('projects')
+        .update({ status: 'active' })
+        .eq('id', projectId)
+      if (updateError) throw updateError
+
+      toast('입지 데이터를 준비하고 있습니다', { duration: 5000 })
       const { error: analyzeErr } = await supabase.functions.invoke('analyze-location', {
         body: { project_id: projectId },
       })
-      if (analyzeErr) console.warn('[analyze-location]', analyzeErr)
-      toast.success('매물 등록 완료!')
-      router.push(`/projects/${projectId}`)
-    } catch { toast.error('완료 처리 실패') } finally { setSubmitting(false) }
+      if (analyzeErr) {
+        toast.error('매물은 등록됐지만 AI 분석은 시작하지 못했습니다. 입지분석 탭에서 다시 실행해주세요.', { duration: 8000 })
+      } else {
+        toast.success('매물 등록과 입지분석 요청이 완료되었습니다')
+      }
+      router.push(`/projects/${projectId}?tab=analysis`)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '완료 처리 실패'
+      toast.error(`완료 처리 실패: ${message}`)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const handleUpload = async (files: File[]) => {

@@ -34,15 +34,8 @@ INSERT INTO organizations (id, name, phone, plan_type, monthly_project_limit)
 VALUES ('b0000000-0000-0000-0000-000000000001', '테스트 부동산', '02-1234-5678', 'pro', 100)
 ON CONFLICT (id) DO NOTHING;
 
--- 테스트 에이전트
-INSERT INTO agent_connections (id, org_id, agent_key, name, platform, version, status)
-VALUES (
-    'c0000000-0000-0000-0000-000000000001',
-    'b0000000-0000-0000-0000-000000000001',
-    'test-agent-key-dev-only',
-    '개발 테스트 에이전트', 'windows', '1.0.0', 'offline'
-)
-ON CONFLICT (id) DO NOTHING;
+-- 에이전트 키는 migration에 고정값으로 저장하지 않습니다.
+-- 개발 환경에서도 Settings 화면의 generate_agent_key RPC로 개별 발급합니다.
 
 -- 테스트 프로젝트
 INSERT INTO projects (

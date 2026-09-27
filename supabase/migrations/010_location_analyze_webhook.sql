@@ -9,7 +9,7 @@ CREATE OR REPLACE FUNCTION public.trg_on_location_analyze_task()
 RETURNS TRIGGER AS $$
 BEGIN
   -- location_analyze 유형의 작업이 'pending' 상태로 들어올 때만 실행
-  IF NEW.type = 'location_analyze' AND NEW.status = 'pending' THEN
+  IF NEW.type = 'location_analyze' AND NEW.status = 'queued' THEN
     PERFORM
       extensions.http_post(
         url := current_setting('app.settings.supabase_url') || '/functions/v1/analyze-location',

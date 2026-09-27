@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { handleCors, corsHeaders } from '../_shared/cors.ts'
+import { getAuthenticatedUser } from '../_shared/auth.ts'
 
 /**
  * 지적도 다운로드 Edge Function
@@ -14,6 +15,7 @@ Deno.serve(async (req) => {
   if (corsResponse) return corsResponse
 
   try {
+    const { supabaseClient } = await getAuthenticatedUser(req)
     const body = await req.json()
     const task       = body.record ?? body
     const task_id    = task.id
@@ -31,7 +33,7 @@ Deno.serve(async (req) => {
     )
 
     // 프로젝트 좌표 조회
-    const { data: project } = await adminClient
+    const { data: project } = await supabaseClient
       .from('projects')
       .select('lat, lng, address, org_id')
       .eq('id', project_id)
@@ -47,7 +49,7 @@ Deno.serve(async (req) => {
       await adminClient.from('tasks').update({
         status: 'running',
         started_at: new Date().toISOString(),
-      }).eq('id', task_id)
+      }).eq('id', task_id).eq('org_id', project.org_id)
     }
 
     // ── BBox 계산 (중심 좌표 기준 ±반경) ──────────────────────
@@ -154,7 +156,7 @@ Deno.serve(async (req) => {
         status: 'success',
         result: { maps: savedDocs },
         completed_at: new Date().toISOString(),
-      }).eq('id', task_id)
+      }).eq('id', task_id).eq('org_id', project.org_id)
     }
 
     return new Response(JSON.stringify({ success: true, maps: savedDocs }), {

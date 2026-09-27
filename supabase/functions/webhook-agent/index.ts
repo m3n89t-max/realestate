@@ -26,6 +26,28 @@ Deno.serve(async (req) => {
 
     if (agentError || !agent) throw new Error('유효하지 않은 에이전트 키입니다')
 
+    const requireOwnedTask = async (taskId: string) => {
+      const { data: task, error } = await adminClient
+        .from('tasks')
+        .select('id, type, project_id, retry_count, max_retries')
+        .eq('id', taskId)
+        .eq('org_id', agent.org_id)
+        .maybeSingle()
+      if (error || !task) throw new Error('작업을 찾을 수 없습니다')
+      return task
+    }
+
+    const requireOwnedProject = async (projectId: string) => {
+      const { data: project, error } = await adminClient
+        .from('projects')
+        .select('id, org_id')
+        .eq('id', projectId)
+        .eq('org_id', agent.org_id)
+        .maybeSingle()
+      if (error || !project) throw new Error('프로젝트를 찾을 수 없습니다')
+      return project
+    }
+
     switch (event) {
       case 'heartbeat': {
         // 에이전트 상태 업데이트 + org_id 반환 (직접 UPDATE)
@@ -51,11 +73,11 @@ Deno.serve(async (req) => {
       }
 
       case 'task_started': {
-        // 작업 시작
         const { task_id } = data
         if (!task_id) throw new Error('task_id가 필요합니다')
+        await requireOwnedTask(task_id)
 
-        await adminClient
+        const { error: updateError } = await adminClient
           .from('tasks')
           .update({
             status: 'running',
@@ -63,55 +85,67 @@ Deno.serve(async (req) => {
             started_at: new Date().toISOString(),
           })
           .eq('id', task_id)
+          .eq('org_id', agent.org_id)
+        if (updateError) throw updateError
 
-        await adminClient.from('task_logs').insert({
+        const { error: logError } = await adminClient.from('task_logs').insert({
           task_id,
           level: 'info',
           message: `에이전트 ${agent.id}가 작업을 시작했습니다`,
         })
+        if (logError) throw logError
         break
       }
 
       case 'task_progress': {
-        // 작업 진행 로그
-        const { task_id, message, level = 'info' } = data
+        const { task_id, message, level = 'info', progress_pct } = data
         if (!task_id) throw new Error('task_id가 필요합니다')
+        await requireOwnedTask(task_id)
 
-        await adminClient.from('task_logs').insert({
+        if (typeof progress_pct === 'number') {
+          const boundedProgress = Math.max(0, Math.min(100, Math.round(progress_pct)))
+          const { error: progressError } = await adminClient
+            .from('tasks')
+            .update({ progress_pct: boundedProgress })
+            .eq('id', task_id)
+            .eq('org_id', agent.org_id)
+          if (progressError) throw progressError
+        }
+
+        const { error: logError } = await adminClient.from('task_logs').insert({
           task_id,
           level,
           message,
         })
+        if (logError) throw logError
         break
       }
 
       case 'task_completed': {
-        // 작업 완료
         const { task_id, result } = data
         if (!task_id) throw new Error('task_id가 필요합니다')
+        const task = await requireOwnedTask(task_id)
 
-        await adminClient
+        const { error: updateError } = await adminClient
           .from('tasks')
           .update({
             status: 'success',
             result,
+            progress_pct: 100,
             completed_at: new Date().toISOString(),
           })
           .eq('id', task_id)
+          .eq('org_id', agent.org_id)
+        if (updateError) throw updateError
 
-        await adminClient.from('task_logs').insert({
+        const { error: logError } = await adminClient.from('task_logs').insert({
           task_id,
           level: 'info',
           message: '작업이 성공적으로 완료되었습니다',
         })
+        if (logError) throw logError
 
         // 서류 수집 완료 시 AI 분석 자동 트리거
-        const { data: task } = await adminClient
-          .from('tasks')
-          .select('type, project_id')
-          .eq('id', task_id)
-          .single()
-
         if (task?.type === 'building_register' && result?.document_id) {
           // analyze-document Edge Function 비동기 호출
           const supabaseUrl = Deno.env.get('SUPABASE_URL')
@@ -146,66 +180,80 @@ Deno.serve(async (req) => {
       }
 
       case 'task_failed': {
-        // 작업 실패
         const { task_id, error_code, error_message, retry } = data
         if (!task_id) throw new Error('task_id가 필요합니다')
+        const task = await requireOwnedTask(task_id)
 
-        const { data: task } = await adminClient
-          .from('tasks')
-          .select('retry_count, max_retries')
-          .eq('id', task_id)
-          .single()
+        const shouldRetry = retry && task.retry_count < task.max_retries
 
-        const shouldRetry = retry && task && task.retry_count < task.max_retries
-
-        await adminClient
+        const { error: updateError } = await adminClient
           .from('tasks')
           .update({
             status: shouldRetry ? 'retrying' : 'failed',
             error_code,
             error_message,
-            retry_count: (task?.retry_count ?? 0) + 1,
+            retry_count: (task.retry_count ?? 0) + 1,
             completed_at: shouldRetry ? null : new Date().toISOString(),
             scheduled_at: shouldRetry
-              ? new Date(Date.now() + 60000).toISOString() // 1분 후 재시도
+              ? new Date(Date.now() + 60000).toISOString()
               : undefined,
           })
           .eq('id', task_id)
+          .eq('org_id', agent.org_id)
+        if (updateError) throw updateError
 
-        await adminClient.from('task_logs').insert({
+        const { error: logError } = await adminClient.from('task_logs').insert({
           task_id,
           level: 'error',
           message: `[${error_code}] ${error_message}`,
         })
+        if (logError) throw logError
         break
       }
 
       case 'document_uploaded': {
-        // 에이전트가 문서를 Supabase Storage에 업로드 완료
         const { project_id, document_type, file_url, file_name, raw_text } = data
+        if (!project_id) throw new Error('project_id가 필요합니다')
+        const project = await requireOwnedProject(project_id)
 
-        const { data: project } = await adminClient
-          .from('projects')
-          .select('org_id')
-          .eq('id', project_id)
-          .single()
-
-        await adminClient.from('documents').insert({
+        const { error: insertError } = await adminClient.from('documents').insert({
           project_id,
-          org_id: project?.org_id,
+          org_id: project.org_id,
           type: document_type,
           file_url,
           file_name,
           raw_text,
         })
+        if (insertError) throw insertError
         break
       }
 
       case 'update_content': {
-        // 에이전트가 콘텐츠 상태 업데이트 (발행 완료 등)
         const { content_id: ucId, updates } = data
         if (!ucId) throw new Error('content_id가 필요합니다')
-        await adminClient.from('generated_contents').update(updates).eq('id', ucId)
+        if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
+          throw new Error('updates 객체가 필요합니다')
+        }
+
+        const allowedUpdates: Record<string, boolean | string> = {}
+        if (typeof updates.is_published === 'boolean') {
+          allowedUpdates.is_published = updates.is_published
+        }
+        if (typeof updates.published_url === 'string') {
+          if (updates.published_url.length > 2048) throw new Error('published_url이 너무 깁니다')
+          allowedUpdates.published_url = updates.published_url
+        }
+        if (Object.keys(allowedUpdates).length === 0) {
+          throw new Error('수정 가능한 콘텐츠 필드가 없습니다')
+        }
+
+        const { data: updated, error } = await adminClient
+          .from('generated_contents')
+          .update(allowedUpdates)
+          .eq('id', ucId)
+          .eq('org_id', agent.org_id)
+          .select('id')
+        if (error || !updated?.length) throw new Error('콘텐츠를 찾을 수 없습니다')
         break
       }
 
@@ -217,6 +265,7 @@ Deno.serve(async (req) => {
           .from('generated_contents')
           .select('id, title, content, tags')
           .eq('id', content_id)
+          .eq('org_id', agent.org_id)
           .single()
         if (error || !content) throw new Error(`콘텐츠를 찾을 수 없습니다: ${content_id}`)
         return new Response(JSON.stringify({ success: true, content }), {
@@ -228,28 +277,31 @@ Deno.serve(async (req) => {
         // 에이전트가 에셋 조회 (서비스 롤로 RLS 우회)
         const { project_id: assetProjectId } = data
         if (!assetProjectId) throw new Error('project_id가 필요합니다')
-        const { data: assets } = await adminClient
+        await requireOwnedProject(assetProjectId)
+        const { data: assets, error } = await adminClient
           .from('assets')
           .select('file_url, type, is_cover, sort_order')
           .eq('project_id', assetProjectId)
+          .eq('org_id', agent.org_id)
           .eq('type', 'image')
           .order('sort_order', { ascending: true })
           .limit(5)
+        if (error) throw error
         return new Response(JSON.stringify({ success: true, assets: assets ?? [] }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
 
       case 'get_pending_tasks': {
-        // 에이전트가 폴링으로 대기 작업 조회 (서비스 롤로 RLS 우회)
-        const { data: tasks } = await adminClient
+        const { data: tasks, error } = await adminClient
           .from('tasks')
           .select('*')
-          .in('status', ['pending', 'retrying'])
+          .in('status', ['queued', 'retrying'])
           .lte('scheduled_at', new Date().toISOString())
           .eq('org_id', agent.org_id)
           .order('scheduled_at', { ascending: true })
           .limit(10)
+        if (error) throw error
         return new Response(JSON.stringify({ success: true, tasks: tasks ?? [] }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
@@ -268,10 +320,10 @@ Deno.serve(async (req) => {
       }
 
       case 'claim_task': {
-        // 작업 claim (Optimistic Lock — 서비스 롤로 RLS 우회)
         const { task_id } = data
         if (!task_id) throw new Error('task_id가 필요합니다')
-        const { data: claimed } = await adminClient
+        await requireOwnedTask(task_id)
+        const { data: claimed, error } = await adminClient
           .from('tasks')
           .update({
             status: 'running',
@@ -279,8 +331,10 @@ Deno.serve(async (req) => {
             started_at: new Date().toISOString(),
           })
           .eq('id', task_id)
-          .in('status', ['pending', 'retrying'])
+          .eq('org_id', agent.org_id)
+          .in('status', ['queued', 'retrying'])
           .select()
+        if (error) throw error
         return new Response(JSON.stringify({ success: true, claimed: (claimed?.length ?? 0) > 0 }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })

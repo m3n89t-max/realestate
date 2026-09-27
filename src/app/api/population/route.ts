@@ -11,6 +11,16 @@ export async function POST(req: NextRequest) {
     if (!project_id) return NextResponse.json({ error: 'project_id가 필요합니다' }, { status: 400 })
 
     const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 })
+
+    const { data: project } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('id', project_id)
+      .single()
+    if (!project) return NextResponse.json({ error: '프로젝트를 찾을 수 없습니다' }, { status: 404 })
+
     const { error, data } = await supabase.functions.invoke('collect-population', {
       body: { project_id },
     })

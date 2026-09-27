@@ -592,6 +592,7 @@ function MapSection({
   card_data?: any
 }) {
   const [loading, setLoading] = useState(false)
+  const [popLoading, setPopLoading] = useState(false)
   const supabase = createClient()
 
   const geocode = async () => {
@@ -622,8 +623,6 @@ function MapSection({
   )
 
   const hasCardFp = !!(card_data?.has_data && card_data?.floating_population?.weekday)
-
-  const [popLoading, setPopLoading] = useState(false)
 
   const analyzePopulation = async () => {
     if (!lat || !lng) { toast.error('좌표가 없습니다'); return }

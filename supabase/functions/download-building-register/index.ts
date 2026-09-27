@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { handleCors } from '../_shared/cors.ts'
 import { corsHeaders } from '../_shared/cors.ts'
+import { getAuthenticatedUser } from '../_shared/auth.ts'
 
 /**
  * 건축물대장 다운로드 Edge Function
@@ -14,6 +15,7 @@ Deno.serve(async (req) => {
   if (corsResponse) return corsResponse
 
   try {
+    const { supabaseClient } = await getAuthenticatedUser(req)
     const body = await req.json()
 
     // Webhook payload 또는 직접 호출 지원
@@ -24,6 +26,13 @@ Deno.serve(async (req) => {
     const project_id = payload.project_id ?? task.project_id
 
     if (!project_id) throw new Error('project_id가 없습니다')
+
+    const { data: ownedProject, error: projectError } = await supabaseClient
+      .from('projects')
+      .select('org_id, sigungu_code, bjdong_code, bun, ji')
+      .eq('id', project_id)
+      .single()
+    if (projectError || !ownedProject) throw new Error('프로젝트를 찾을 수 없습니다')
 
     const apiKey = Deno.env.get('BUILDING_API_KEY')
     if (!apiKey) throw new Error('BUILDING_API_KEY 환경변수가 설정되지 않았습니다')
@@ -40,15 +49,10 @@ Deno.serve(async (req) => {
     let ji           = payload.ji  ?? ''
 
     if (!sigungu_code || !bjdong_code) {
-      const { data: projData } = await adminClient
-        .from('projects')
-        .select('sigungu_code, bjdong_code, bun, ji')
-        .eq('id', project_id)
-        .single()
-      sigungu_code = projData?.sigungu_code ?? ''
-      bjdong_code  = projData?.bjdong_code  ?? ''
-      bun          = bun || projData?.bun || '0'
-      ji           = ji  || projData?.ji  || '0'
+      sigungu_code = ownedProject.sigungu_code ?? ''
+      bjdong_code  = ownedProject.bjdong_code  ?? ''
+      bun          = bun || ownedProject.bun || '0'
+      ji           = ji  || ownedProject.ji  || '0'
     }
 
     bun = (bun || '0').padStart(4, '0')
@@ -62,7 +66,7 @@ Deno.serve(async (req) => {
       await adminClient.from('tasks').update({
         status: 'running',
         started_at: new Date().toISOString(),
-      }).eq('id', task_id)
+      }).eq('id', task_id).eq('org_id', ownedProject.org_id)
     }
 
     // ── 건축HUB API 호출 ──────────────────────────────────────
@@ -96,17 +100,11 @@ Deno.serve(async (req) => {
     if (expRes) results.exclusive = expRes
 
     // ── documents 테이블에 저장 ───────────────────────────────
-    const { data: projectData } = await adminClient
-      .from('projects')
-      .select('org_id')
-      .eq('id', project_id)
-      .single()
-
     let docId: string | null = null
-    if (projectData) {
+    if (ownedProject) {
       const { data: savedDoc } = await adminClient.from('documents').upsert({
         project_id,
-        org_id:    projectData.org_id,
+        org_id:    ownedProject.org_id,
         type:      'building_register',
         status:    'completed',
         raw_data:  results,
@@ -141,7 +139,7 @@ Deno.serve(async (req) => {
         status:       'success',
         result:       { api_data: results, doc_id: docId },
         completed_at: new Date().toISOString(),
-      }).eq('id', task_id)
+      }).eq('id', task_id).eq('org_id', ownedProject.org_id)
     }
 
     return new Response(JSON.stringify({ success: true, data: results, doc_id: docId }), {

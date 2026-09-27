@@ -7,12 +7,14 @@ import {
   ChevronRight
 } from 'lucide-react'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import StatusBadge from '@/components/ui/StatusBadge'
 import { formatRelativeTime, getPropertyTypeLabel, formatPrice } from '@/lib/utils'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
   const { data: membership } = await supabase
     .from('memberships')
@@ -29,7 +31,7 @@ export default async function DashboardPage() {
       .order('created_at', { ascending: false }).limit(8),
     supabase.rpc('get_org_usage', { p_org_id: orgId }).single(),
     supabase.from('tasks').select('status').eq('org_id', orgId)
-      .in('status', ['pending', 'running', 'retrying']),
+      .in('status', ['queued', 'running', 'retrying']),
     supabase.from('agent_connections').select('status, last_seen_at').eq('org_id', orgId).limit(1).single(),
     supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('status', 'success'),
   ])

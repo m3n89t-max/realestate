@@ -1,4 +1,6 @@
-const SID = 'd6bb74ee9073410eafce', SK = '9158f4b394394cafb07f';
+const SID = process.env.SGIS_CONSUMER_KEY;
+const SK = process.env.SGIS_CONSUMER_SECRET;
+if (!SID || !SK) throw new Error('SGIS_CONSUMER_KEY와 SGIS_CONSUMER_SECRET 환경변수가 필요합니다');
 const token = (await fetch(`https://sgisapi.kostat.go.kr/OpenAPI3/auth/authentication.json?consumer_key=${SID}&consumer_secret=${SK}`).then(r=>r.json())).result.accessToken;
 
 // 병점역 UTM-K 좌표 (이전 테스트에서 확인)
