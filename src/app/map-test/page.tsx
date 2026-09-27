@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-const KAKAO_API_KEY = '65a3b218190f7f33bbe1b37f75ede543'
+const KAKAO_API_KEY = process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY
 
 const SAMPLE_MARKERS = [
     { id: '1', lat: 37.5665, lng: 126.978, label: '서울 시청', price: '8억 5,000만' },
@@ -20,6 +20,12 @@ export default function KakaoMapTestPage() {
     const [errorMsg, setErrorMsg] = useState('')
 
     useEffect(() => {
+        if (!KAKAO_API_KEY) {
+            setStatus('error')
+            setErrorMsg('NEXT_PUBLIC_KAKAO_MAP_API_KEY 환경변수가 설정되지 않았습니다')
+            return
+        }
+
         // 이미 로드 됐으면
         if (typeof window !== 'undefined' && (window as any).kakao?.maps) {
             initMap()
@@ -98,7 +104,7 @@ export default function KakaoMapTestPage() {
         <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto', fontFamily: 'sans-serif' }}>
             <h1 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>카카오맵 통합 테스트</h1>
             <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>
-                API Key: {KAKAO_API_KEY.substring(0, 8)}... | 도메인: {typeof window !== 'undefined' ? window.location.hostname : ''}
+                API Key: {KAKAO_API_KEY ? '환경변수 설정됨' : '미설정'} | 도메인: {typeof window !== 'undefined' ? window.location.hostname : ''}
             </p>
 
             <div style={{

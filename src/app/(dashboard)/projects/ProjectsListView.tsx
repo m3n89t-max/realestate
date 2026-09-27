@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
-    Search, Plus, SlidersHorizontal, ArrowUpDown, MapIcon, List, X
+    Search, Plus, ArrowUpDown, MapIcon, List, X
 } from 'lucide-react'
 import PropertyCard from '@/components/projects/PropertyCard'
 import ProjectsMap from '@/components/projects/ProjectsMap'
@@ -103,9 +103,14 @@ export default function ProjectsListView({ projects, searchParams }: ProjectsLis
             : '최신순'
 
     return (
-        <div className="px-4 lg:px-6 py-5">
+        <div className="space-y-5">
+            <div className="flex flex-col gap-3 border-b border-slate-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
+                <div><h2 className="text-2xl font-bold tracking-[-0.035em] text-slate-950">매물 관리</h2><p className="mt-1 text-sm text-slate-500">매물 정보와 콘텐츠 제작 상태를 관리합니다.</p></div>
+                <Link href="/projects/new" className="btn-primary"><Plus size={16} />새 매물 등록</Link>
+            </div>
             {/* ────────── 검색 & 필터 바 ────────── */}
-            <div className="flex flex-col md:flex-row items-start md:items-center gap-3 mb-5">
+            <div className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4">
+            <div className="flex flex-col md:flex-row items-start md:items-center gap-3">
                 {/* 검색 */}
                 <form onSubmit={handleSearch} className="relative w-full md:w-72 flex-shrink-0">
                     <Search size={16} aria-hidden="true" className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -115,24 +120,24 @@ export default function ProjectsListView({ projects, searchParams }: ProjectsLis
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                         placeholder="주소로 검색…"
-                        className="w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl
-                       placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent
+                        className="w-full min-h-11 rounded-lg border border-slate-300 bg-white py-2 pl-10 pr-4 text-sm
+                       placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500
                        transition-colors duration-200"
                     />
                 </form>
 
                 {/* 필터 pills */}
-                <div className="flex items-center gap-2 flex-wrap flex-1">
+                <div className="flex w-full items-center gap-2 overflow-x-auto pb-1 md:w-auto md:flex-1 md:flex-wrap md:overflow-visible">
                     {/* 상태 필터 */}
                     {STATUS_FILTERS.map(f => (
                         <button
                             key={f.value}
                             onClick={() => updateFilter('status', f.value)}
                             className={cn(
-                                'px-3.5 py-2 rounded-xl text-sm font-medium border transition-all duration-200',
+                                'min-h-10 shrink-0 rounded-lg border px-3 py-2 text-sm font-medium transition-colors',
                                 (searchParams.status === f.value || (!searchParams.status && f.value === ''))
-                                    ? 'bg-gray-900 text-white border-gray-900'
-                                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                    ? 'border-slate-900 bg-slate-900 text-white'
+                                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
                             )}
                         >
                             {f.label}
@@ -148,10 +153,10 @@ export default function ProjectsListView({ projects, searchParams }: ProjectsLis
                             key={f.value}
                             onClick={() => updateFilter('type', searchParams.type === f.value ? '' : f.value)}
                             className={cn(
-                                'px-3.5 py-2 rounded-xl text-sm font-medium border transition-all duration-200',
+                                'min-h-10 shrink-0 rounded-lg border px-3 text-sm font-medium transition-colors',
                                 searchParams.type === f.value
-                                    ? 'bg-brand-600 text-white border-brand-600'
-                                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                    ? 'border-brand-600 bg-brand-600 text-white'
+                                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
                             )}
                         >
                             {f.label}
@@ -171,29 +176,28 @@ export default function ProjectsListView({ projects, searchParams }: ProjectsLis
                     )}
                 </div>
             </div>
+            </div>
 
             {/* ────────── 결과 헤더 ────────── */}
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <h2 className="text-lg font-bold text-gray-900">
+                    <h3 className="text-base font-bold text-slate-900">
                         {projects.length}개 매물
-                    </h2>
-                    <Link href="/projects/new" className="btn-primary text-sm !py-2">
-                        <Plus size={15} />
-                        새 매물
-                    </Link>
+                    </h3>
                 </div>
 
                 <div className="flex items-center gap-2">
                     {/* 정렬 */}
                     <button
+                        type="button"
+                        aria-label={`정렬 기준 변경, 현재 ${sortLabel}`}
                         onClick={() => {
                             const next = !searchParams.sort ? 'price_asc'
                                 : searchParams.sort === 'price_asc' ? 'price_desc'
                                     : ''
                             updateFilter('sort', next)
                         }}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm text-gray-600 bg-white border border-gray-200 hover:border-gray-300 transition-colors"
+                        className="flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-600 hover:border-slate-300 transition-colors"
                     >
                         <ArrowUpDown size={14} />
                         {sortLabel}
@@ -201,16 +205,19 @@ export default function ProjectsListView({ projects, searchParams }: ProjectsLis
 
                     {/* 맵 토글 */}
                     <button
+                        type="button"
+                        aria-pressed={showMap}
+                        aria-label={showMap ? '지도 숨기기' : '지도 표시하기'}
                         onClick={() => setShowMap(!showMap)}
                         className={cn(
-                            'flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border transition-all duration-200',
+                            'flex min-h-11 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors',
                             showMap
-                                ? 'bg-brand-50 text-brand-700 border-brand-200'
-                                : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                                ? 'border-brand-200 bg-brand-50 text-brand-800'
+                                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                         )}
                     >
-                        {showMap ? <MapIcon size={14} /> : <List size={14} />}
-                        {showMap ? '지도' : '목록'}
+                        {showMap ? <List size={14} aria-hidden="true" /> : <MapIcon size={14} aria-hidden="true" />}
+                        {showMap ? '지도 숨기기' : '지도 보기'}
                     </button>
                 </div>
             </div>
@@ -226,10 +233,10 @@ export default function ProjectsListView({ projects, searchParams }: ProjectsLis
                     showMap ? 'lg:w-[55%] lg:flex-none' : ''
                 )}>
                     {projects.length === 0 ? (
-                        <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center">
-                            <Search size={40} className="mx-auto text-gray-200 mb-4" />
-                            <p className="text-gray-600 font-medium">매물이 없습니다</p>
-                            <p className="text-sm text-gray-400 mt-1.5">새 매물을 등록하거나 검색 조건을 변경해보세요</p>
+                        <div className="rounded-xl border border-slate-200 bg-white p-12 text-center">
+                            <Search size={32} className="mx-auto mb-4 text-slate-300" />
+                            <p className="font-medium text-slate-700">매물이 없습니다</p>
+                            <p className="mt-1.5 text-sm text-slate-500">새 매물을 등록하거나 검색 조건을 변경해보세요</p>
                             <Link href="/projects/new" className="btn-primary mt-5 inline-flex">
                                 <Plus size={16} />
                                 매물 등록하기
@@ -268,7 +275,7 @@ export default function ProjectsListView({ projects, searchParams }: ProjectsLis
 
                 {/* 우측: 지도 */}
                 {showMap && (
-                    <div className="lg:flex-1 h-[400px] lg:h-[calc(100vh-220px)] lg:sticky lg:top-[84px] rounded-2xl overflow-hidden">
+                    <div role="region" aria-label="매물 위치 지도" className="h-[360px] overflow-hidden rounded-xl border border-slate-200 lg:sticky lg:top-[84px] lg:h-[calc(100vh-180px)] lg:flex-1">
                         <ProjectsMap
                             projects={projects.map(p => ({
                                 id: p.id,

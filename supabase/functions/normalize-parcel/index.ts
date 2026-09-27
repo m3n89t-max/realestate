@@ -362,7 +362,7 @@ Deno.serve(async (req) => {
         org_id: project.org_id,
         project_id,
         type: 'download_building_register',
-        status: 'pending',
+        status: 'queued',
         payload: { project_id, normalized_address, sigungu_code, bjdong_code, bun, ji, legal_dong },
       }])
       .select('id, type')

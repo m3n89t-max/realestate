@@ -167,7 +167,7 @@ export default function BlogTab({ projectId, orgId, project, contents, assets }:
         .select('id, status, created_at')
         .eq('project_id', projectId)
         .eq('type', 'upload_naver_blog')
-        .in('status', ['pending', 'running'])
+        .in('status', ['queued', 'running'])
         .order('created_at', { ascending: false })
       if (data) setUploadTasks(data)
     }
@@ -366,7 +366,7 @@ export default function BlogTab({ projectId, orgId, project, contents, assets }:
         org_id: orgId,
         project_id: projectId,
         type: 'upload_naver_blog',
-        status: 'pending',
+        status: 'queued',
         scheduled_at: new Date().toISOString(),
         payload: {
           content_id: selectedId,

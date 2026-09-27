@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { PROPERTY_TYPE_LABELS } from '@/lib/types'
 import { FileArchive, Plus, ArrowRight, Download } from 'lucide-react'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 
 const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   building_register: '건축물대장',
@@ -17,6 +18,7 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
 export default async function DocsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
   const { data: membership } = await supabase
     .from('memberships')

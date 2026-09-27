@@ -67,7 +67,8 @@ Deno.serve(async (req) => {
   if (corsResponse) return corsResponse
 
   const authHeader = req.headers.get('Authorization') ?? ''
-  const isServiceRole = authHeader.includes(Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? 'never-match')
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  const isServiceRole = serviceRoleKey.length > 0 && authHeader === `Bearer ${serviceRoleKey}`
 
   const supabaseClient = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',

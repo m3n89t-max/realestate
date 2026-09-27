@@ -5,6 +5,7 @@ import { RefreshCw, AlertCircle, CheckCircle, Clock, XCircle, Loader2 } from 'lu
 import StatusBadge from '@/components/ui/StatusBadge'
 import { formatRelativeTime } from '@/lib/utils'
 import type { TaskType } from '@/lib/types'
+import { redirect } from 'next/navigation'
 
 const TASK_TYPE_LABELS: Record<TaskType, string> = {
   naver_upload: '네이버 업로드',
@@ -26,6 +27,7 @@ const ERROR_GUIDES: Record<string, string> = {
 export default async function TasksPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
   const { data: membership } = await supabase
     .from('memberships')
@@ -42,7 +44,7 @@ export default async function TasksPage() {
     .order('created_at', { ascending: false })
     .limit(100)
 
-  const pendingCount = (tasks ?? []).filter(t => ['pending', 'running', 'retrying'].includes(t.status)).length
+  const pendingCount = (tasks ?? []).filter(t => ['queued', 'running', 'retrying'].includes(t.status)).length
   const failedCount = (tasks ?? []).filter(t => t.status === 'failed').length
 
   const StatusIcon = ({ status }: { status: string }) => {
@@ -50,7 +52,7 @@ export default async function TasksPage() {
       case 'success': return <CheckCircle size={16} className="text-green-500" />
       case 'failed': return <XCircle size={16} className="text-red-500" />
       case 'running': return <Loader2 size={16} className="text-blue-500 animate-spin" />
-      case 'pending': return <Clock size={16} className="text-yellow-500" />
+      case 'queued': return <Clock size={16} className="text-yellow-500" />
       case 'retrying': return <RefreshCw size={16} className="text-orange-500" />
       default: return <Clock size={16} className="text-gray-400" />
     }
@@ -116,18 +118,24 @@ export default async function TasksPage() {
 
             <div className="divide-y divide-gray-50">
               {tasks.map(task => (
-                <div key={task.id} className="grid grid-cols-1 md:grid-cols-[1fr_120px_100px_120px_80px] gap-4 items-start px-5 py-4">
+                <div key={task.id} className="grid grid-cols-1 items-start gap-4 px-4 py-4 sm:px-5 md:grid-cols-[1fr_120px_100px_120px_80px]">
                   {/* 작업 정보 */}
-                  <div className="flex items-start gap-3">
-                    <StatusIcon status={task.status} />
-                    <div>
-                      <p className="text-sm font-medium text-gray-800">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span className="mt-0.5 shrink-0" aria-hidden="true"><StatusIcon status={task.status} /></span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-slate-800">
                         {task.project?.address ?? '(프로젝트 없음)'}
                       </p>
+                      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 text-xs text-slate-600 md:hidden">
+                        <span><span className="sr-only">유형: </span>{TASK_TYPE_LABELS[task.type as TaskType] ?? task.type}</span>
+                        <span className="justify-self-end"><StatusBadge status={task.status} size="sm" /></span>
+                        <span>{formatRelativeTime(task.created_at)}</span>
+                        <span className="justify-self-end">재시도 {task.retry_count}/{task.max_retries}</span>
+                      </div>
                       {task.error_code && (
-                        <div className="mt-1.5 p-2 bg-red-50 rounded text-xs text-red-600">
-                          <p className="font-medium">{task.error_code}</p>
-                          <p className="mt-0.5 text-red-500">
+                        <div className="mt-2 rounded-lg bg-red-50 p-2.5 text-xs text-red-700">
+                          <p className="font-semibold">{task.error_code}</p>
+                          <p className="mt-0.5">
                             {ERROR_GUIDES[task.error_code] ?? task.error_message ?? '알 수 없는 오류'}
                           </p>
                         </div>
@@ -136,7 +144,7 @@ export default async function TasksPage() {
                   </div>
 
                   {/* 유형 */}
-                  <span className="hidden md:block text-sm text-gray-600">
+                  <span className="hidden text-sm text-slate-600 md:block">
                     {TASK_TYPE_LABELS[task.type as TaskType] ?? task.type}
                   </span>
 
@@ -144,21 +152,21 @@ export default async function TasksPage() {
                   <div className="hidden md:block">
                     <StatusBadge status={task.status} size="sm" />
                     {task.retry_count > 0 && (
-                      <p className="text-xs text-gray-400 mt-0.5">{task.retry_count}번 재시도</p>
+                      <p className="mt-1 text-xs text-slate-600">{task.retry_count}번 재시도</p>
                     )}
                   </div>
 
                   {/* 시간 */}
-                  <span className="hidden md:block text-xs text-gray-400">
+                  <span className="hidden text-xs text-slate-600 md:block">
                     {formatRelativeTime(task.created_at)}
                   </span>
 
                   {/* 재시도 버튼 */}
-                  <div className="hidden md:block">
+                  <div className="pl-7 md:pl-0">
                     {task.status === 'failed' && task.retry_count < task.max_retries && (
                       <form action={`/api/tasks/${task.id}/retry`} method="POST">
-                        <button type="submit" className="text-xs text-brand-600 hover:underline flex items-center gap-1">
-                          <RefreshCw size={12} />
+                        <button type="submit" className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-brand-200 px-3 text-sm font-semibold text-brand-700 hover:bg-brand-50 md:min-h-0 md:border-0 md:px-0 md:text-xs md:hover:underline">
+                          <RefreshCw size={13} aria-hidden="true" />
                           재시도
                         </button>
                       </form>

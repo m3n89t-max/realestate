@@ -1,17 +1,27 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '@playwright/test'
 
-test('has title', async ({ page }) => {
-    await page.goto('/');
+test('비로그인 사용자는 대시보드에서 로그인 화면으로 이동한다', async ({ page }) => {
+  await page.goto('/dashboard', { waitUntil: 'domcontentloaded' })
 
-    // Expect a title "to contain" a substring.
-    // Update this to match your actual page title when ready
-    await expect(page).toHaveTitle(/./);
-});
+  await expect(page).toHaveURL(/\/login(?:\?|$)/)
+  await expect(page.getByRole('button', { name: '로그인', exact: true })).toBeVisible()
+  await expect(page.locator('input[type="email"]')).toBeVisible()
+  await expect(page.locator('input[type="password"]')).toBeVisible()
+})
 
-test('can navigate', async ({ page }) => {
-    await page.goto('/');
+test('비로그인 사용자의 인구 분석 API 요청을 거부한다', async ({ request }) => {
+  const response = await request.post('/api/population', {
+    data: { project_id: '00000000-0000-0000-0000-000000000000' },
+  })
 
-    // Add more assertions here depending on your home page structure
-    const body = page.locator('body');
-    await expect(body).toBeVisible();
-});
+  expect(response.status()).toBe(401)
+})
+
+test('가입 화면은 이름, 이메일, 비밀번호를 요구한다', async ({ page }) => {
+  await page.goto('/login', { waitUntil: 'domcontentloaded' })
+  await page.getByRole('button', { name: '무료 계정 만들기' }).click()
+
+  await expect(page.getByLabel('이름')).toHaveAttribute('required', '')
+  await expect(page.getByLabel('이메일')).toHaveAttribute('required', '')
+  await expect(page.getByRole('textbox', { name: '비밀번호', exact: true })).toHaveAttribute('minlength', '6')
+})

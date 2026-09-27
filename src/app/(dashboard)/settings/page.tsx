@@ -6,10 +6,12 @@ import { version as agentVersion } from '../../../../package.json'
 import StatusBadge from '@/components/ui/StatusBadge'
 import UsageMeter from '@/components/ui/UsageMeter'
 import AgentManager from './AgentManager'
+import { redirect } from 'next/navigation'
 
 export default async function SettingsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
   const { data: membership } = await supabase
     .from('memberships')

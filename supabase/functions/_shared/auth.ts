@@ -39,8 +39,8 @@ export async function checkQuota(
     .rpc('check_quota', { p_org_id: orgId, p_type: type })
 
   if (error) {
-    console.warn('[checkQuota] RPC 오류 (무시):', error.message)
-    return // quota 체크 실패 시 통과
+    console.error('[checkQuota] RPC 오류:', error.message)
+    throw new Error('사용량 한도를 확인할 수 없습니다. 잠시 후 다시 시도해주세요.')
   }
   if (data?.exceeded) {
     throw new Error(`월간 ${type} 한도를 초과했습니다. 요금제를 업그레이드하세요.`)

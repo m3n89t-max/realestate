@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { handleCors } from '../_shared/cors.ts'
-import { getAuthenticatedUser, getOrgId } from '../_shared/auth.ts'
+import { checkQuota, getAuthenticatedUser, getOrgId } from '../_shared/auth.ts'
 import { callGemini } from '../_shared/gemini.ts'
 import { maskPersonalInfo } from '../_shared/masking.ts'
 import { ok, err } from '../_shared/response.ts'
@@ -13,6 +13,7 @@ Deno.serve(async (req) => {
   try {
     const { user, supabaseClient } = await getAuthenticatedUser(req)
     const orgId = await getOrgId(supabaseClient, user.id)
+    await checkQuota(supabaseClient, orgId, 'generation')
 
     const { project_id, custom_instructions = '' } = await req.json()
     if (!project_id) throw new Error('project_id가 필요합니다')
@@ -93,6 +94,15 @@ ${assetInfo ? `\n[업로드된 미디어]\n${assetInfo}` : ''}
 
     const script = JSON.parse(responseText)
 
+    const { data: latestVersion } = await supabaseClient
+      .from('generated_contents')
+      .select('version')
+      .eq('project_id', project_id)
+      .eq('type', 'video_script')
+      .order('version', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
     const { data: saved, error: saveError } = await supabaseClient
       .from('generated_contents')
       .insert({
@@ -102,7 +112,7 @@ ${assetInfo ? `\n[업로드된 미디어]\n${assetInfo}` : ''}
         title: `쇼츠 스크립트 - ${maskedAddress}`,
         content: responseText,
         tags: script.hashtags,
-        version: 1,
+        version: (latestVersion?.version ?? 0) + 1,
       })
       .select('id')
       .single()

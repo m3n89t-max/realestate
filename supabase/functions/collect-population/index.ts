@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, handleCors } from '../_shared/cors.ts'
+import { getAuthenticatedUser } from '../_shared/auth.ts'
 
 // ── SGIS 헬퍼 ────────────────────────────────────────────────────────────────
 
@@ -138,6 +139,7 @@ Deno.serve(async (req) => {
   if (corsRes) return corsRes
 
   try {
+    const { supabaseClient } = await getAuthenticatedUser(req)
     const { project_id } = await req.json()
     if (!project_id) throw new Error('project_id 필요')
 
@@ -150,7 +152,7 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     )
 
-    const { data: project } = await admin.from('projects').select('lat, lng').eq('id', project_id).single()
+    const { data: project } = await supabaseClient.from('projects').select('lat, lng, org_id').eq('id', project_id).single()
     if (!project?.lat || !project?.lng) throw new Error('프로젝트 좌표 없음')
 
     const { lat, lng } = project
@@ -295,7 +297,7 @@ Deno.serve(async (req) => {
       collected_at: new Date().toISOString(),
     }
 
-    await admin.from('projects').update({ population_data }).eq('id', project_id)
+    await admin.from('projects').update({ population_data }).eq('id', project_id).eq('org_id', project.org_id)
 
     return new Response(JSON.stringify({ success: true, population_data }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

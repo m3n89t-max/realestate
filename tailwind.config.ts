@@ -10,29 +10,21 @@ const config: Config = {
     extend: {
       colors: {
         brand: {
-          50:  '#eef2ff',
-          100: '#e0e7ff',
-          200: '#c7d2fe',
-          300: '#a5b4fc',
-          400: '#818cf8',
-          500: '#6366f1',
-          600: '#4f46e5',
-          700: '#4338ca',
-          800: '#3730a3',
-          900: '#1e1b4b',
+          50: '#eef7f5', 100: '#d9ebe6', 200: '#b7d9d0', 300: '#86bfb1', 400: '#559e8e',
+          500: '#287d6d', 600: '#186557', 700: '#145147', 800: '#123f39', 900: '#102f2c',
         },
       },
       boxShadow: {
-        card:  '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
-        hover: '0 4px 12px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.05)',
-        focus: '0 0 0 3px rgba(99,102,241,0.2)',
+        card: '0 1px 2px rgba(19, 34, 32, 0.04)',
+        hover: '0 5px 14px rgba(19, 34, 32, 0.08)',
+        focus: '0 0 0 3px rgba(40, 125, 109, 0.22)',
       },
       borderRadius: {
-        '3xl': '1.5rem',
+        '3xl': '0.75rem',
       },
       fontFamily: {
-        sans: ['Pretendard', 'var(--font-pretendard)', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
-        display: ['GmarketSans', 'Pretendard', 'sans-serif'],
+        sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
+        display: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
       },
       animation: {
         'fade-in': 'fadeIn 0.2s ease-in-out',

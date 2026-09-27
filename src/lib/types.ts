@@ -11,7 +11,7 @@ export type BlogTone = 'professional' | 'friendly' | 'emotional' | 'intuitive'
 export type BlogFormat = 'default' | 'storytelling' | 'summary' | 'qna'
 export type BlogFocus = 'location' | 'investment' | 'interior' | 'price'
 export type TaskType = 'naver_upload' | 'youtube_upload' | 'building_register' | 'seumteo_api' | 'video_render' | 'pdf_merge'
-export type TaskStatus = 'pending' | 'running' | 'success' | 'failed' | 'retrying' | 'cancelled'
+export type TaskStatus = 'queued' | 'running' | 'success' | 'failed' | 'retrying' | 'cancelled'
 export type AssetType = 'image' | 'video' | 'document' | 'card_news'
 export type DocumentType = 'building_register' | 'cadastral_map' | 'floor_plan' | 'permit_history' | 'risk_report' | 'package_pdf'
 
@@ -480,7 +480,7 @@ export const TASK_TYPE_LABELS: Record<TaskType, string> = {
 }
 
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
-  pending: '대기중',
+  queued: '대기중',
   running: '진행중',
   success: '완료',
   failed: '실패',
