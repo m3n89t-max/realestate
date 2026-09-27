@@ -115,9 +115,10 @@ class LocalAgent {
         this.startFallbackPolling();
 
         // 6. 로컬 UI 설정 서버 시작
-        startUIServer();
+        const uiServer = await startUIServer();
 
         console.log('[Agent] 에이전트가 정상 가동되었습니다. 작업 대기 중...');
+        return uiServer;
     }
 
     // ============================================================

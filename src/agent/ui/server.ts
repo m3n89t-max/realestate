@@ -9,6 +9,7 @@ const DEFAULT_PORT = 3005;
 const LOOPBACK_HOST = '127.0.0.1';
 const DEFAULT_MAX_BODY_BYTES = 32 * 1024;
 const PROCESS_TOKEN = crypto.randomBytes(32).toString('hex');
+const SESSION_COOKIE_NAME = 'agent_ui_session';
 
 interface UIServerOptions {
     port?: number;
@@ -16,6 +17,13 @@ interface UIServerOptions {
     token?: string;
     maxBodyBytes?: number;
     onQuit?: () => void;
+}
+
+export interface UIServerHandle {
+    server: http.Server;
+    origin: string;
+    url: string;
+    close: () => Promise<void>;
 }
 
 function safeEqual(left: string, right: string): boolean {
@@ -100,16 +108,24 @@ function mergeCredentialUpdates(existing: Record<string, any>, updates: Record<s
     return merged;
 }
 
-function isAuthorizedHeader(req: http.IncomingMessage, token: string): boolean {
-    const supplied = req.headers['x-agent-ui-token'];
-    return typeof supplied === 'string' && safeEqual(supplied, token);
+function getCookie(req: http.IncomingMessage, name: string): string {
+    for (const part of (req.headers.cookie ?? '').split(';')) {
+        const separator = part.indexOf('=');
+        if (separator < 0) continue;
+        if (part.slice(0, separator).trim() === name) return part.slice(separator + 1).trim();
+    }
+    return '';
 }
 
-export function getUIAccessUrl(port = DEFAULT_PORT): string {
-    return `http://${LOOPBACK_HOST}:${port}/?token=${PROCESS_TOKEN}`;
+function isAuthorizedSession(req: http.IncomingMessage, sessionToken: string): boolean {
+    return safeEqual(getCookie(req, SESSION_COOKIE_NAME), sessionToken);
 }
 
-export function startUIServer(options: UIServerOptions = {}): http.Server {
+function hasExpectedRequestOrigin(req: http.IncomingMessage, origin: string): boolean {
+    return req.headers.host === new URL(origin).host && req.headers.origin === origin;
+}
+
+export function startUIServer(options: UIServerOptions = {}): Promise<UIServerHandle> {
     const port = options.port ?? DEFAULT_PORT;
     const appDataPath = options.appDataPath ?? process.env.APPDATA ?? path.join(os.homedir(), 'AppData', 'Roaming');
     const token = options.token ?? PROCESS_TOKEN;
@@ -118,6 +134,8 @@ export function startUIServer(options: UIServerOptions = {}): http.Server {
     const targetDir = path.join(appDataPath, 'RealEstateAIOS');
     const credPath = path.join(targetDir, 'credentials.json');
     const configPath = path.join(targetDir, 'config.json');
+    const sessionToken = crypto.randomBytes(32).toString('hex');
+    let origin = '';
 
     const server = http.createServer(async (req, res) => {
         const requestUrl = new URL(req.url ?? '/', `http://${LOOPBACK_HOST}`);
@@ -125,7 +143,18 @@ export function startUIServer(options: UIServerOptions = {}): http.Server {
 
         if (isPage) {
             const suppliedToken = requestUrl.searchParams.get('token') ?? '';
-            if (!safeEqual(suppliedToken, token)) {
+            if (suppliedToken && safeEqual(suppliedToken, token)) {
+                res.writeHead(303, {
+                    'Cache-Control': 'no-store',
+                    'Location': '/',
+                    'Referrer-Policy': 'no-referrer',
+                    'Set-Cookie': `${SESSION_COOKIE_NAME}=${sessionToken}; HttpOnly; SameSite=Strict; Path=/`,
+                    'X-Content-Type-Options': 'nosniff',
+                });
+                res.end();
+                return;
+            }
+            if (!isAuthorizedSession(req, sessionToken)) {
                 sendJson(res, 403, { success: false, error: 'Forbidden' });
                 return;
             }
@@ -140,14 +169,14 @@ export function startUIServer(options: UIServerOptions = {}): http.Server {
                 'X-Content-Type-Options': 'nosniff',
                 'X-Frame-Options': 'DENY',
             });
-            res.end(getHtmlContent(currentCreds, config.agent_key, token));
+            res.end(getHtmlContent(currentCreds, config.agent_key));
             return;
         }
 
         const isCredentialSave = req.method === 'POST' && requestUrl.pathname === '/api/credentials';
         const isQuit = req.method === 'POST' && requestUrl.pathname === '/api/quit';
         if (isCredentialSave || isQuit) {
-            if (!isAuthorizedHeader(req, token)) {
+            if (!isAuthorizedSession(req, sessionToken) || !hasExpectedRequestOrigin(req, origin)) {
                 sendJson(res, 403, { success: false, error: 'Forbidden' });
                 return;
             }
@@ -188,27 +217,37 @@ export function startUIServer(options: UIServerOptions = {}): http.Server {
         res.end('Not Found');
     });
 
-    server.on('error', (error: NodeJS.ErrnoException) => {
-        if (error.code === 'EADDRINUSE') {
-            console.log(`[Agent UI] 포트 ${port}이 이미 사용 중입니다. UI 서버를 건너뜁니다.`);
-        } else {
-            console.error('[Agent UI] 서버 에러:', error.message);
-        }
+    return new Promise((resolve, reject) => {
+        const onStartupError = (error: NodeJS.ErrnoException) => reject(error);
+        server.once('error', onStartupError);
+        server.listen(port, LOOPBACK_HOST, () => {
+            server.off('error', onStartupError);
+            server.on('error', error => console.error('[Agent UI] 서버 에러:', error.message));
+            const address = server.address();
+            if (!address || typeof address !== 'object') {
+                server.close();
+                reject(new Error('UI server did not expose a TCP address'));
+                return;
+            }
+            origin = `http://${LOOPBACK_HOST}:${address.port}`;
+            const url = `${origin}/?token=${encodeURIComponent(token)}`;
+            console.log(`[Agent UI] 로컬 환경설정 서버가 시작되었습니다: ${origin}`);
+            resolve({
+                server,
+                origin,
+                url,
+                close: () => new Promise<void>((closeResolve, closeReject) => {
+                    server.close(error => error ? closeReject(error) : closeResolve());
+                }),
+            });
+        });
     });
-
-    server.listen(port, LOOPBACK_HOST, () => {
-        const address = server.address();
-        const actualPort = address && typeof address === 'object' ? address.port : port;
-        console.log(`[Agent UI] 로컬 환경설정 서버가 시작되었습니다: http://${LOOPBACK_HOST}:${actualPort}`);
-    });
-    return server;
 }
 
-function getHtmlContent(creds: Record<string, any>, agentKey: unknown, token: string): string {
+function getHtmlContent(creds: Record<string, any>, agentKey: unknown): string {
     const naverOk = Boolean(creds.naver?.id && creds.naver?.pw);
     const googleOk = Boolean(creds.google?.email && creds.google?.pw);
     const instagramOk = Boolean(creds.instagram?.id && creds.instagram?.pw);
-    const scriptToken = JSON.stringify(token).replaceAll('<', '\\u003c');
 
     return `<!DOCTYPE html>
 <html lang="ko">
@@ -241,9 +280,8 @@ function getHtmlContent(creds: Record<string, any>, agentKey: unknown, token: st
     </div>
 </div>
 <script>
-const accessToken=${scriptToken};
 const toast=document.getElementById('toast');
-const request=(url,body)=>fetch(url,{method:'POST',headers:{'Content-Type':'application/json','X-Agent-UI-Token':accessToken},body:body===undefined?undefined:JSON.stringify(body)});
+const request=(url,body)=>fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
 document.getElementById('quit').addEventListener('click',async()=>{if(confirm('에이전트를 종료하시겠습니까?')){await request('/api/quit');window.close();}});
 document.getElementById('credsForm').addEventListener('submit',async event=>{event.preventDefault();const data={agent_key:document.getElementById('agent_key').value,naver:{id:document.getElementById('naver_id').value,pw:document.getElementById('naver_pw').value},google:{email:document.getElementById('google_email').value,pw:document.getElementById('google_pw').value},instagram:{id:document.getElementById('instagram_id').value,pw:document.getElementById('instagram_pw').value}};try{const response=await request('/api/credentials',data);const result=await response.json();toast.textContent=response.ok&&result.success?'저장되었습니다.':'저장하지 못했습니다.';}catch{toast.textContent='저장하지 못했습니다.';}});
 </script>

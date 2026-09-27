@@ -404,8 +404,6 @@
   </div>
 
   <script>
-    const { ipcRenderer } = require('electron');
-
     function goPanel(n) {
       document.querySelectorAll('.panel').forEach((p, i) => {
         p.classList.toggle('active', i + 1 === n);
@@ -453,7 +451,7 @@
         const agent_name = document.getElementById('agent_name').value.trim();
 
         // 1. 서버 설정 저장 (URL/Key는 하드코딩됨)
-        const cfgResult = await ipcRenderer.invoke('save-config', {
+        const cfgResult = await window.agentSetup.saveConfig({
           url: 'https://mlluhuiwtsjndkztomjx.supabase.co',
           anon_key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1sbHVodWl3dHNqbmRrenRvbWp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkxMjUxMzcsImV4cCI6MjA4NDcwMTEzN30.zExaSeZL3TnlBHfE6TnWQm-Za3VVjkHqYLKAGfQlTog',
           agent_key,
@@ -470,7 +468,7 @@
             if (btn) { btn.disabled = false; btn.textContent = '시작하기! 🚀'; }
             return;
           }
-          await ipcRenderer.invoke('save-credentials', {
+          await window.agentSetup.saveCredentials({
             naver: { id: naver_id, pw: naver_pw },
             google: {
               email: document.getElementById('google_email').value.trim(),
@@ -488,7 +486,7 @@
         }
 
         goPanel(3);
-        setTimeout(() => ipcRenderer.invoke('config-saved'), 1500);
+        setTimeout(() => window.agentSetup.configSaved(), 1500);
 
       } catch (e) {
         showError('err2', '저장 실패: ' + e.message);

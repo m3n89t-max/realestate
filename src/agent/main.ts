@@ -1,10 +1,10 @@
-import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage } from 'electron';
+import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, dialog } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import zlib from 'zlib';
 import { ensurePrivateDirectory, writePrivateJson } from './secure-files';
-import { getUIAccessUrl } from './ui/server';
+import type { UIServerHandle } from './ui/server';
 
 // Node.js 내장 zlib로 16x16 파란색 PNG 버퍼 생성 (외부 파일 불필요)
 function createIconBuffer(): Buffer {
@@ -42,6 +42,7 @@ function createIconBuffer(): Buffer {
 
 let mainWindow: BrowserWindow | null;
 let tray: Tray | null;
+let uiServer: UIServerHandle | null = null;
 
 const CONFIG_DIR = path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'RealEstateAIOS');
 const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
@@ -103,19 +104,26 @@ ipcMain.handle('save-credentials', (_event, data: {
 // ─── IPC: 설정 완료 → 에이전트 시작 ─────────────────────────
 ipcMain.handle('config-saved', async () => {
     mainWindow?.close();
-    await startAgent();
-    createTray();
-    // UI 서버 기동 대기 후 메인 창 오픈
-    setTimeout(() => showMainUI(), 2000);
+    try {
+        await startAgent();
+        createTray();
+        showMainUI();
+    } catch (error) {
+        handleFatalUIError(error);
+    }
 });
 
-async function startAgent() {
-    try {
-        const { agent } = await import('./worker');
-        await agent.start();
-    } catch (err) {
-        console.error('[Agent] 치명적 오류:', err);
-    }
+async function startAgent(): Promise<UIServerHandle> {
+    const { agent } = await import('./worker');
+    uiServer = await agent.start();
+    return uiServer;
+}
+
+function handleFatalUIError(error: unknown): void {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('[Agent UI] 치명적 오류:', message);
+    dialog.showErrorBox('설정 UI 시작 실패', `로컬 설정 UI를 시작할 수 없습니다.\n${message}`);
+    app.quit();
 }
 
 const createTray = () => {
@@ -135,7 +143,7 @@ const createTray = () => {
             click: () => {
                 if (mainWindow) {
                     mainWindow.show();
-                } else {
+                } else if (uiServer) {
                     showMainUI();
                 }
             }
@@ -156,25 +164,47 @@ const showSetupWindow = () => {
         height: 620,
         resizable: false,
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false,
+            nodeIntegration: false,
+            contextIsolation: true,
+            sandbox: true,
+            preload: path.join(__dirname, 'preload.js'),
         },
         title: '부동산 AI 에이전트 초기 설정',
     });
+    mainWindow.webContents.on('will-navigate', event => event.preventDefault());
+    mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     mainWindow.loadFile(path.join(__dirname, 'setup.html'));
     mainWindow.on('closed', () => { mainWindow = null; });
 };
 
 const showMainUI = () => {
+    if (!uiServer) throw new Error('UI server is not ready');
+    const activeUIServer = uiServer;
     mainWindow = new BrowserWindow({
         width: 650,
         height: 800,
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false,
+            nodeIntegration: false,
+            contextIsolation: true,
+            sandbox: true,
         },
     });
-    mainWindow.loadURL(getUIAccessUrl());
+    const isAllowedUIUrl = (targetUrl: string): boolean => {
+        try {
+            return new URL(targetUrl).origin === activeUIServer.origin;
+        } catch {
+            return false;
+        }
+    };
+    const preventExternalNavigation = (event: Electron.Event, targetUrl: string): void => {
+        if (!isAllowedUIUrl(targetUrl)) event.preventDefault();
+    };
+    mainWindow.webContents.on('will-navigate', preventExternalNavigation);
+    mainWindow.webContents.on('will-redirect', preventExternalNavigation);
+    mainWindow.webContents.setWindowOpenHandler(({ url }) => ({
+        action: isAllowedUIUrl(url) ? 'allow' : 'deny',
+    }));
+    mainWindow.loadURL(activeUIServer.url);
     mainWindow.on('closed', () => { mainWindow = null; });
     ; (mainWindow as any).on('minimize', (event: any) => {
         event.preventDefault();
@@ -189,7 +219,7 @@ if (!gotLock) {
 } else {
     app.on('second-instance', () => {
         if (mainWindow) { mainWindow.show(); mainWindow.focus(); }
-        else showMainUI();
+        else if (uiServer) showMainUI();
     });
 }
 
@@ -199,9 +229,13 @@ app.on('ready', async () => {
         showSetupWindow();
     } else {
         // 설정 있음: 바로 시작
-        await startAgent();
-        createTray();
-        setTimeout(() => showMainUI(), 2000);
+        try {
+            await startAgent();
+            createTray();
+            showMainUI();
+        } catch (error) {
+            handleFatalUIError(error);
+        }
     }
 });
 
