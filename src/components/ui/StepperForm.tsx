@@ -13,16 +13,19 @@ interface StepperFormProps {
   steps: Step[]
   currentStep: number
   onStepClick?: (index: number) => void
+  disabled?: boolean
 }
 
-export function StepperHeader({ steps, currentStep, onStepClick }: StepperFormProps) {
+export function StepperHeader({ steps, currentStep, onStepClick, disabled = false }: StepperFormProps) {
   return (
     <div className="flex items-center">
       {steps.map((step, index) => (
         <div key={step.id} className="flex items-center flex-1 last:flex-none">
           {/* 스텝 */}
           <button
-            onClick={() => index < currentStep && onStepClick?.(index)}
+            type="button"
+            disabled={disabled}
+            onClick={() => !disabled && index < currentStep && onStepClick?.(index)}
             className={cn(
               'flex items-center gap-3 group',
               index < currentStep && 'cursor-pointer'
@@ -80,6 +83,7 @@ interface StepperNavProps {
   nextLabel?: string
   submitLabel?: string
   canNext?: boolean
+  disabled?: boolean
 }
 
 export function StepperNav({
@@ -93,6 +97,7 @@ export function StepperNav({
   submitLabel = '완료',
   canNext = true,
   isNextLoading = false,
+  disabled = false,
 }: StepperNavProps & { isNextLoading?: boolean }) {
   const isLast = currentStep === totalSteps - 1
 
@@ -100,7 +105,7 @@ export function StepperNav({
     <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-200">
       <button
         onClick={onPrev}
-        disabled={currentStep === 0 || isNextLoading}
+        disabled={currentStep === 0 || isNextLoading || disabled}
         className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
       >
         이전
@@ -109,7 +114,7 @@ export function StepperNav({
       {isLast ? (
         <button
           onClick={onSubmit}
-          disabled={isSubmitting || !canNext}
+          disabled={isSubmitting || !canNext || disabled}
           className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isSubmitting ? (
@@ -122,7 +127,7 @@ export function StepperNav({
       ) : (
         <button
           onClick={onNext}
-          disabled={!canNext || isNextLoading}
+          disabled={!canNext || isNextLoading || disabled}
           className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isNextLoading ? (

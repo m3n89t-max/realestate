@@ -1,0 +1,1 @@
+export default function TermsPage() { return <main className="mx-auto max-w-2xl p-8"><h1 className="text-2xl font-bold">이용약관 안내</h1><p className="mt-4 leading-7 text-slate-600">이 문서는 서비스 이용 방식에 대한 정보 초안이며, 법적 효력이 있는 최종 이용약관이 아닙니다.</p><p className="mt-3 leading-7 text-slate-600">매물 정보는 정확하게 입력해 주세요. 정식 약관은 운영 주체와 적용 내용이 확정된 뒤 별도로 안내됩니다.</p></main> }

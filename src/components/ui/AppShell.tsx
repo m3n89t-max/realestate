@@ -7,22 +7,18 @@ import {
   BarChart3,
   Bot,
   Building2,
-  FileText,
+  CircleHelp,
   FolderOpen,
   LayoutDashboard,
-  LayoutGrid,
-  LineChart,
   ListTodo,
   LogOut,
   Menu,
-  Newspaper,
   Settings,
   Users,
-  Video,
   X,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getNavigationSections, getPageMeta, type NavigationItem } from '@/lib/navigation'
+import { getNavigationSections, getPageMeta, isNavigationItemActive, type NavigationItem } from '@/lib/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 
@@ -30,14 +26,17 @@ const icons = {
   dashboard: LayoutDashboard,
   projects: FolderOpen,
   tasks: ListTodo,
-  analysis: LineChart,
-  blog: Newspaper,
-  cardnews: LayoutGrid,
-  shorts: Video,
-  docs: FileText,
+  help: CircleHelp,
   usage: BarChart3,
   members: Users,
 }
+
+const mobileNavigation: NavigationItem[] = [
+  { href: '/dashboard', label: '홈', icon: 'dashboard' },
+  { href: '/projects', label: '내 매물', icon: 'projects' },
+  { href: '/tasks', label: '처리 알림', icon: 'tasks' },
+  { href: '/projects/new', label: '새 매물', icon: 'projects' },
+]
 
 interface AppShellProps {
   children: React.ReactNode
@@ -102,11 +101,6 @@ export default function AppShell({
     }
   }, [mobileOpen])
 
-  const isActive = (href: string) =>
-    href === '/dashboard'
-      ? pathname === '/dashboard'
-      : pathname === href || pathname.startsWith(`${href}/`)
-
   const handleLogout = async () => {
     try {
       const { error } = await supabase.auth.signOut()
@@ -121,7 +115,7 @@ export default function AppShell({
 
   const renderNavItem = (item: NavigationItem) => {
     const Icon = icons[item.icon]
-    const active = isActive(item.href)
+    const active = isNavigationItemActive(pathname, item.href)
     return (
       <Link
         key={item.href}
@@ -158,7 +152,7 @@ export default function AppShell({
             <Building2 size={17} aria-hidden="true" />
           </span>
           <span className="text-[15px] font-bold tracking-[-0.03em] text-slate-900">
-            RealEstate AI OS
+            새론 부동산 업무 도우미
           </span>
         </Link>
         {mobile && (
@@ -214,9 +208,9 @@ export default function AppShell({
             }
           />
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-slate-600">로컬 에이전트</p>
+            <p className="text-xs font-semibold text-slate-600">자동화 연결</p>
             <p className="text-xs font-semibold text-slate-800">
-              {agentStatus === 'online' ? '연결됨' : agentStatus === 'busy' ? '작업 중' : '오프라인'}
+              {agentStatus === 'online' ? '연결됨' : agentStatus === 'busy' ? '작업 중' : '연결이 필요해요'}
             </p>
           </div>
         </div>
@@ -306,9 +300,16 @@ export default function AppShell({
           </span>
         </header>
         <main id="main-content" tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-[1440px] p-4 lg:p-8">{children}</div>
+          <div className="mx-auto w-full max-w-[1440px] p-4 pb-24 lg:p-8">{children}</div>
         </main>
       </div>
+      <nav aria-label="모바일 빠른 메뉴" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-slate-200 bg-white/95 px-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur lg:hidden">
+        {mobileNavigation.map((item) => {
+          const Icon = icons[item.icon]
+          const active = isNavigationItemActive(pathname, item.href)
+          return <Link key={item.href} href={item.href} aria-current={active ? 'page' : undefined} className={cn('flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-xs font-semibold', active ? 'text-brand-700' : 'text-slate-600')}><Icon size={18} aria-hidden="true" /><span>{item.label}</span></Link>
+        })}
+      </nav>
     </div>
   )
 }

@@ -71,6 +71,8 @@ export default async function ProjectDetailPage({
     .select('*')
     .eq('project_id', id)
     .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true })
 
   const { data: documents } = await supabase
     .from('documents')
