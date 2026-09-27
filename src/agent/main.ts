@@ -3,6 +3,8 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import zlib from 'zlib';
+import { ensurePrivateDirectory, writePrivateJson } from './secure-files';
+import { getUIAccessUrl } from './ui/server';
 
 // Node.js 내장 zlib로 16x16 파란색 PNG 버퍼 생성 (외부 파일 불필요)
 function createIconBuffer(): Buffer {
@@ -57,7 +59,7 @@ function hasConfig(): boolean {
 // ─── IPC: 설정 저장 ───────────────────────────────────────────
 ipcMain.handle('save-config', (_event, data: { url: string; anon_key: string; agent_name: string; agent_key: string }) => {
     try {
-        if (!fs.existsSync(CONFIG_DIR)) fs.mkdirSync(CONFIG_DIR, { recursive: true });
+        ensurePrivateDirectory(CONFIG_DIR);
         const config = {
             supabase_url: data.url,
             supabase_anon_key: data.anon_key,
@@ -66,7 +68,7 @@ ipcMain.handle('save-config', (_event, data: { url: string; anon_key: string; ag
             agent_name: data.agent_name || `Agent-${os.hostname()}`,
             version: '1.0.0',
         };
-        fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+        writePrivateJson(CONFIG_PATH, config);
         return { ok: true };
     } catch (e: any) {
         return { ok: false, error: e.message };
@@ -80,7 +82,7 @@ ipcMain.handle('save-credentials', (_event, data: {
     instagram?: { id?: string; pw?: string };
 }) => {
     try {
-        if (!fs.existsSync(CONFIG_DIR)) fs.mkdirSync(CONFIG_DIR, { recursive: true });
+        ensurePrivateDirectory(CONFIG_DIR);
         const credPath = path.join(CONFIG_DIR, 'credentials.json');
         // 기존 데이터 유지하며 병합
         let existing: Record<string, any> = {};
@@ -91,7 +93,7 @@ ipcMain.handle('save-credentials', (_event, data: {
         if (data.naver?.id || data.naver?.pw) merged.naver = data.naver;
         if (data.google?.email || data.google?.pw) merged.google = data.google;
         if (data.instagram?.id || data.instagram?.pw) merged.instagram = data.instagram;
-        fs.writeFileSync(credPath, JSON.stringify(merged, null, 2));
+        writePrivateJson(credPath, merged);
         return { ok: true };
     } catch (e: any) {
         return { ok: false, error: e.message };
@@ -172,7 +174,7 @@ const showMainUI = () => {
             contextIsolation: false,
         },
     });
-    mainWindow.loadURL('http://localhost:3005');
+    mainWindow.loadURL(getUIAccessUrl());
     mainWindow.on('closed', () => { mainWindow = null; });
     ; (mainWindow as any).on('minimize', (event: any) => {
         event.preventDefault();
