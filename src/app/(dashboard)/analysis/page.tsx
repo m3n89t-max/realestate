@@ -4,10 +4,12 @@ import { createClient } from '@/lib/supabase/server'
 import { PROPERTY_TYPE_LABELS } from '@/lib/types'
 import { MapPin, Plus, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 
 export default async function AnalysisPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
   const { data: membership } = await supabase
     .from('memberships')
@@ -86,7 +88,7 @@ export default async function AnalysisPage() {
                       </span>
                     )}
                     <Link
-                      href={`/projects/${project.id}${isDone ? '#analysis' : ''}`}
+                      href={`/projects/${project.id}?tab=analysis`}
                       className="flex items-center gap-1 text-xs text-brand-600 hover:underline font-medium"
                     >
                       {isDone ? '결과 보기' : '분석 시작'}

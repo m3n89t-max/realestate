@@ -5,6 +5,7 @@ import { Video, Copy, Check, Loader2, Download, ChevronLeft, ChevronRight, Play,
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
 import { cn } from '@/lib/utils'
+import type { GeneratedContent } from '@/lib/types'
 
 /* ── Canvas 텍스트 줄바꿈 유틸 ── */
 function wrapText(
@@ -216,6 +217,18 @@ interface ShortsScript {
 interface ShortsTabProps {
   projectId: string
   assets?: { file_url: string; type: string; file_name?: string; is_cover?: boolean }[]
+  contents?: GeneratedContent[]
+}
+
+function parseSavedScript(contents: GeneratedContent[]): ShortsScript | null {
+  const latest = contents[0]
+  if (!latest?.content) return null
+  try {
+    const parsed = JSON.parse(latest.content) as ShortsScript
+    return Array.isArray(parsed.scenes) ? parsed : null
+  } catch {
+    return null
+  }
 }
 
 /* ── 폰 미리보기 컴포넌트 ── */
@@ -375,10 +388,10 @@ function PhonePreview({ script, activeScene, onScene, photos = [] }: {
 }
 
 /* ── 메인 컴포넌트 ── */
-export default function ShortsTab({ projectId, assets = [] }: ShortsTabProps) {
+export default function ShortsTab({ projectId, assets = [], contents = [] }: ShortsTabProps) {
   const supabase = createClient()
   const [generating, setGenerating] = useState(false)
-  const [script, setScript] = useState<ShortsScript | null>(null)
+  const [script, setScript] = useState<ShortsScript | null>(() => parseSavedScript(contents))
   const [copied, setCopied] = useState<string | null>(null)
   const [activeScene, setActiveScene] = useState(0)
   const [rendering, setRendering] = useState(false)

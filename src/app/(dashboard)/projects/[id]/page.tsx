@@ -80,6 +80,7 @@ export default async function ProjectDetailPage({
 
   const blogContents = contents?.filter(c => c.type === 'blog') ?? []
   const cardNewsContents = contents?.filter(c => c.type === 'card_news') ?? []
+  const shortsContents = contents?.filter(c => c.type === 'video_script') ?? []
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -120,11 +121,11 @@ export default async function ProjectDetailPage({
           {/* 우측 액션 버튼 */}
           <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
             <ProjectActions projectId={id} currentStatus={project.status} />
-            <button className="btn-secondary">
+            <button className="btn-secondary opacity-60 cursor-not-allowed" disabled aria-disabled="true" title="공유 기능 준비 중">
               <Share2 size={14} />
               공유
             </button>
-            <button className="btn-secondary">
+            <button className="btn-secondary opacity-60 cursor-not-allowed" disabled aria-disabled="true" title="PDF 기능은 패키지 탭에서 제공 예정">
               <Download size={14} />
               PDF
             </button>
@@ -147,6 +148,7 @@ export default async function ProjectDetailPage({
             <Link
               key={t.id}
               href={`/projects/${id}?tab=${t.id}`}
+              aria-current={tab === t.id ? 'page' : undefined}
               className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${tab === t.id
                 ? 'border-brand-600 text-brand-700'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -284,7 +286,7 @@ export default async function ProjectDetailPage({
       )}
 
       {tab === 'shorts' && (
-        <ShortsTab projectId={id} assets={assets ?? []} />
+        <ShortsTab projectId={id} assets={assets ?? []} contents={shortsContents} />
       )}
 
       {tab === 'tasks' && (

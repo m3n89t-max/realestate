@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
 interface Task {
   id: string
   type: string
-  status: 'pending' | 'running' | 'success' | 'failed' | 'retrying'
+  status: 'queued' | 'running' | 'success' | 'failed' | 'retrying'
   progress_pct?: number
   error_message?: string
   created_at: string
@@ -37,7 +37,7 @@ const TASK_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
 }
 
 const STATUS_CONFIG = {
-  pending:  { label: '대기 중',  color: 'bg-gray-100 text-gray-500',  icon: <Clock size={12} /> },
+  queued:   { label: '대기 중',  color: 'bg-gray-100 text-gray-500',  icon: <Clock size={12} /> },
   running:  { label: '실행 중',  color: 'bg-blue-100 text-blue-700',  icon: <Loader2 size={12} className="animate-spin" /> },
   retrying: { label: '재시도 중', color: 'bg-amber-100 text-amber-700', icon: <RefreshCw size={12} className="animate-spin" /> },
   success:  { label: '완료',     color: 'bg-green-100 text-green-700', icon: <CheckCircle size={12} /> },
@@ -148,7 +148,7 @@ export default function TasksTab({ projectId }: TasksTabProps) {
         <div className="card divide-y divide-gray-50">
           {tasks.map(task => {
             const meta = TASK_LABELS[task.type]
-            const statusCfg = STATUS_CONFIG[task.status] ?? STATUS_CONFIG.pending
+            const statusCfg = STATUS_CONFIG[task.status] ?? STATUS_CONFIG.queued
             const duration = formatDuration(task.started_at, task.completed_at)
 
             return (

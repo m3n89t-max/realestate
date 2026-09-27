@@ -4,10 +4,12 @@ import { createClient } from '@/lib/supabase/server'
 import { PROPERTY_TYPE_LABELS } from '@/lib/types'
 import { Video, Plus, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 
 export default async function ShortsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
   const { data: membership } = await supabase
     .from('memberships')

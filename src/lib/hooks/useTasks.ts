@@ -95,7 +95,7 @@ export function useTasks(orgId?: string) {
       const { error } = await supabase
         .from('tasks')
         .update({
-          status: 'pending',
+          status: 'queued',
           error_code: null,
           error_message: null,
           started_at: null,
@@ -111,7 +111,7 @@ export function useTasks(orgId?: string) {
     }
   }
 
-  const pendingCount = tasks.filter(t => ['pending', 'running', 'retrying'].includes(t.status)).length
+  const pendingCount = tasks.filter(t => ['queued', 'running', 'retrying'].includes(t.status)).length
 
   return { tasks, loading, pendingCount, refetch: fetchTasks, createTask, retryTask }
 }

@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { Plus } from 'lucide-react'
 import type { PropertyType } from '@/lib/types'
 import ProjectsListView from './ProjectsListView'
@@ -22,6 +23,7 @@ export default async function ProjectsPage({
   const params = await searchParams
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
   const { data: membership } = await supabase
     .from('memberships')
