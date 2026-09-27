@@ -17,13 +17,21 @@ export default async function DashboardLayout({
   }
 
   // 조직 정보 조회
-  const { data: membership } = await supabase
+  let { data: membership } = await supabase
     .from('memberships')
     .select('*, organization:organizations(name, plan_type)')
     .eq('user_id', user.id)
     .not('joined_at', 'is', null)
     .limit(1)
     .single()
+
+  if (!membership) {
+    const { error } = await supabase.rpc('ensure_user_organization')
+    if (error) redirect('/onboarding/error')
+    const result = await supabase.from('memberships').select('*, organization:organizations(name, plan_type)').eq('user_id', user.id).not('joined_at', 'is', null).limit(1).single()
+    membership = result.data
+    if (!membership) redirect('/onboarding/error')
+  }
 
   // 에이전트 상태 조회
   const { data: agent } = await supabase

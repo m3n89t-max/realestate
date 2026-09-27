@@ -1,36 +1,37 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { getNavigationSections, getPageMeta } from '../src/lib/navigation'
+import { getNavigationSections, getPageMeta, isNavigationItemActive } from '../src/lib/navigation'
 
-test('핵심 업무와 AI 제작 도구를 서로 다른 메뉴 그룹으로 구성한다', () => {
+test('일반 사용자는 네 가지 쉬운 기본 메뉴만 본다', () => {
   const sections = getNavigationSections('viewer')
+  const items = sections.flatMap(section => section.items)
 
-  assert.deepEqual(sections.map(section => section.label), ['업무', 'AI 콘텐츠', '관리'])
-  assert.deepEqual(
-    sections[0].items.map(item => item.href),
-    ['/dashboard', '/projects', '/tasks'],
-  )
-  assert.deepEqual(
-    sections[1].items.map(item => item.href),
-    ['/analysis', '/blog', '/cardnews', '/shorts', '/docs'],
-  )
+  assert.deepEqual(sections.map(section => section.label), ['기본 메뉴'])
+  assert.deepEqual(items.map(item => item.href), ['/dashboard', '/projects', '/tasks', '/help'])
+  assert.deepEqual(items.map(item => item.label), ['홈', '내 매물', '처리 알림', '도움말'])
 })
 
-test('회원 관리는 관리자에게만 노출한다', () => {
-  const viewerItems = getNavigationSections('viewer').flatMap(section => section.items)
-  const adminItems = getNavigationSections('admin').flatMap(section => section.items)
+test('새 매물 입력에서는 모바일 새 매물만 활성화한다', () => {
+  assert.equal(isNavigationItemActive('/projects/new', '/projects/new'), true)
+  assert.equal(isNavigationItemActive('/projects/new', '/projects'), false)
+  assert.equal(isNavigationItemActive('/projects/abc', '/projects'), true)
+})
 
+test('관리 메뉴는 관리자에게만 보인다', () => {
+  const viewerItems = getNavigationSections('viewer').flatMap(section => section.items)
+  const adminSections = getNavigationSections('admin')
+  const adminItems = adminSections.flatMap(section => section.items)
+
+  assert.equal(viewerItems.some(item => item.href === '/usage'), false)
   assert.equal(viewerItems.some(item => item.href === '/admin/members'), false)
+  assert.equal(adminSections.some(section => section.label === '관리자 메뉴'), true)
+  assert.equal(adminItems.some(item => item.href === '/usage'), true)
   assert.equal(adminItems.some(item => item.href === '/admin/members'), true)
 })
 
-test('상세 경로에서도 상단 헤더 문맥을 유지한다', () => {
-  assert.deepEqual(getPageMeta('/projects/abc'), {
-    eyebrow: '매물 관리',
-    title: '매물 상세',
-  })
-  assert.deepEqual(getPageMeta('/cardnews'), {
-    eyebrow: 'AI 콘텐츠',
-    title: '카드뉴스',
-  })
+test('상세 경로에서도 초보자가 이해할 수 있는 상단 문맥을 유지한다', () => {
+  assert.deepEqual(getPageMeta('/dashboard'), { eyebrow: '홈', title: '오늘 할 일' })
+  assert.deepEqual(getPageMeta('/projects/abc'), { eyebrow: '내 매물', title: '매물 상세' })
+  assert.deepEqual(getPageMeta('/tasks'), { eyebrow: '처리 알림', title: '처리 상태와 문제 해결' })
+  assert.deepEqual(getPageMeta('/help'), { eyebrow: '도움말', title: '처음 사용하는 분을 위한 안내' })
 })

@@ -1,0 +1,1 @@
+export default function PrivacyPage() { return <main className="mx-auto max-w-2xl p-8"><h1 className="text-2xl font-bold">개인정보 처리 안내</h1><p className="mt-4 leading-7 text-slate-600">이 문서는 서비스 정보 초안이며, 법적 효력이 있는 최종 개인정보처리방침이 아닙니다.</p><p className="mt-3 leading-7 text-slate-600">서비스 제공과 계정 관리에 필요한 정보 처리 범위는 운영 주체와 적용 내용이 확정된 뒤 정식 문서로 안내됩니다.</p></main> }

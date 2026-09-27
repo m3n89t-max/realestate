@@ -1,715 +1,224 @@
 'use client'
 
-import { useState } from 'react'
-import { flushSync } from 'react-dom'
+import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { StepperHeader, StepperNav } from '@/components/ui/StepperForm'
-import AssetUploader from '@/components/ui/AssetUploader'
-import { MapPin, Home } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { Home, MapPin } from 'lucide-react'
 import toast from 'react-hot-toast'
+import AssetUploader, { type AssetUploadResult } from '@/components/ui/AssetUploader'
+import { StepperHeader, StepperNav } from '@/components/ui/StepperForm'
+import { formatKoreanPrice, parsePositivePrice, validatePropertyBasics } from '@/lib/property-form'
+import { createClient } from '@/lib/supabase/client'
+import { uploadProjectAssets } from '@/lib/project-asset-upload'
 import type { PropertyType } from '@/lib/types'
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-declare global { interface Window { kakao: any } }
-
-async function geocodeAddress(address: string): Promise<{ lat: number; lng: number; jibun_address: string | null } | null> {
-  const apiKey = process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY
-  if (!apiKey) return null
-  if (!window.kakao?.maps?.services) {
-    await new Promise<void>((resolve, reject) => {
-      if (document.querySelector('script[src*="dapi.kakao.com"]')) {
-        const check = setInterval(() => {
-          if (window.kakao?.maps?.services) { clearInterval(check); resolve() }
-        }, 100)
-        setTimeout(() => { clearInterval(check); reject(new Error('SDK timeout')) }, 10000)
-        return
-      }
-      const script = document.createElement('script')
-      script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${apiKey}&autoload=false&libraries=services`
-      script.onload = () => window.kakao.maps.load(resolve)
-      script.onerror = reject
-      document.head.appendChild(script)
-    })
-  }
-  return new Promise((resolve) => {
-    const geocoder = new window.kakao.maps.services.Geocoder()
-    geocoder.addressSearch(address, (result: any[], status: string) => {
-      if (status === window.kakao.maps.services.Status.OK && result.length > 0) {
-        const r = result[0]
-        resolve({ lat: parseFloat(r.y), lng: parseFloat(r.x), jibun_address: r.address?.address_name ?? null })
-      } else {
-        const places = new window.kakao.maps.services.Places()
-        places.keywordSearch(address, (kResult: any[], kStatus: string) => {
-          if (kStatus === window.kakao.maps.services.Status.OK && kResult.length > 0) {
-            resolve({ lat: parseFloat(kResult[0].y), lng: parseFloat(kResult[0].x), jibun_address: kResult[0].address_name ?? null })
-          } else { resolve(null) }
-        })
-      }
-    })
-  })
-}
-
 const STEPS = [
-  { id: 'basic', title: '매물 정보표', description: '공인중개사 확인·설명서 기준' },
-  { id: 'photos', title: '사진/동영상', description: '매물 사진 · 동영상 추가' },
-  { id: 'analysis', title: '입지 분석', description: 'AI 입지 분석 실행' },
+  { id: 'basic', title: '기본정보 입력', description: '주소와 가격을 입력해요' },
+  { id: 'photos', title: '사진 추가 (선택)', description: '나중에 추가할 수 있어요' },
+  { id: 'analysis', title: '입지 분석 시작', description: '주변 정보를 준비해요' },
 ]
 
-const PROPERTY_TYPES: { value: PropertyType; label: string }[] = [
-  { value: 'apartment', label: '아파트' },
-  { value: 'officetel', label: '오피스텔' },
-  { value: 'oneroom', label: '원룸' },
-  { value: 'villa', label: '빌라/다세대' },
-  { value: 'multi_unit', label: '다가구주택' },
-  { value: 'house', label: '단독주택' },
-  { value: 'mixed_use', label: '상가주택' },
-  { value: 'commercial', label: '상가/사무실' },
-  { value: 'knowledge_industry', label: '지식산업센터' },
-  { value: 'factory', label: '공장/창고' },
-  { value: 'land', label: '토지' },
-  { value: 'forest', label: '임야' },
+const TYPES: { value: PropertyType; label: string }[] = [
+  { value: 'apartment', label: '아파트' }, { value: 'officetel', label: '오피스텔' },
+  { value: 'oneroom', label: '원룸' }, { value: 'villa', label: '빌라/다세대' },
+  { value: 'multi_unit', label: '다가구주택' }, { value: 'house', label: '단독주택' },
+  { value: 'mixed_use', label: '상가주택' }, { value: 'commercial', label: '상가/사무실' },
+  { value: 'knowledge_industry', label: '지식산업센터' }, { value: 'factory', label: '공장/창고' },
+  { value: 'land', label: '토지' }, { value: 'forest', label: '임야' },
 ]
+const FEATURES = ['역세권', '학군우수', '신축', '주차가능', '남향', '조용한', '뷰좋음', '풀옵션', '관리비저렴', '대단지', '커뮤니티시설', '공원인접', '상권인접', '즉시입주']
+const WHOLE_BUILDING_FEATURE = '건물전체'
+const DIRECTIONS = ['', '남향', '남동향', '남서향', '동향', '서향', '북향', '북동향', '북서향']
 
-const DIRECTIONS = ['남향', '남동향', '남서향', '동향', '서향', '북향', '북동향', '북서향']
+type TextField = 'address' | 'property_category' | 'main_use' | 'price' | 'monthly_rent' | 'deposit' | 'key_money' | 'area' | 'land_area' | 'total_area' | 'floor' | 'total_floors' | 'rooms_count' | 'bathrooms_count' | 'direction' | 'approval_date' | 'parking_legal' | 'parking_actual' | 'move_in_date' | 'management_fee_detail' | 'building_condition' | 'floor_composition' | 'rental_status' | 'note'
+type Form = Record<TextField, string> & { property_type: PropertyType | ''; transaction_type: 'sale' | 'lease' | 'rent'; whole_building: boolean; features: string[] }
 
-const COMMON_FEATURES = [
-  '역세권', '학군우수', '신축', '주차가능', '남향', '조용한', '뷰좋음',
-  '풀옵션', '관리비저렴', '대단지', '커뮤니티시설', '공원인접', '상권인접', '즉시입주',
-]
-
-interface FormData {
-  address: string
-  property_type: PropertyType | ''
-  property_category: string
-  main_use: string
-  transaction_type: 'sale' | 'lease' | 'rent'
-  price: string
-  monthly_rent: string
-  deposit: string
-  key_money: string
-  area: string
-  land_area: string
-  total_area: string
-  floor: string
-  whole_building: boolean   // UI전용: 건물 전체 여부
-  total_floors: string
-  rooms_count: string
-  bathrooms_count: string
-  direction: string
-  approval_date: string
-  parking_legal: string
-  parking_actual: string
-  move_in_date: string
-  management_fee_detail: string
-  features: string[]
-  building_condition: string
-  floor_composition: string
-  rental_status: string
-  note: string
+const initial: Form = {
+  address: '', property_type: '', property_category: '', main_use: '', transaction_type: 'sale', price: '', monthly_rent: '', deposit: '', key_money: '', area: '', land_area: '', total_area: '', floor: '', whole_building: false, total_floors: '', rooms_count: '', bathrooms_count: '', direction: '', approval_date: '', parking_legal: '', parking_actual: '', move_in_date: '', management_fee_detail: '', features: [], building_condition: '', floor_composition: '', rental_status: '', note: '',
 }
 
-function TLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <td className="border border-gray-300 bg-blue-50 px-3 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap align-middle w-28">
-      {children}
-    </td>
-  )
-}
-function TCell({ children, colSpan }: { children: React.ReactNode; colSpan?: number }) {
-  return (
-    <td className="border border-gray-300 px-2 py-1.5 align-middle" colSpan={colSpan}>
-      {children}
-    </td>
-  )
-}
-function TInput({ value, onChange, placeholder, type = 'text', className = '', disabled, ariaLabel, inputMode }: {
-  value: string; onChange: (v: string) => void; placeholder?: string; type?: string; className?: string; disabled?: boolean
-  ariaLabel?: string; inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode']
-}) {
-  return (
-    <input
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      placeholder={placeholder}
-      type={type}
-      inputMode={inputMode}
-      aria-label={ariaLabel ?? placeholder}
-      disabled={disabled}
-      className={`w-full text-sm border-0 bg-transparent px-1 py-0.5 rounded placeholder:text-gray-300 disabled:text-gray-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:bg-brand-50/40 ${className}`}
-    />
-  )
+function optionalNumber(value: string, decimal = false): number | null {
+  const normalized = value.trim()
+  if (!normalized) return null
+  const pattern = decimal ? /^\d+(\.\d+)?$/ : /^\d+$/
+  if (!pattern.test(normalized)) return null
+  const number = Number(normalized)
+  return Number.isSafeInteger(number) || (decimal && Number.isFinite(number)) ? number : null
 }
 
 export default function NewProjectPage() {
   const router = useRouter()
   const supabase = createClient()
-  const [currentStep, setCurrentStep] = useState(0)
-  const [submitting, setSubmitting] = useState(false)
-  const [nextLoading, setNextLoading] = useState(false)
+  const [form, setForm] = useState<Form>(initial)
+  const [step, setStep] = useState(0)
   const [projectId, setProjectId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [normalizationStatus, setNormalizationStatus] = useState('')
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const refs = useRef<Record<string, HTMLElement | null>>({})
+  const normalizationPromise = useRef<Promise<void> | null>(null)
 
-  const [form, setForm] = useState<FormData>({
-    address: '',
-    property_type: '',
-    property_category: '',
-    main_use: '',
-    transaction_type: 'sale',
-    price: '',
-    monthly_rent: '',
-    deposit: '',
-    key_money: '',
-    area: '',
-    land_area: '',
-    total_area: '',
-    floor: '',
-    whole_building: false,
-    total_floors: '',
-    rooms_count: '',
-    bathrooms_count: '',
-    direction: '',
-    approval_date: '',
-    parking_legal: '',
-    parking_actual: '',
-    move_in_date: '',
-    management_fee_detail: '',
-    features: [],
-    building_condition: '',
-    floor_composition: '',
-    rental_status: '',
-    note: '',
-  })
-
-  const set = (field: keyof FormData, value: string | string[] | boolean) =>
-    setForm(prev => ({ ...prev, [field]: value }))
-
-  const toggleFeature = (f: string) =>
-    setForm(prev => ({
-      ...prev,
-      features: prev.features.includes(f) ? prev.features.filter(x => x !== f) : [...prev.features, f],
-    }))
-
-  const toggleWholeBuilding = () => {
-    setForm(prev => {
-      const next = !prev.whole_building
-      const features = next
-        ? prev.features.includes('건물전체') ? prev.features : [...prev.features, '건물전체']
-        : prev.features.filter(f => f !== '건물전체')
-      return { ...prev, whole_building: next, floor: next ? '' : prev.floor, features }
+  const set = <Key extends keyof Form>(key: Key, value: Form[Key]) => {
+    setForm((previous) => ({ ...previous, [key]: value }))
+    setErrors((previous) => {
+      const next = { ...previous }
+      delete next[key]
+      return next
     })
   }
 
-  const canNext = () => {
-    if (currentStep === 0) return form.address.length > 0
-    return true
+  const toggleWholeBuilding = (checked: boolean) => {
+    setForm((previous) => ({
+      ...previous,
+      whole_building: checked,
+      floor: checked ? '' : previous.floor,
+      features: checked
+        ? [...new Set([...previous.features, WHOLE_BUILDING_FEATURE])]
+        : previous.features.filter((feature) => feature !== WHOLE_BUILDING_FEATURE),
+    }))
   }
 
-  const handleNext = async () => {
-    if (currentStep === 0 && !projectId) {
-      flushSync(() => setNextLoading(true))
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) { toast.error('로그인이 필요합니다'); return }
+  const validate = () => {
+    const next = validatePropertyBasics({ address: form.address, propertyType: form.property_type, transactionType: form.transaction_type, price: form.price, deposit: form.deposit, monthlyRent: form.monthly_rent })
+    setErrors(next)
+    const first = Object.keys(next)[0]
+    if (first) refs.current[first]?.focus()
+    return !first
+  }
 
-        let { data: membership } = await supabase
-          .from('memberships').select('org_id').eq('user_id', user.id)
-          .not('joined_at', 'is', null).limit(1).single()
+  const startNormalization = (address: string, id: string) => {
+    setNormalizationStatus('주소 정보를 확인하는 중입니다. 잠시만 기다려 주세요.')
+    normalizationPromise.current = supabase.functions.invoke('normalize-parcel', { body: { parcel_input: address, project_id: id } })
+      .then(({ error }) => setNormalizationStatus(error ? '주소 정보를 확인하지 못했습니다. 분석은 계속할 수 있습니다.' : '주소 정보 확인이 완료되었습니다.'))
+      .catch(() => setNormalizationStatus('주소 정보를 확인하지 못했습니다. 분석은 계속할 수 있습니다.'))
+  }
 
-        if (!membership) {
-          const displayName = user.email?.split('@')[0] ?? '사용자'
-          const { data: newOrg, error: orgErr } = await supabase
-            .from('organizations').insert({ name: `${displayName}의 중개사무소`, plan_type: 'free' })
-            .select('id').single()
-          if (orgErr || !newOrg) { toast.error(`조직 생성 실패: ${orgErr?.message}`); return }
-          await supabase.from('memberships').insert({
-            org_id: newOrg.id, user_id: user.id, role: 'owner', joined_at: new Date().toISOString()
-          })
-          membership = { org_id: newOrg.id }
-        }
+  const saveBasic = async () => {
+    if (!validate()) return false
+    setLoading(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { toast.error('로그인이 필요합니다.'); return false }
+      const { data: membership } = await supabase.from('memberships').select('org_id').eq('user_id', user.id).not('joined_at', 'is', null).limit(1).single()
+      if (!membership) { toast.error('계정을 준비하지 못했습니다. 다시 로그인해 주세요.'); return false }
 
-        let lat: number | null = null, lng: number | null = null, jibunAddress: string | null = null
-        try {
-          const geo = await geocodeAddress(form.address)
-          if (geo) { lat = geo.lat; lng = geo.lng; jibunAddress = geo.jibun_address }
-          else toast('주소 좌표를 찾지 못했습니다.', { duration: 5000 })
-        } catch { /* 좌표 변환 실패 시 null로 저장 (비치명적) */ }
-
-        const { data, error } = await supabase.from('projects').insert({
-          org_id: membership.org_id,
-          created_by: user.id,
-          address: form.address,
-          jibun_address: jibunAddress,
-          lat, lng,
-          property_type: form.property_type || null,
-          property_category: form.property_category || null,
-          main_use: form.main_use || null,
-          transaction_type: form.transaction_type,
-          price: form.price ? parseInt(form.price) * 10000 : null,
-          monthly_rent: form.monthly_rent ? parseInt(form.monthly_rent) * 10000 : null,
-          deposit: form.deposit ? parseInt(form.deposit) * 10000 : null,
-          key_money: form.key_money ? parseInt(form.key_money) * 10000 : null,
-          area: form.area ? parseFloat(form.area) : null,
-          land_area: form.land_area ? parseFloat(form.land_area) : null,
-          total_area: form.total_area ? parseFloat(form.total_area) : null,
-          // 건물 전체이면 floor=null
-          floor: form.whole_building ? null : (form.floor ? parseInt(form.floor) : null),
-          total_floors: form.total_floors ? parseInt(form.total_floors) : null,
-          rooms_count: form.rooms_count ? parseInt(form.rooms_count) : null,
-          bathrooms_count: form.bathrooms_count ? parseInt(form.bathrooms_count) : null,
-          direction: form.direction || null,
-          approval_date: form.approval_date || null,
-          parking_legal: form.parking_legal ? parseInt(form.parking_legal) : null,
-          parking_actual: form.parking_actual ? parseInt(form.parking_actual) : null,
-          move_in_date: form.move_in_date || null,
-          management_fee_detail: form.management_fee_detail || null,
-          features: form.features,
-          building_condition: form.building_condition || null,
-          floor_composition: form.floor_composition || null,
-          rental_status: form.rental_status || null,
-          note: form.note || null,
-          status: 'draft',
-        }).select().single()
-
-        if (error) {
-          console.error('[projects.insert] error:', error)
-          throw new Error(`[${error.code}] ${error.message}${error.details ? ' | ' + error.details : ''}${error.hint ? ' | hint: ' + error.hint : ''}`)
-        }
-        setProjectId(data.id)
-
-        try {
-          await supabase.functions.invoke('normalize-parcel', {
-            body: { parcel_input: form.address, project_id: data.id },
-          })
-        } catch { /* non-critical */ }
-
-        toast.success('기본 정보가 저장되었습니다')
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err)
-        console.error('[handleNext] save failed:', msg)
-        toast.error(`저장 실패: ${msg}`, { duration: 10000 })
-        return
-      } finally {
-        setNextLoading(false)
+      const money = (value: string) => {
+        const parsed = parsePositivePrice(value)
+        return parsed === null ? null : parsed * 10000
       }
-    }
-    setCurrentStep(prev => prev + 1)
+      const { data, error } = await supabase.from('projects').insert({
+        org_id: membership.org_id, created_by: user.id, address: form.address.trim(), property_type: form.property_type || null,
+        property_category: form.property_category || null, main_use: form.main_use || null, transaction_type: form.transaction_type,
+        price: money(form.price), monthly_rent: money(form.monthly_rent), deposit: money(form.deposit), key_money: money(form.key_money),
+        area: optionalNumber(form.area, true), land_area: optionalNumber(form.land_area, true), total_area: optionalNumber(form.total_area, true),
+        floor: form.whole_building ? null : optionalNumber(form.floor), total_floors: optionalNumber(form.total_floors),
+        rooms_count: optionalNumber(form.rooms_count), bathrooms_count: optionalNumber(form.bathrooms_count), direction: form.direction || null,
+        approval_date: form.approval_date || null, parking_legal: optionalNumber(form.parking_legal), parking_actual: optionalNumber(form.parking_actual),
+        move_in_date: form.move_in_date || null, management_fee_detail: form.management_fee_detail || null, features: form.features,
+        building_condition: form.building_condition || null, floor_composition: form.floor_composition || null, rental_status: form.rental_status || null,
+        note: form.note || null, status: 'draft',
+      }).select().single()
+      if (error || !data) { toast.error('저장하지 못했습니다. 잠시 후 다시 시도해 주세요.'); return false }
+      setProjectId(data.id)
+      startNormalization(form.address.trim(), data.id)
+      toast.success('기본 정보를 임시 저장했습니다.')
+      return true
+    } catch {
+      toast.error('저장하지 못했습니다. 잠시 후 다시 시도해 주세요.')
+      return false
+    } finally { setLoading(false) }
   }
 
-  const handleSubmit = async () => {
-    if (!projectId) return
+  const upload = async (files: File[]): Promise<AssetUploadResult[]> => {
+    if (!projectId) return files.map((file) => ({ file, success: false, error: '먼저 기본 정보를 저장해 주세요.' }))
+    let membership: { org_id: string } | null = null
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data } = await supabase.from('memberships').select('org_id').eq('user_id', user.id).not('joined_at', 'is', null).limit(1).single()
+        membership = data
+      }
+    } catch {
+      return files.map((file) => ({ file, success: false, error: '계정 정보를 확인하지 못했습니다. 다시 시도해 주세요.' }))
+    }
+    if (!membership) return files.map((file) => ({ file, success: false, error: '계정 정보를 찾을 수 없습니다.' }))
+
+    return uploadProjectAssets(files, {
+      makePath: (file) => `${membership.org_id}/${projectId}/${crypto.randomUUID()}_${file.name}`,
+      upload: async (path, file) => !(await supabase.storage.from('project-assets').upload(path, file)).error,
+      publicUrl: (path) => supabase.storage.from('project-assets').getPublicUrl(path).data.publicUrl,
+      registerAsset: async ({ file, url, sortOrder }) => {
+        const { data, error } = await supabase.rpc('register_project_asset', {
+          p_org_id: membership.org_id,
+          p_project_id: projectId,
+          p_file_name: file.name,
+          p_file_url: url,
+          p_file_size: file.size,
+          p_mime_type: file.type,
+          p_type: file.type.startsWith('video/') ? 'video' : 'image',
+          p_sort_order: sortOrder,
+        }).single()
+        if (error || !data) return null
+        const registered = data as { asset_id: string; is_cover: boolean }
+        return { assetId: registered.asset_id, isCover: registered.is_cover }
+      },
+      deleteStorage: async (path) => !(await supabase.storage.from('project-assets').remove([path])).error,
+    })
+  }
+
+  const next = async () => {
+    if (uploading) return
+    if (step === 0 && !projectId && !(await saveBasic())) return
+    setStep((value) => value + 1)
+  }
+
+  const finish = async () => {
+    if (!projectId || uploading) return
     setSubmitting(true)
     try {
-      const { error: updateError } = await supabase
-        .from('projects')
-        .update({ status: 'active' })
-        .eq('id', projectId)
-      if (updateError) throw updateError
-
-      toast('입지 데이터를 준비하고 있습니다', { duration: 5000 })
-      const { error: analyzeErr } = await supabase.functions.invoke('analyze-location', {
-        body: { project_id: projectId },
-      })
-      if (analyzeErr) {
-        toast.error('매물은 등록됐지만 AI 분석은 시작하지 못했습니다. 입지분석 탭에서 다시 실행해주세요.', { duration: 8000 })
-      } else {
-        toast.success('매물 등록과 입지분석 요청이 완료되었습니다')
+      if (normalizationPromise.current) {
+        setNormalizationStatus('주소 정보 확인이 끝날 때까지 기다리고 있습니다.')
+        await normalizationPromise.current
       }
+      const { error } = await supabase.from('projects').update({ status: 'active' }).eq('id', projectId)
+      if (error) throw error
+      const { error: analyzeError } = await supabase.functions.invoke('analyze-location', { body: { project_id: projectId } })
+      toast[analyzeError ? 'error' : 'success'](analyzeError ? '매물은 등록됐습니다. 입지 분석은 매물 상세에서 다시 시작해 주세요.' : '매물을 등록하고 입지 분석을 시작했습니다.')
       router.push(`/projects/${projectId}?tab=analysis`)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '완료 처리 실패'
-      toast.error(`완료 처리 실패: ${message}`)
-    } finally {
-      setSubmitting(false)
-    }
+    } catch {
+      toast.error('완료하지 못했습니다. 잠시 후 다시 시도해 주세요.')
+    } finally { setSubmitting(false) }
   }
 
-  const handleUpload = async (files: File[]) => {
-    if (!projectId) return
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { toast.error('사용자 인증 정보를 찾을 수 없습니다.'); return }
-    const { data: membership, error: memError } = await supabase
-      .from('memberships').select('org_id').eq('user_id', user.id)
-      .not('joined_at', 'is', null).limit(1).single()
-    if (memError || !membership) { toast.error('조직 정보를 불러오지 못했습니다.'); return }
-
-    let firstUrl: string | null = null
-    let count = 0
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]
-      const ext = file.name.split('.').pop()
-      const filePath = `${membership.org_id}/${projectId}/${Math.random().toString(36).slice(2)}_${Date.now()}.${ext}`
-      const { error: uploadError } = await supabase.storage.from('project-assets').upload(filePath, file)
-      if (uploadError) { toast.error(`${file.name} 업로드 실패`); continue }
-      const { data: urlData } = supabase.storage.from('project-assets').getPublicUrl(filePath)
-      if (!firstUrl) firstUrl = urlData.publicUrl
-      const { error: insertError } = await supabase.from('assets').insert({
-        project_id: projectId, org_id: membership.org_id,
-        type: file.type.startsWith('video/') ? 'video' : 'image',
-        file_name: file.name, file_url: urlData.publicUrl,
-        file_size: file.size, mime_type: file.type,
-        is_cover: i === 0, sort_order: i,
-      })
-      if (!insertError) count++
-    }
-    if (firstUrl) {
-      const { data: pd } = await supabase.from('projects').select('cover_image_url').eq('id', projectId).single()
-      if (!pd?.cover_image_url) await supabase.from('projects').update({ cover_image_url: firstUrl }).eq('id', projectId)
-    }
-    if (count > 0) toast.success(`${count}개의 파일이 업로드되었습니다.`)
-  }
-
-  /* ── 거래형태별 가격 행 ── */
-  const priceSections = () => {
-    if (form.transaction_type === 'rent') return (
-      <tr>
-        <TLabel>보 증 금<br /><span className="font-normal text-gray-400">(만원)</span></TLabel>
-        <TCell><TInput value={form.deposit} onChange={v => set('deposit', v)} placeholder="7000" /></TCell>
-        <TLabel>월 임 대 료<br /><span className="font-normal text-gray-400">(만원)</span></TLabel>
-        <TCell><TInput value={form.monthly_rent} onChange={v => set('monthly_rent', v)} placeholder="500" className="text-red-600 font-bold" /></TCell>
-      </tr>
-    )
-    if (form.transaction_type === 'lease') return (
-      <tr>
-        <TLabel>전세보증금<br /><span className="font-normal text-gray-400">(만원)</span></TLabel>
-        <TCell colSpan={3}><TInput value={form.deposit} onChange={v => set('deposit', v)} placeholder="30000" className="text-red-600 font-bold" /></TCell>
-      </tr>
-    )
-    return (
-      <tr>
-        <TLabel>매 매 가<br /><span className="font-normal text-gray-400">(만원)</span></TLabel>
-        <TCell colSpan={3}><TInput value={form.price} onChange={v => set('price', v)} placeholder="100000" className="text-red-600 font-bold" /></TCell>
-      </tr>
-    )
-  }
-
-  const chipBtn = (label: string, active: boolean, onClick: () => void) => (
-    <button key={label} type="button" onClick={onClick}
-      className={`px-2.5 py-1 rounded text-xs border transition-colors ${active ? 'bg-brand-600 text-white border-brand-600' : 'border-gray-200 text-gray-600 hover:border-brand-300'}`}>
+  const input = (key: TextField, label: string, type = 'text') => (
+    <label className="block text-sm font-semibold text-slate-800">
       {label}
-    </button>
+      <input ref={(node) => { refs.current[key] = node }} type={type} value={form[key]} onChange={(event) => set(key, event.target.value)} className="input mt-2" />
+      {errors[key] && <span role="alert" className="mt-1 block text-sm text-red-700">{errors[key]}</span>}
+    </label>
   )
+  const priceKey = form.transaction_type === 'sale' ? 'price' : form.transaction_type === 'lease' ? 'deposit' : 'monthly_rent'
+  const priceLabel = form.transaction_type === 'sale' ? '매매가 (만원)' : form.transaction_type === 'lease' ? '전세 보증금 (만원)' : '월세 (만원)'
 
-  return (
-    <div className="max-w-3xl mx-auto animate-fade-in">
-      <div className="mb-6">
-        <h1 className="text-xl font-bold text-gray-900">새 매물 등록</h1>
-        <p className="text-sm text-gray-500 mt-1">공인중개사 확인·설명서 기준으로 입력하면 AI가 자동으로 마케팅 콘텐츠를 생성합니다</p>
-      </div>
-
-      <div className="card p-5 mb-5">
-        <StepperHeader steps={STEPS} currentStep={currentStep} />
-      </div>
-
-      <div className="card p-5">
-
-        {/* ── Step 1: 매물 정보표 ── */}
-        {currentStep === 0 && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-brand-600 mb-3">
-              <MapPin size={16} />
-              <h2 className="font-semibold text-sm">매물 확인·설명서 정보 입력</h2>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse border border-gray-400 text-xs">
-                <tbody>
-
-                  {/* Row 1: 소재지 */}
-                  <tr>
-                    <TLabel>소 재 지 *</TLabel>
-                    <TCell colSpan={5}>
-                      <input
-                        value={form.address}
-                        onChange={e => set('address', e.target.value)}
-                        placeholder="화성시 만세구 향남읍 하길리 123"
-                        className="w-full text-sm border-0 outline-none bg-transparent px-1 py-0.5 placeholder:text-gray-300"
-                      />
-                    </TCell>
-                  </tr>
-
-                  {/* Row 1b: 중개대상물 종류 — 가로 탭 */}
-                  <tr>
-                    <TLabel>중개대상물 종류</TLabel>
-                    <TCell colSpan={5}>
-                      <div className="flex gap-1 py-0.5 flex-wrap">
-                        {PROPERTY_TYPES.map(pt => (
-                          <button
-                            key={pt.value}
-                            type="button"
-                            onClick={() => setForm(f => ({ ...f, property_type: pt.value, property_category: pt.label }))}
-                            className={`px-3 py-1 rounded-full text-[11px] border transition-colors whitespace-nowrap ${form.property_type === pt.value ? 'bg-brand-600 text-white border-brand-600' : 'border-gray-300 text-gray-500 hover:border-brand-400'}`}
-                          >
-                            {pt.label}
-                          </button>
-                        ))}
-                      </div>
-                    </TCell>
-                  </tr>
-
-                  {/* Row 2: 주용도 / 해당층·총층·건물전체 / 거래형태 */}
-                  <tr>
-                    <TLabel>주 용 도</TLabel>
-                    <TCell>
-                      <TInput value={form.main_use} onChange={v => set('main_use', v)} placeholder="제2종근생" />
-                    </TCell>
-                    <TLabel>해당층/총층</TLabel>
-                    <TCell>
-                      <div className="flex items-center gap-1 flex-nowrap whitespace-nowrap">
-                        <input
-                          value={form.whole_building ? '전체' : form.floor}
-                          onChange={e => set('floor', e.target.value)}
-                          placeholder="1"
-                          disabled={form.whole_building}
-                          className="w-10 text-sm border-0 outline-none bg-transparent px-1 py-0.5 placeholder:text-gray-300 disabled:text-gray-400"
-                        />
-                        <span className="text-gray-400">층 /</span>
-                        <input
-                          value={form.total_floors}
-                          onChange={e => set('total_floors', e.target.value)}
-                          placeholder="2"
-                          className="w-10 text-sm border-0 outline-none bg-transparent px-1 py-0.5 placeholder:text-gray-300"
-                        />
-                        <span className="text-gray-400">층</span>
-                        <button
-                          type="button"
-                          onClick={toggleWholeBuilding}
-                          className={`ml-1 px-2 py-0.5 rounded text-[11px] border transition-colors flex-shrink-0 ${form.whole_building ? 'bg-brand-600 text-white border-brand-600' : 'border-gray-300 text-gray-500 hover:border-brand-400'}`}
-                        >
-                          건물전체
-                        </button>
-                      </div>
-                    </TCell>
-                    <TLabel>거 래 형 태</TLabel>
-                    <TCell>
-                      <select
-                        value={form.transaction_type}
-                        onChange={e => set('transaction_type', e.target.value)}
-                        className="text-sm border-0 outline-none bg-transparent w-full"
-                      >
-                        <option value="sale">매매</option>
-                        <option value="lease">전세</option>
-                        <option value="rent">임대</option>
-                      </select>
-                    </TCell>
-                  </tr>
-
-                  {/* Row 4: 대지면적 / 사용승인일 / 연면적 */}
-                  <tr>
-                    <TLabel>대지면적(㎡)</TLabel>
-                    <TCell>
-                      <TInput value={form.land_area} onChange={v => set('land_area', v)} placeholder="1428" type="number" />
-                    </TCell>
-                    <TLabel>사용승인일</TLabel>
-                    <TCell>
-                      <TInput value={form.approval_date} onChange={v => set('approval_date', v)} placeholder="2025.08" />
-                    </TCell>
-                    <TLabel>연 면 적(㎡)</TLabel>
-                    <TCell>
-                      <TInput value={form.total_area} onChange={v => set('total_area', v)} placeholder="285" type="number" />
-                    </TCell>
-                  </tr>
-
-                  {/* Row 5: 전용면적 / 입주가능일 / 방·화장실 */}
-                  <tr>
-                    <TLabel>전용면적(㎡)</TLabel>
-                    <TCell>
-                      <TInput value={form.area} onChange={v => set('area', v)} placeholder="285" type="number" />
-                    </TCell>
-                    <TLabel>입주가능일</TLabel>
-                    <TCell>
-                      <TInput value={form.move_in_date} onChange={v => set('move_in_date', v)} placeholder="즉시입주가능" />
-                    </TCell>
-                    <TLabel>방 / 화장실</TLabel>
-                    <TCell>
-                      <div className="flex items-center gap-1">
-                        <TInput value={form.rooms_count} onChange={v => set('rooms_count', v)} placeholder="0" type="number" className="w-10" />
-                        <span className="text-gray-400"> / </span>
-                        <TInput value={form.bathrooms_count} onChange={v => set('bathrooms_count', v)} placeholder="1" type="number" className="w-10" />
-                      </div>
-                    </TCell>
-                  </tr>
-
-                  {/* Row 5b: 주차대수 */}
-                  <tr>
-                    <TLabel>주 차 대 수</TLabel>
-                    <TCell colSpan={5}>
-                      <div className="flex gap-4 flex-nowrap">
-                        <div className="flex items-center gap-1 text-xs whitespace-nowrap">
-                          <span className="text-gray-500">대장상</span>
-                          <TInput value={form.parking_legal} onChange={v => set('parking_legal', v)} placeholder="12" type="number" className="w-12" />
-                          <span className="text-gray-400">대</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-xs whitespace-nowrap">
-                          <span className="text-gray-500">실주차</span>
-                          <TInput value={form.parking_actual} onChange={v => set('parking_actual', v)} placeholder="20" type="number" className="w-12" />
-                          <span className="text-gray-400">대</span>
-                        </div>
-                      </div>
-                    </TCell>
-                  </tr>
-
-                  {/* Row 6: 가격 (거래형태별) */}
-                  {priceSections()}
-
-                  {/* Row 7: 권리금 / 관리비 */}
-                  <tr>
-                    <TLabel>권 리 금<br /><span className="font-normal text-gray-400">(만원)</span></TLabel>
-                    <TCell>
-                      <TInput value={form.key_money} onChange={v => set('key_money', v)} placeholder="무권리=0" />
-                    </TCell>
-                    <TLabel>관 리 비</TLabel>
-                    <TCell colSpan={3}>
-                      <textarea
-                        value={form.management_fee_detail}
-                        onChange={e => set('management_fee_detail', e.target.value)}
-                        placeholder={`없음.\n실비(전기,수도가스,인터넷 실사용 부과)`}
-                        rows={2}
-                        className="w-full text-xs border-0 outline-none bg-transparent px-1 py-0.5 resize-none placeholder:text-gray-300"
-                      />
-                    </TCell>
-                  </tr>
-
-                  {/* Row 8: 방향 */}
-                  <tr>
-                    <TLabel>방 향<br /><span className="font-normal text-gray-400">(주출입구)</span></TLabel>
-                    <TCell colSpan={5}>
-                      <div className="flex flex-wrap gap-1.5 py-0.5">
-                        {DIRECTIONS.map(dir => chipBtn(dir, form.direction === dir, () => set('direction', form.direction === dir ? '' : dir)))}
-                      </div>
-                    </TCell>
-                  </tr>
-
-                  {/* Row 9: 특장점 */}
-                  <tr>
-                    <TLabel>특 장 점<br /><span className="font-normal text-gray-400">(복수 선택)</span></TLabel>
-                    <TCell colSpan={5}>
-                      <div className="flex flex-wrap gap-1.5 py-0.5">
-                        {COMMON_FEATURES.map(f => chipBtn(f, form.features.includes(f), () => toggleFeature(f)))}
-                      </div>
-                    </TCell>
-                  </tr>
-
-                  {/* Row 10: 건물 상태 */}
-                  <tr>
-                    <TLabel>건 물 상 태</TLabel>
-                    <TCell colSpan={5}>
-                      <div className="flex gap-2 py-0.5">
-                        {['신축', '양호', '보통', '노후'].map(c => chipBtn(c, form.building_condition === c, () => set('building_condition', form.building_condition === c ? '' : c)))}
-                      </div>
-                    </TCell>
-                  </tr>
-
-                  {/* Row 11: 층별 구성 */}
-                  <tr>
-                    <TLabel>층 별 구 성</TLabel>
-                    <TCell colSpan={5}>
-                      <textarea
-                        value={form.floor_composition}
-                        onChange={e => set('floor_composition', e.target.value)}
-                        placeholder={`1층: 편의점 (임대중, 보증금 1000/월세 150)\n2층: 사무실 (공실)`}
-                        rows={2}
-                        className="w-full text-xs border-0 outline-none bg-transparent px-1 py-0.5 resize-none placeholder:text-gray-300"
-                      />
-                    </TCell>
-                  </tr>
-
-                  {/* Row 12: 임대 현황 */}
-                  <tr>
-                    <TLabel>임 대 현 황</TLabel>
-                    <TCell colSpan={5}>
-                      <textarea
-                        value={form.rental_status}
-                        onChange={e => set('rental_status', e.target.value)}
-                        placeholder="계약만료일, 수익률, 공실 현황 등"
-                        rows={2}
-                        className="w-full text-xs border-0 outline-none bg-transparent px-1 py-0.5 resize-none placeholder:text-gray-300"
-                      />
-                    </TCell>
-                  </tr>
-
-                </tbody>
-              </table>
-            </div>
-
-            {/* 현장 관찰 메모 - 표 외부 */}
-            <div className="border-t pt-4">
-              <div className="flex items-center gap-2 mb-2">
-                <span>📋</span>
-                <h3 className="font-semibold text-gray-800 text-sm">현장 관찰 메모</h3>
-                <span className="text-xs text-gray-400">AI 콘텐츠 품질에 직결됩니다</span>
-              </div>
-              <textarea
-                value={form.note}
-                onChange={e => set('note', e.target.value)}
-                placeholder={`현장에서 직접 보고 느낀 것을 자유롭게 적어주세요.\n- 외관 상태, 주변 환경, 장단점, 주의사항 등`}
-                rows={3}
-                className="input resize-none text-sm w-full"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* ── Step 2: 사진/동영상 ── */}
-        {currentStep === 1 && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-brand-600 mb-4">
-              <Home size={18} />
-              <h2 className="font-semibold">사진 &amp; 동영상 업로드</h2>
-            </div>
-            <p className="text-sm text-gray-500">
-              사진과 동영상을 함께 업로드하세요. AI가 실제 매물 이미지를 분석하여 카드뉴스 · 쇼츠 스크립트 품질을 높입니다.<br />
-              <strong className="text-brand-600 mt-1 inline-block">※ 첫 번째로 업로드하는 파일(사진/동영상)이 대표 썸네일로 자동 지정됩니다.</strong>
-            </p>
-            <div className="flex gap-3 text-xs text-gray-500 bg-gray-50 rounded-lg p-3">
-              <span className="text-blue-500 font-medium">사진</span> 카드뉴스 배경 · AI 비전 분석
-              <span className="mx-1">·</span>
-              <span className="text-purple-500 font-medium">동영상</span> 쇼츠 편집 소스 · 장면 구성 참고
-            </div>
-            <AssetUploader
-              accept={{ 'image/*': ['.jpg', '.jpeg', '.png', '.webp'], 'video/*': ['.mp4', '.mov', '.avi', '.webm'] }}
-              maxFiles={30}
-              maxSize={200 * 1024 * 1024}
-              onUpload={handleUpload}
-            />
-          </div>
-        )}
-
-        {/* ── Step 3: 입지 분석 ── */}
-        {currentStep === 2 && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-brand-600 mb-4">
-              <MapPin size={18} />
-              <h2 className="font-semibold">입지 분석</h2>
-            </div>
-            <div className="bg-brand-50 rounded-xl p-5">
-              <p className="text-sm font-medium text-brand-800">AI 입지 분석 준비됨</p>
-              <p className="text-sm text-brand-600 mt-1">&quot;완료&quot; 버튼을 누르면 아래 항목이 자동 분석됩니다:</p>
-              <ul className="mt-3 space-y-1.5">
-                {['교통 (도보/차량 시간 기반)', '학군 (학교 위치 및 거리)', '상권 (마트/병원/공원 등)', '입지 장점 7가지 자동 생성', '추천 타겟 3종 분석'].map((item, i) => (
-                  <li key={i} className="flex items-center gap-2 text-sm text-brand-700">
-                    <span className="w-5 h-5 bg-brand-200 rounded-full flex items-center justify-center text-xs font-bold text-brand-700">{i + 1}</span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <p className="text-xs text-gray-400">* 분석에는 약 10~30초가 소요됩니다.</p>
-          </div>
-        )}
-
-        <StepperNav
-          currentStep={currentStep}
-          totalSteps={STEPS.length}
-          onPrev={() => setCurrentStep(prev => prev - 1)}
-          onNext={handleNext}
-          onSubmit={handleSubmit}
-          isSubmitting={submitting}
-          isNextLoading={nextLoading}
-          nextLabel="다음 단계"
-          submitLabel="매물 등록 완료"
-          canNext={canNext()}
-        />
-      </div>
+  return <div className="mx-auto max-w-3xl animate-fade-in">
+    <h1 className="text-2xl font-bold">새 매물 입력</h1>
+    <p className="mt-2 text-sm text-slate-600">쉬운 정보부터 입력하고, 나머지는 나중에 이어서 할 수 있어요.</p>
+    <div className="card mt-6 p-4"><StepperHeader steps={STEPS} currentStep={step} onStepClick={setStep} disabled={uploading} /></div>
+    <div className="card mt-5 p-5">
+      {step === 0 && <BasicDetails form={form} errors={errors} input={input} set={set} refs={refs} toggleWholeBuilding={toggleWholeBuilding} priceKey={priceKey} priceLabel={priceLabel} />}
+      {step === 1 && <PhotoStep upload={upload} uploading={uploading} setStep={setStep} setUploading={setUploading} />}
+      {step === 2 && <AnalysisStep normalizationStatus={normalizationStatus} />}
+      {uploading && <p className="mt-5 rounded-lg bg-amber-50 p-3 text-sm font-semibold text-amber-900" role="status">사진을 올리는 중입니다</p>}
+      <StepperNav currentStep={step} totalSteps={STEPS.length} onPrev={() => setStep((value) => value - 1)} onNext={next} onSubmit={finish} isSubmitting={submitting} isNextLoading={loading} disabled={uploading} nextLabel="다음" submitLabel="입지 분석 시작" canNext />
     </div>
-  )
+  </div>
 }
+
+type InputRenderer = (key: TextField, label: string, type?: string) => JSX.Element
+function BasicDetails({ form, errors, input, set, refs, toggleWholeBuilding, priceKey, priceLabel }: { form: Form; errors: Record<string, string>; input: InputRenderer; set: <Key extends keyof Form>(key: Key, value: Form[Key]) => void; refs: React.MutableRefObject<Record<string, HTMLElement | null>>; toggleWholeBuilding: (checked: boolean) => void; priceKey: TextField; priceLabel: string }) {
+  return <div className="space-y-7"><section><h2 className="text-lg font-bold">필수 정보</h2><div className="mt-5 space-y-5">{input('address', '주소')}<fieldset><legend className="text-sm font-semibold">매물 종류</legend><div className="mt-2 flex flex-wrap gap-2">{TYPES.map((type) => <button key={type.value} type="button" ref={(node) => { if (!refs.current.propertyType) refs.current.propertyType = node }} onClick={() => { set('property_type', type.value); set('property_category', type.label) }} className={`min-h-11 rounded-lg border px-3 text-sm ${form.property_type === type.value ? 'border-brand-600 bg-brand-50' : 'border-slate-300'}`}>{type.label}</button>)}</div>{errors.propertyType && <span role="alert" className="text-sm text-red-700">{errors.propertyType}</span>}</fieldset><label className="block text-sm font-semibold">거래 방식<select value={form.transaction_type} onChange={(event) => set('transaction_type', event.target.value as Form['transaction_type'])} className="input mt-2"><option value="sale">매매</option><option value="lease">전세</option><option value="rent">월세</option></select></label>{form.transaction_type === 'rent' && input('deposit', '보증금 (만원)', 'number')}{input(priceKey, priceLabel, 'number')}<p className="text-sm font-medium text-brand-800">{formatKoreanPrice(form[priceKey])}</p></div></section><section><h2 className="text-lg font-bold">매물 크기</h2><div className="mt-4 grid gap-4 sm:grid-cols-2">{input('area', '전용면적 (㎡)', 'number')}{input('land_area', '대지면적 (㎡)', 'number')}{input('total_area', '연면적 (㎡)', 'number')}{form.whole_building ? <p className="rounded-lg bg-slate-100 p-3 text-sm text-slate-600">건물 전체 매물은 해당 층을 입력하지 않습니다.</p> : input('floor', '해당 층', 'number')}{input('total_floors', '전체 층', 'number')}</div></section><details className="rounded-xl border p-4"><summary className="min-h-11 cursor-pointer pt-2 font-semibold">상세 정보 더 입력</summary><div className="mt-4 grid gap-4 sm:grid-cols-2">{input('main_use', '주용도')}{input('approval_date', '사용승인일', 'date')}{input('rooms_count', '방 개수', 'number')}{input('bathrooms_count', '화장실 개수', 'number')}<label className="text-sm font-semibold">방향<select value={form.direction} onChange={(event) => set('direction', event.target.value)} className="input mt-2">{DIRECTIONS.map((direction) => <option key={direction} value={direction}>{direction || '선택 안 함'}</option>)}</select></label>{input('move_in_date', '입주 가능일', 'date')}{input('parking_legal', '대장상 주차', 'number')}{input('parking_actual', '실주차', 'number')}{input('key_money', '권리금 (만원)', 'number')}<label className="flex min-h-11 items-center gap-2 text-sm font-semibold sm:col-span-2"><input type="checkbox" checked={form.whole_building} onChange={(event) => toggleWholeBuilding(event.target.checked)} className="size-5" />건물 전체 매물</label><fieldset className="sm:col-span-2"><legend className="text-sm font-semibold">특장점</legend><div className="mt-2 flex flex-wrap gap-2">{FEATURES.map((feature) => <label key={feature} className="flex min-h-11 items-center gap-1 rounded-lg border px-3 text-sm"><input type="checkbox" checked={form.features.includes(feature)} onChange={() => set('features', form.features.includes(feature) ? form.features.filter((value) => value !== feature) : [...form.features, feature])} />{feature}</label>)}</div></fieldset>{input('building_condition', '건물 상태')}<TextArea label="관리비" value={form.management_fee_detail} onChange={(value) => set('management_fee_detail', value)} /><TextArea label="층별 구성" value={form.floor_composition} onChange={(value) => set('floor_composition', value)} /><TextArea label="임대 현황" value={form.rental_status} onChange={(value) => set('rental_status', value)} /><TextArea label="메모" value={form.note} onChange={(value) => set('note', value)} /></div></details><p className="rounded-lg bg-brand-50 p-4 text-sm text-brand-900">다음을 누르면 임시 저장됩니다. 나중에 이어서 입력할 수 있습니다.</p></div>
+}
+function TextArea({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { return <label className="text-sm font-semibold sm:col-span-2">{label}<textarea value={value} onChange={(event) => onChange(event.target.value)} className="input mt-2 min-h-24" /></label> }
+function PhotoStep({ upload, uploading, setStep, setUploading }: { upload: (files: File[]) => Promise<AssetUploadResult[]>; uploading: boolean; setStep: React.Dispatch<React.SetStateAction<number>>; setUploading: (value: boolean) => void }) { return <div className="space-y-5"><div><Home className="text-brand-700" /><h2 className="mt-3 text-lg font-bold">사진 추가 (선택)</h2><p className="mt-1 text-sm text-slate-600">사진은 나중에 추가할 수 있어요.</p></div><AssetUploader maxFiles={30} maxSize={100 * 1024 * 1024} onUpload={upload} onUploadingChange={setUploading} /><button type="button" disabled={uploading} onClick={() => setStep(2)} className="min-h-11 text-sm font-semibold text-brand-700">사진은 나중에 추가</button></div> }
+function AnalysisStep({ normalizationStatus }: { normalizationStatus: string }) { return <div><MapPin className="text-brand-700" /><h2 className="mt-3 text-lg font-bold">입지 분석 시작</h2><p className="mt-2 text-sm leading-6 text-slate-600">완료를 누르면 주변 교통과 생활 편의시설 정보를 준비합니다.</p>{normalizationStatus && <p className="mt-4 rounded-lg bg-brand-50 p-3 text-sm text-brand-900" aria-live="polite">{normalizationStatus}</p>}</div> }

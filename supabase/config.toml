@@ -24,7 +24,8 @@ file_size_limit = "100MiB"
 site_url = "http://localhost:3000"
 additional_redirect_urls = [
     "http://localhost:3000",
-    "http://localhost:3001"
+    "http://localhost:3001",
+    "https://realestate-eosin-alpha.vercel.app/auth/confirm"
 ]
 jwt_expiry = 3600
 [auth.email]
