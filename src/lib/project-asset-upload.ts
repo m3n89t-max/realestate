@@ -6,7 +6,7 @@ export interface ProjectAssetUploadOperations {
   makePath(file: File): string
   upload(path: string, file: File): Promise<boolean>
   publicUrl(path: string): string
-  registerAsset(input: { file: File; url: string; sortOrder: number }): Promise<{ assetId: string; isCover: boolean } | null>
+  registerAsset(input: { file: File; url: string }): Promise<{ assetId: string; isCover: boolean } | null>
   deleteStorage(path: string): Promise<boolean>
 }
 
@@ -20,7 +20,7 @@ export async function uploadProjectAssets(
 ): Promise<AssetUploadResult[]> {
   const results: AssetUploadResult[] = []
 
-  for (const [index, file] of files.entries()) {
+  for (const file of files) {
     let path = ''
     let url = ''
     let stored = false
@@ -33,9 +33,8 @@ export async function uploadProjectAssets(
       stored = true
 
       url = operations.publicUrl(path)
-      // assets.sort_order is a PostgreSQL 32-bit integer. Selection order is
-      // sufficient here; created_at remains the stable cross-batch tiebreaker.
-      const registered = await operations.registerAsset({ file, url, sortOrder: index })
+      // The RPC allocates the next project-wide order while holding the project lock.
+      const registered = await operations.registerAsset({ file, url })
       if (!registered) {
         const removed = await operations.deleteStorage(path).catch(() => false)
         results.push({ file, success: false, error: removed ? '파일 정보를 저장하지 못했습니다.' : cleanupFailure, retryable: removed })

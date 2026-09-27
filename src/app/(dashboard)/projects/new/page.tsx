@@ -6,7 +6,8 @@ import { Home, MapPin } from 'lucide-react'
 import toast from 'react-hot-toast'
 import AssetUploader, { type AssetUploadResult } from '@/components/ui/AssetUploader'
 import { StepperHeader, StepperNav } from '@/components/ui/StepperForm'
-import { formatKoreanPrice, parsePositivePrice, validatePropertyBasics } from '@/lib/property-form'
+import { buildProjectDraftWrite } from '@/lib/project-draft'
+import { formatKoreanPrice, parseOptionalNumber, parsePositivePrice, validateOptionalNumbers, validateOptionalPrice, validatePropertyBasics } from '@/lib/property-form'
 import { createClient } from '@/lib/supabase/client'
 import { uploadProjectAssets } from '@/lib/project-asset-upload'
 import type { PropertyType } from '@/lib/types'
@@ -34,15 +35,6 @@ type Form = Record<TextField, string> & { property_type: PropertyType | ''; tran
 
 const initial: Form = {
   address: '', property_type: '', property_category: '', main_use: '', transaction_type: 'sale', price: '', monthly_rent: '', deposit: '', key_money: '', area: '', land_area: '', total_area: '', floor: '', whole_building: false, total_floors: '', rooms_count: '', bathrooms_count: '', direction: '', approval_date: '', parking_legal: '', parking_actual: '', move_in_date: '', management_fee_detail: '', features: [], building_condition: '', floor_composition: '', rental_status: '', note: '',
-}
-
-function optionalNumber(value: string, decimal = false): number | null {
-  const normalized = value.trim()
-  if (!normalized) return null
-  const pattern = decimal ? /^\d+(\.\d+)?$/ : /^\d+$/
-  if (!pattern.test(normalized)) return null
-  const number = Number(normalized)
-  return Number.isSafeInteger(number) || (decimal && Number.isFinite(number)) ? number : null
 }
 
 export default function NewProjectPage() {
@@ -80,7 +72,17 @@ export default function NewProjectPage() {
   }
 
   const validate = () => {
-    const next = validatePropertyBasics({ address: form.address, propertyType: form.property_type, transactionType: form.transaction_type, price: form.price, deposit: form.deposit, monthlyRent: form.monthly_rent })
+    const keyMoneyError = validateOptionalPrice(form.key_money, '권리금')
+    const next = {
+      ...validatePropertyBasics({ address: form.address, propertyType: form.property_type, transactionType: form.transaction_type, price: form.price, deposit: form.deposit, monthlyRent: form.monthly_rent }),
+      ...(keyMoneyError ? { key_money: keyMoneyError } : {}),
+      ...validateOptionalNumbers({
+        area: form.area, land_area: form.land_area, total_area: form.total_area,
+        floor: form.whole_building ? '' : form.floor, total_floors: form.total_floors,
+        rooms_count: form.rooms_count, bathrooms_count: form.bathrooms_count,
+        parking_legal: form.parking_legal, parking_actual: form.parking_actual,
+      }),
+    }
     setErrors(next)
     const first = Object.keys(next)[0]
     if (first) refs.current[first]?.focus()
@@ -107,22 +109,27 @@ export default function NewProjectPage() {
         const parsed = parsePositivePrice(value)
         return parsed === null ? null : parsed * 10000
       }
-      const { data, error } = await supabase.from('projects').insert({
-        org_id: membership.org_id, created_by: user.id, address: form.address.trim(), property_type: form.property_type || null,
+      const values = {
+        address: form.address.trim(), property_type: form.property_type || null,
         property_category: form.property_category || null, main_use: form.main_use || null, transaction_type: form.transaction_type,
         price: money(form.price), monthly_rent: money(form.monthly_rent), deposit: money(form.deposit), key_money: money(form.key_money),
-        area: optionalNumber(form.area, true), land_area: optionalNumber(form.land_area, true), total_area: optionalNumber(form.total_area, true),
-        floor: form.whole_building ? null : optionalNumber(form.floor), total_floors: optionalNumber(form.total_floors),
-        rooms_count: optionalNumber(form.rooms_count), bathrooms_count: optionalNumber(form.bathrooms_count), direction: form.direction || null,
-        approval_date: form.approval_date || null, parking_legal: optionalNumber(form.parking_legal), parking_actual: optionalNumber(form.parking_actual),
+        area: parseOptionalNumber(form.area, { decimal: true }), land_area: parseOptionalNumber(form.land_area, { decimal: true }), total_area: parseOptionalNumber(form.total_area, { decimal: true }),
+        floor: form.whole_building ? null : parseOptionalNumber(form.floor, { signed: true }), total_floors: parseOptionalNumber(form.total_floors),
+        rooms_count: parseOptionalNumber(form.rooms_count), bathrooms_count: parseOptionalNumber(form.bathrooms_count), direction: form.direction || null,
+        approval_date: form.approval_date || null, parking_legal: parseOptionalNumber(form.parking_legal), parking_actual: parseOptionalNumber(form.parking_actual),
         move_in_date: form.move_in_date || null, management_fee_detail: form.management_fee_detail || null, features: form.features,
         building_condition: form.building_condition || null, floor_composition: form.floor_composition || null, rental_status: form.rental_status || null,
         note: form.note || null, status: 'draft',
-      }).select().single()
+      }
+      const write = buildProjectDraftWrite(projectId, values, { orgId: membership.org_id, userId: user.id })
+      const query = write.operation === 'insert'
+        ? supabase.from('projects').insert(write.values)
+        : supabase.from('projects').update(write.values).eq('id', write.projectId)
+      const { data, error } = await query.select().single()
       if (error || !data) { toast.error('저장하지 못했습니다. 잠시 후 다시 시도해 주세요.'); return false }
       setProjectId(data.id)
       startNormalization(form.address.trim(), data.id)
-      toast.success('기본 정보를 임시 저장했습니다.')
+      toast.success(write.operation === 'insert' ? '기본 정보를 임시 저장했습니다.' : '수정한 정보를 저장했습니다.')
       return true
     } catch {
       toast.error('저장하지 못했습니다. 잠시 후 다시 시도해 주세요.')
@@ -148,7 +155,7 @@ export default function NewProjectPage() {
       makePath: (file) => `${membership.org_id}/${projectId}/${crypto.randomUUID()}_${file.name}`,
       upload: async (path, file) => !(await supabase.storage.from('project-assets').upload(path, file)).error,
       publicUrl: (path) => supabase.storage.from('project-assets').getPublicUrl(path).data.publicUrl,
-      registerAsset: async ({ file, url, sortOrder }) => {
+      registerAsset: async ({ file, url }) => {
         const { data, error } = await supabase.rpc('register_project_asset', {
           p_org_id: membership.org_id,
           p_project_id: projectId,
@@ -157,7 +164,6 @@ export default function NewProjectPage() {
           p_file_size: file.size,
           p_mime_type: file.type,
           p_type: file.type.startsWith('video/') ? 'video' : 'image',
-          p_sort_order: sortOrder,
         }).single()
         if (error || !data) return null
         const registered = data as { asset_id: string; is_cover: boolean }
@@ -169,8 +175,14 @@ export default function NewProjectPage() {
 
   const next = async () => {
     if (uploading) return
-    if (step === 0 && !projectId && !(await saveBasic())) return
+    if (step === 0 && !(await saveBasic())) return
     setStep((value) => value + 1)
+  }
+
+  const goToStep = async (target: number) => {
+    if (uploading || target === step) return
+    if (step === 0 && target > 0 && !(await saveBasic())) return
+    setStep(target)
   }
 
   const finish = async () => {
@@ -204,7 +216,7 @@ export default function NewProjectPage() {
   return <div className="mx-auto max-w-3xl animate-fade-in">
     <h1 className="text-2xl font-bold">새 매물 입력</h1>
     <p className="mt-2 text-sm text-slate-600">쉬운 정보부터 입력하고, 나머지는 나중에 이어서 할 수 있어요.</p>
-    <div className="card mt-6 p-4"><StepperHeader steps={STEPS} currentStep={step} onStepClick={setStep} disabled={uploading} /></div>
+    <div className="card mt-6 p-4"><StepperHeader steps={STEPS} currentStep={step} onStepClick={(target) => { void goToStep(target) }} disabled={uploading || loading} /></div>
     <div className="card mt-5 p-5">
       {step === 0 && <BasicDetails form={form} errors={errors} input={input} set={set} refs={refs} toggleWholeBuilding={toggleWholeBuilding} priceKey={priceKey} priceLabel={priceLabel} />}
       {step === 1 && <PhotoStep upload={upload} uploading={uploading} setStep={setStep} setUploading={setUploading} />}

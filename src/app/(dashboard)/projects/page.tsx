@@ -60,6 +60,8 @@ export default async function ProjectsPage({
       .in('project_id', projectIds)
       .eq('type', 'image')
       .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
 
     if (assetData) {
       assets = assetData.reduce((acc, a) => {

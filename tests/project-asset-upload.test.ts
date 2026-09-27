@@ -28,18 +28,20 @@ test('각 파일 예외를 분리하고 혼합 결과도 입력 순서 그대로
   assert.deepEqual(result.map((item) => [item.file.name, item.success]), [['first.jpg', true], ['second.jpg', false], ['third.jpg', true]])
 })
 
-test('정렬 순서는 PostgreSQL integer 범위 안에서 선택 순서를 사용한다', async () => {
-  const sortOrders: number[] = []
+test('파일은 선택 순서대로 등록하고 정렬 번호는 DB가 배정한다', async () => {
+  const registered: Array<{ file: File; url: string }> = []
   await uploadProjectAssets([file('first.jpg'), file('second.jpg')], operations({
-    registerAsset: async ({ file: input, sortOrder }) => {
-      sortOrders.push(sortOrder)
-      assert.ok(Number.isInteger(sortOrder))
-      assert.ok(sortOrder >= -2_147_483_648 && sortOrder <= 2_147_483_647)
-      return { assetId: `asset-${input.name}`, isCover: sortOrder === 0 }
+    registerAsset: async (input) => {
+      registered.push(input)
+      return { assetId: `asset-${input.file.name}`, isCover: input.file.name === 'first.jpg' }
     },
   }))
 
-  assert.deepEqual(sortOrders, [0, 1])
+  assert.deepEqual(registered.map((input) => input.file.name), ['first.jpg', 'second.jpg'])
+  assert.deepEqual(registered.map((input) => Object.keys(input).sort()), [
+    ['file', 'url'],
+    ['file', 'url'],
+  ])
 })
 
 test('RPC 등록 예외 뒤 저장소를 정리하고 다음 파일을 계속 처리한다', async () => {
