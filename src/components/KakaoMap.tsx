@@ -2,7 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { POIItem, KakaoDensity } from '@/lib/types'
-import { effectiveCatchment } from '@/lib/effective-catchment'
+import {
+  buildFacilityHeatPoints,
+  describeBarrierStatus,
+  getPopulationEstimate,
+  hasDisplayableMetric,
+} from '@/lib/location-data-truthfulness'
 
 declare global {
   interface Window { kakao: any }
@@ -20,19 +25,6 @@ interface KakaoMapProps {
   populationData?: any
   commercialData?: any
   cardData?: any
-}
-
-const POI_HEATMAP_WEIGHT: Record<string, number> = {
-  subway: 10,
-  mart: 7,
-  convenience: 5,
-  cafe: 4,
-  restaurant: 4,
-  hospital: 3,
-  pharmacy: 3,
-  school: 3,
-  bank: 2,
-  culture: 2,
 }
 
 // 네이티브 Canvas 히트맵 렌더러 (heatmap.js 불필요)
@@ -112,7 +104,7 @@ export default function KakaoMap({
           }).setMap(map)
         }
 
-        // 3. 유동인구 히트맵 (네이티브 Canvas) — POI + kakaoDensity 아이템 좌표 활용
+        // 3. 시설 밀집 참고도 (네이티브 Canvas) — 장소 좌표를 중복 제거해 시각화
         const canvas = canvasRef.current
         if (!canvas) return
 
@@ -134,36 +126,9 @@ export default function KakaoMap({
           if (!w || !h) return  // 컨테이너 미준비 시 스킵
           canvas.width  = w
           canvas.height = h
-          const points: { x: number; y: number; value: number }[] = []
-
-          // POI 데이터 포인트
-          if (poiData) {
-            Object.entries(poiData).forEach(([cat, items]) => {
-              const weight = POI_HEATMAP_WEIGHT[cat] || 2
-              items.forEach(item => {
-                if (item.lat && item.lng) {
-                  const pt = toPixel(item.lat, item.lng)
-                  if (pt.x > -80 && pt.x < canvas.width + 80 && pt.y > -80 && pt.y < canvas.height + 80) {
-                    points.push({ ...pt, value: weight })
-                  }
-                }
-              })
-            })
-          }
-
-          // kakaoDensity 아이템 포인트 (업종별 개별 시설 좌표)
-          if (kakaoDensityRef.current?.categories) {
-            Object.entries(kakaoDensityRef.current.categories).forEach(([, cat]: [string, any]) => {
-              (cat.items || []).forEach((item: any) => {
-                if (item.lat && item.lng) {
-                  const pt = toPixel(item.lat, item.lng)
-                  if (pt.x > -80 && pt.x < canvas.width + 80 && pt.y > -80 && pt.y < canvas.height + 80) {
-                    points.push({ ...pt, value: 3 })
-                  }
-                }
-              })
-            })
-          }
+          const points = buildFacilityHeatPoints(poiData, kakaoDensityRef.current)
+            .map(point => ({ ...toPixel(point.lat, point.lng), value: point.value }))
+            .filter(point => point.x > -80 && point.x < canvas.width + 80 && point.y > -80 && point.y < canvas.height + 80)
 
           drawHeatmap(canvas, points)
         }
@@ -221,13 +186,11 @@ export default function KakaoMap({
     circle.setMap(map)
     popCircleRef.current = circle
 
-    // 라벨은 원 위쪽에 배치 (유효 배후인구 = 거주 + 유동)
-    const cat = effectiveCatchment(populationData.radius_500m_estimated, locationAnalysis?.commercial_grade)
-    const labelText = cat != null
-      ? `약 ${cat.effective.toLocaleString()}명`
-      : (populationData.radius_500m_estimated != null
-          ? `약 ${populationData.radius_500m_estimated.toLocaleString()}명`
-          : `${(populationData.total_population / 10000).toFixed(1)}만명`)
+    // 행정구역 평균 인구밀도로 단순 환산한 거주인구 추정값만 표시한다.
+    const estimate = getPopulationEstimate(populationData)
+    const labelText = estimate
+      ? `약 ${estimate.value.toLocaleString()}명(추정)`
+      : `${(populationData.total_population / 10000).toFixed(1)}만명`
     const labelPos = new window.kakao.maps.LatLng(
       lat + (popRadius / 111_000) * 0.9,
       lng
@@ -251,10 +214,11 @@ export default function KakaoMap({
     if (flpopLabelRef.current)  { flpopLabelRef.current.setMap(null);  flpopLabelRef.current  = null }
 
     // cardData 우선 사용, 없으면 commercialData fallback
-    const useCard = cardData?.has_data && cardData?.floating_population?.weekday
+    const useCard = cardData?.has_data && hasDisplayableMetric(cardData?.floating_population)
+    const useCommercial = hasDisplayableMetric(commercialData?.floating_population)
     const weekdayCount: number = useCard
       ? cardData.floating_population.weekday
-      : (commercialData?.floating_population?.weekday ?? 0)
+      : (useCommercial ? commercialData.floating_population.weekday : 0)
     const byHour: number[] | undefined = useCard
       ? cardData.floating_population.by_hour
       : commercialData?.floating_population?.by_hour
@@ -315,16 +279,16 @@ export default function KakaoMap({
     if (cardNoDataRef.current)  { cardNoDataRef.current.setMap(null);  cardNoDataRef.current  = null }
 
     // 제주 카드 데이터
-    const hasJejuCard = cardData?.has_data === true
+    const hasJejuCard = cardData?.has_data === true && hasDisplayableMetric(cardData?.card_sales)
     // 전국 상권 매출 데이터 (소상공인진흥공단 trdarSalersList)
     const commercialSales = commercialData?.sales_data
-    const hasCommercialSales = !!(commercialSales?.monthly_sales > 0 || commercialSales?.area_name)
+    const hasCommercialSales = hasDisplayableMetric(commercialSales) && !!(commercialSales?.monthly_sales > 0 || commercialSales?.area_name)
 
     const overlayPos = new window.kakao.maps.LatLng(lat, lng + 0.003)
 
     // ── 전국 상권 유동인구 (소상공인 API — 카드 대체)
     const commercialFp = commercialData?.floating_population
-    const hasCommercialFp = !!(commercialFp?.weekday > 0)
+    const hasCommercialFp = hasDisplayableMetric(commercialFp) && !!(commercialFp?.weekday > 0)
 
     // ── 데이터 없음 표기
     if (!hasJejuCard && !hasCommercialSales) {
@@ -488,7 +452,7 @@ export default function KakaoMap({
               : 'bg-white/90 backdrop-blur-sm text-gray-600 border-gray-200 hover:bg-gray-50'
           }`}
         >
-          🔥 히트맵
+          시설 밀집 참고도
         </button>
       )}
 
@@ -507,44 +471,21 @@ export default function KakaoMap({
             </div>
           )}
 
-          {/* 섹션 1: 반경 500m 추정 (거주 + 유동 = 유효 배후인구) */}
+          {/* 섹션 1: 행정구역 평균밀도 기반 500m 거주인구 단순 환산 */}
           {!(populationData as any).error && populationData.radius_500m_estimated != null && (() => {
-            const cat = effectiveCatchment(populationData.radius_500m_estimated, locationAnalysis?.commercial_grade)
-            if (!cat) return null
-            const hasFloating = cat.multiplier > 0
+            const estimate = getPopulationEstimate(populationData)
+            if (!estimate) return null
+            const barrierMessage = describeBarrierStatus(populationData)
             return (
               <div className="mb-2.5">
-                <p className="text-[9px] font-semibold text-blue-600 mb-1">📍 매물 반경 500m · 유효 배후인구</p>
+                <p className="text-[9px] font-semibold text-blue-600 mb-1">매물 주변 500m · 거주인구 참고값</p>
                 <div className="bg-blue-50 rounded-lg px-2.5 py-1.5 flex justify-between items-center">
-                  <span className="text-[11px] text-blue-700">유효 배후인구</span>
-                  <span className="text-[13px] font-bold text-blue-800">약 {cat.effective.toLocaleString()}명</span>
+                  <span className="text-[11px] text-blue-700">거주인구 추정</span>
+                  <span className="text-[13px] font-bold text-blue-800">약 {estimate.value.toLocaleString()}명</span>
                 </div>
-                {hasFloating ? (
-                  <div className="mt-1 space-y-0.5 text-[10px]">
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-500">· 거주 배후인구</span>
-                      <span className="text-gray-700 font-medium">{cat.resident.toLocaleString()}명</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-emerald-600">· 유동인구</span>
-                      <span className="text-emerald-700 font-medium">+{cat.floating.toLocaleString()}명
-                        <span className="text-gray-400 ml-1">({cat.grade}등급 ×{cat.multiplier})</span>
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-[9px] text-gray-400 mt-1">상권등급 분석 후 유동인구가 합산됩니다 (현재 거주만)</p>
-                )}
-                {populationData.barrier_names?.length > 0 && (
-                  <div className="flex justify-between items-center text-[10px] mt-1">
-                    <span className="text-orange-500">거주 장벽 보정</span>
-                    <span className="text-orange-600 font-medium">
-                      ×{(populationData.barrier_coefficient / 100).toFixed(2)}
-                      <span className="text-gray-400 ml-1">({populationData.barrier_names.join(', ')})</span>
-                    </span>
-                  </div>
-                )}
-                <p className="text-[8px] text-gray-400 mt-0.5 text-right">거주(집계구 밀도×장벽) + 유동(상권등급)</p>
+                <p className="text-[9px] text-gray-500 mt-1">{estimate.description}</p>
+                <p className="text-[8px] text-gray-400 mt-0.5">{estimate.sourceLabel}</p>
+                {barrierMessage && <p className="text-[8px] text-orange-500 mt-0.5">{barrierMessage}</p>}
               </div>
             )
           })()}

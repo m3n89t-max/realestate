@@ -236,6 +236,14 @@ export interface PopulationData {
   single_households: number
   avg_members: number
   avg_age: number
+  adm_nm?: string
+  adm_cd?: string
+  adm_level?: string
+  source_year?: string
+  radius_500m_estimated?: number | null
+  estimation_method?: string | null
+  barrier_status?: 'available' | 'failed' | 'not_collected'
+  barrier_names?: string[]
   collected_at: string
 }
 

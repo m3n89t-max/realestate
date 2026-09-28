@@ -12,7 +12,11 @@ import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
 import type { POIItem, RealPriceItem } from '@/lib/types'
 import KakaoMap from '@/components/KakaoMap'
-import { effectiveCatchment } from '@/lib/effective-catchment'
+import {
+  describeBarrierStatus,
+  getPopulationEstimate,
+  hasDisplayableMetric,
+} from '@/lib/location-data-truthfulness'
 
 // ── POI 아이콘 맵 ─────────────────────────────────────────────
 const POI_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
@@ -85,6 +89,7 @@ function AIAnalysisReport({ analysis, projectId, hasCoords, hasPOI, hasData, isC
 }) {
   const [loading, setLoading] = useState(false)
   const supabase = createClient()
+  const showDerivedCommercialInsights = hasDisplayableMetric(analysis?.foot_traffic)
 
   const prereqs = [
     { label: '좌표 변환', done: hasCoords },
@@ -190,7 +195,7 @@ function AIAnalysisReport({ analysis, projectId, hasCoords, hasPOI, hasData, isC
       )}
 
       {/* TEAM5: 상권 등급 + 유동인구 + 상권유형 */}
-      {(analysis.commercial_grade || analysis.commercial_type || analysis.foot_traffic) && (
+      {showDerivedCommercialInsights && (analysis.commercial_grade || analysis.commercial_type || analysis.foot_traffic) && (
         <div className="grid grid-cols-3 gap-3">
           {/* 상권 등급 */}
           {analysis.commercial_grade && (() => {
@@ -208,7 +213,7 @@ function AIAnalysisReport({ analysis, projectId, hasCoords, hasPOI, hasData, isC
                 </div>
                 <p className="text-4xl font-black">{analysis.commercial_grade}</p>
                 <p className="text-xs mt-1 opacity-70">
-                  {analysis.commercial_grade === 'S' ? '최우수 상권' : analysis.commercial_grade === 'A' ? '우수 상권' : analysis.commercial_grade === 'B' ? '보통 상권' : '낮은 상권'}
+                  {analysis.commercial_grade}등급 추정
                 </p>
               </div>
             )
@@ -260,7 +265,7 @@ function AIAnalysisReport({ analysis, projectId, hasCoords, hasPOI, hasData, isC
       )}
 
       {/* TEAM5: 추천 / 비추천 업종 */}
-      {analysis.recommended_industries && (
+      {showDerivedCommercialInsights && analysis.recommended_industries && (
         <div className="card p-5">
           <h3 className="section-title mb-4 flex items-center gap-2">
             <Store size={16} className="text-brand-500" />
@@ -622,8 +627,6 @@ function MapSection({
     </div>
   )
 
-  const hasCardFp = !!(card_data?.has_data && card_data?.floating_population?.weekday)
-
   const analyzePopulation = async () => {
     if (!lat || !lng) { toast.error('좌표가 없습니다'); return }
     setPopLoading(true)
@@ -666,49 +669,28 @@ function MapSection({
       </div>
 
       {/* 지도 분석 가이드 */}
-      <div className="grid grid-cols-3 gap-2 text-[11px]">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 text-[11px]">
 
-        {/* ① 배후인구 산정방식 */}
+        {/* ① 거주인구 참고값 */}
         <div className="bg-white border border-blue-100 rounded-xl p-3 shadow-sm">
           <p className="font-bold text-blue-700 mb-2 flex items-center gap-1">
             <span className="w-3 h-3 rounded-full border-2 border-dashed inline-block flex-shrink-0" style={{borderColor:'#ef4444'}} />
-            유효 배후인구 산정방식
+            주변 거주인구 참고값
           </p>
-          {/* 공식 박스 */}
-          <div className="bg-blue-50 rounded-lg px-2.5 py-2 text-[10px] leading-relaxed text-blue-800 font-mono mb-2">
-            <div><span className="text-blue-400">거주</span> = 집계구 밀도 × 0.785㎢ × 장벽보정</div>
-            <div><span className="text-emerald-500">유동</span> = 거주 × 상권등급 배수</div>
-            <div className="pl-2 text-[9px] text-blue-400">S×3 · A×2 · B×1 · C×0.5 · D×0.2</div>
-            <div className="border-t border-blue-200 mt-1 pt-1 font-bold">= 유효 배후인구 (거주 + 유동)</div>
+          <div className="bg-blue-50 rounded-lg px-2.5 py-2 text-[10px] leading-relaxed text-blue-800 mb-2">
+            행정구역의 평균 인구밀도를 매물 주변 500m 원에 단순 환산한 추정값이에요. 실제 보행권 인구와는 다를 수 있어요.
           </div>
           {/* 실제 값 표시 */}
           {population_data?.radius_500m_estimated != null && (() => {
-            const cat = effectiveCatchment(population_data.radius_500m_estimated, locationAnalysis?.commercial_grade)
-            if (!cat) return null
+            const estimate = getPopulationEstimate(population_data)
+            if (!estimate) return null
             return (
               <div className="text-[10px] text-gray-600 space-y-0.5">
                 <div className="flex justify-between">
-                  <span className="text-gray-400">· 거주 배후인구</span>
-                  <span className="font-medium text-gray-700">{cat.resident.toLocaleString()}명</span>
+                  <span className="text-gray-400">거주인구 추정</span>
+                  <span className="font-bold text-blue-700">약 {estimate.value.toLocaleString()}명</span>
                 </div>
-                {cat.multiplier > 0 ? (
-                  <div className="flex justify-between">
-                    <span className="text-emerald-600">· 유동인구 ({cat.grade}등급 ×{cat.multiplier})</span>
-                    <span className="font-medium text-emerald-700">+{cat.floating.toLocaleString()}명</span>
-                  </div>
-                ) : (
-                  <div className="text-[9px] text-gray-400">상권등급 분석 후 유동 합산 (현재 거주만)</div>
-                )}
-                <div className="flex justify-between border-t border-gray-100 pt-0.5 mt-0.5">
-                  <span className="text-gray-400">유효 배후인구</span>
-                  <span className="font-bold text-blue-700">약 {cat.effective.toLocaleString()}명</span>
-                </div>
-                {population_data.barrier_coefficient != null && population_data.barrier_coefficient < 100 && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">거주 장벽 보정</span>
-                    <span className="text-orange-600 font-medium">×{(population_data.barrier_coefficient / 100).toFixed(2)}</span>
-                  </div>
-                )}
+                <div className="text-[9px] text-gray-400">{estimate.sourceLabel}</div>
               </div>
             )
           })()}
@@ -716,59 +698,35 @@ function MapSection({
             <span className="flex items-center gap-0.5 text-[9px] text-gray-400"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#ef4444'}} />고밀</span>
             <span className="flex items-center gap-0.5 text-[9px] text-gray-400"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#f97316'}} />중밀</span>
             <span className="flex items-center gap-0.5 text-[9px] text-gray-400"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#22c55e'}} />저밀</span>
-            <span className="text-[9px] text-gray-500 ml-auto">SGIS 2022</span>
+            <span className="text-[9px] text-gray-500 ml-auto">SGIS 행정구역 통계</span>
           </div>
         </div>
 
-        {/* ② 장벽 보정 설명 */}
+        {/* ② 보행 장벽 참고정보 */}
         <div className="bg-white border border-orange-100 rounded-xl p-3 shadow-sm">
           <p className="font-bold text-orange-700 mb-2 flex items-center gap-1">
-            🚧 장벽 보정 (대로·강·철도)
+            보행 장벽 참고정보
           </p>
-          {/* 장벽 개념 설명 */}
           <div className="bg-gray-50 rounded-lg px-2.5 py-1.5 text-[10px] text-gray-600 leading-relaxed mb-2">
-            <span className="font-semibold text-gray-700">장벽이란?</span> 사람들이 걸어서 넘기 어려운 물리적 경계입니다. 왕복 4차선+ 대로, 하천·강은 장벽으로 작용해 반경 500m 안에 있어도 실제 배후인구에서 제외해야 합니다.
-            <div className="mt-1 space-y-0.5 text-[9px] text-gray-500">
-              <div>🚗 왕복 4차선+ 대로 — 신호 없이 횡단 어려움</div>
-              <div>🌊 하천·강·운하 — 교량 없으면 완전 차단</div>
-              <div>🚃 지상 철도·선로 — 건널목 외 통행 불가</div>
-              <div className="text-gray-500 pt-0.5">※ 이면도로·골목은 장벽 아님</div>
-            </div>
-          </div>
-          <div className="bg-orange-50 rounded-lg px-2.5 py-1.5 text-[10px] text-orange-700 mb-2">
-            <div className="font-semibold mb-0.5">차감 기준 (원형 세그먼트 공식)</div>
-            <div className="space-y-0.5 text-[9px]">
-              <div>• 장벽이 매물 바로 옆 → <span className="font-bold">50% 차감</span></div>
-              <div>• 장벽이 100m 거리 → <span className="font-bold">약 23% 차감</span></div>
-              <div>• 장벽이 300m 거리 → <span className="font-bold">약 3% 차감</span></div>
-              <div>• 복수 장벽 → <span className="font-bold">곱연산 중첩 적용</span></div>
-            </div>
+            도로나 하천은 이동에 영향을 줄 수 있어요. 현재는 인구 숫자에서 임의로 차감하지 않고, 확인된 항목만 참고정보로 보여드려요.
           </div>
           {/* 실제 감지된 장벽 표시 */}
-          {population_data?.barrier_names?.length > 0 ? (
-            <div className="text-[9px] bg-red-50 rounded px-2 py-1 text-red-600">
-              <span className="font-semibold">감지된 장벽: </span>
-              {population_data.barrier_names.join(', ')}
+          {describeBarrierStatus(population_data) && (
+            <div className="text-[9px] bg-orange-50 rounded px-2 py-1 text-orange-700">
+              {describeBarrierStatus(population_data)}
             </div>
-          ) : population_data?.radius_500m_estimated != null ? (
-            <div className="text-[9px] bg-green-50 rounded px-2 py-1 text-green-600">
-              ✅ 주요 장벽 없음 (보정 미적용)
-            </div>
-          ) : null}
+          )}
           <p className="text-[9px] text-gray-500 mt-1.5 text-right">OpenStreetMap 기반</p>
         </div>
 
-        {/* ③ 유동인구 + 히트맵 */}
+        {/* ③ 시설 밀집 참고도 */}
         <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
           <p className="font-bold text-gray-700 mb-2 flex items-center gap-1">
             <span className="w-3 h-3 rounded-full border-2 inline-block flex-shrink-0" style={{borderColor:'#2563eb'}} />
-            유동인구 추정
+            시설 밀집 참고도
           </p>
           <p className="text-[10px] text-gray-500 leading-relaxed mb-2">
-            💳 <span className="font-medium">카드 사용량 기반</span> 유동인구 추정 (전국 적용)<br/>
-            {hasCardFp
-              ? <span className="text-indigo-500 font-medium">제주: 카드이용자 수 직접 반영</span>
-              : <span>주중·주말 소비패턴으로 실제 유동규모 추정</span>}
+            카카오 장소 검색에서 확인된 시설 위치를 보기 쉽게 표현했어요. 사람 수를 측정한 자료는 아니에요.
           </p>
           <div className="flex gap-1.5 mb-3">
             <span className="flex items-center gap-0.5 text-[9px] text-gray-400"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#7c3aed'}} />고</span>
@@ -776,7 +734,7 @@ function MapSection({
             <span className="flex items-center gap-0.5 text-[9px] text-gray-400"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#0891b2'}} />저</span>
           </div>
           <div className="border-t border-gray-100 pt-2">
-            <p className="font-semibold text-gray-600 mb-1 flex items-center gap-1">🔥 히트맵</p>
+            <p className="font-semibold text-gray-600 mb-1 flex items-center gap-1">시설 가중 밀도</p>
             <p className="text-[10px] text-gray-400 leading-relaxed">
               좌하단 버튼 ON/OFF.<br/>지하철·마트·편의점 등 집객시설 밀집도
             </p>
@@ -1065,9 +1023,13 @@ function CommercialSection({ commercial_data, projectId }: {
     store_count_by_category = {},
     stores = [],
     radius_m = 500,
-    floating_population = null,
-    sales_data = null,
+    floating_population: rawFloatingPopulation = null,
+    sales_data: rawSalesData = null,
   } = commercial_data
+
+  // 출처·기준시점·의미가 없는 과거 유동/매출 값은 사용자에게 노출하지 않는다.
+  const floating_population = hasDisplayableMetric(rawFloatingPopulation) ? rawFloatingPopulation : null
+  const sales_data = hasDisplayableMetric(rawSalesData) ? rawSalesData : null
 
   const totalStores: number = stores.length
   const categories = Object.entries(store_count_by_category as Record<string, number>)
@@ -1347,7 +1309,6 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
   const hasRealPrice = project.real_price_data != null
   const hasCommercial = project.commercial_data != null
   const hasTourism = project.tourism_data != null
-  const hasCardData = project.card_data != null
   const hasData = isCommercial ? hasCommercial : hasRealPrice
   const hasAnalysis = !!locationAnalysis
 
@@ -1364,14 +1325,13 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
     const needsPOI = !hasPOI
     // 비상업용도 실거래가 수집
     const needsRealPrice = !isCommercial && !hasRealPrice
-    // 모든 매물: 유동인구 히트맵을 위해 상권 데이터 수집
+    // 모든 매물: 점포·업종 구성과 상권 경계 참고자료 수집
     const needsCommercial = !hasCommercial
     const needsKakao = !project.kakao_density
     const needsPopulation = !project.population_data
     const needsTourism = !hasTourism
-    const needsCardData = !hasCardData
 
-    if (!needsPOI && !needsRealPrice && !needsCommercial && !needsKakao && !needsPopulation && !needsTourism && !needsCardData) return
+    if (!needsPOI && !needsRealPrice && !needsCommercial && !needsKakao && !needsPopulation && !needsTourism) return
 
     const supabase = createClient()
     const post = async (url: string) => {
@@ -1385,68 +1345,48 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
     }
 
     ;(async () => {
-      try {
-        if (needsPOI) {
-          setAutoStep('주변 시설(POI) 수집 중…')
-          await post('/api/poi')
+      const failures: string[] = []
+      let successCount = 0
+      const run = async (label: string, task: () => Promise<void>) => {
+        setAutoStep(`${label} 중…`)
+        try {
+          await task()
+          successCount += 1
+        } catch (error: any) {
+          failures.push(`${label}: ${error?.message ?? '수집 실패'}`)
+          console.warn(`[auto-collect] ${label} skipped:`, error)
         }
-        if (needsRealPrice) {
-          setAutoStep('부동산 실거래가 수집 중…')
-          const { error } = await supabase.functions.invoke('collect-real-price', { body: { project_id: projectId } })
-          if (error) throw new Error(error.message)
-        }
-        if (needsCommercial) {
-          setAutoStep('유동인구 · 상권 데이터 수집 중…')
-          const { error } = await supabase.functions.invoke('analyze-commercial', { body: { project_id: projectId } })
-          if (error) throw new Error(error.message)
-        }
-        if (needsKakao) {
-          setAutoStep('업종 밀집도 분석 중…')
-          await post('/api/kakao-poi')
-        }
-        if (needsPopulation) {
-          setAutoStep('배후 인구 분석 중…')
-          await post('/api/population')
-        }
-        if (needsTourism) {
-          setAutoStep('관광 시설 데이터 수집 중…')
-          const { error } = await supabase.functions.invoke('analyze-tourism', { body: { project_id: projectId } })
-          if (error) {
-            console.warn('[analyze-tourism] skipped:', error.message)
-            // 에러 시 placeholder 저장 → 무한루프 방지
-            await supabase.from('projects')
-              .update({ tourism_data: { total_count: 0, error: error.message } })
-              .eq('id', projectId)
-          }
-        }
-        if (needsCardData) {
-          setAutoStep('카드 이용 데이터 수집 중…')
-          const { error } = await supabase.functions.invoke('analyze-jeju-card', { body: { project_id: projectId } })
-          if (error) {
-            console.warn('[analyze-jeju-card] skipped:', error.message)
-            // 에러 시 placeholder 저장 → 무한루프 방지 (card_data가 null이면 매 reload마다 재시도)
-            await supabase.from('projects')
-              .update({ card_data: { has_data: false, error: error.message } })
-              .eq('id', projectId)
-          }
-        }
-        setAutoStep(null)
-        window.location.reload()
-      } catch (e: any) {
-        setAutoError(e.message ?? '자동 수집 실패')
-        setAutoStep(null)
       }
+
+      if (needsPOI) await run('주변 시설 수집', () => post('/api/poi'))
+      if (needsRealPrice) await run('부동산 실거래가 수집', async () => {
+        const { error } = await supabase.functions.invoke('collect-real-price', { body: { project_id: projectId } })
+        if (error) throw error
+      })
+      if (needsCommercial) await run('점포·업종 구성 수집', async () => {
+        const { error } = await supabase.functions.invoke('analyze-commercial', { body: { project_id: projectId } })
+        if (error) throw error
+      })
+      if (needsKakao) await run('시설 밀집 참고도 분석', () => post('/api/kakao-poi'))
+      if (needsPopulation) await run('주변 거주인구 분석', () => post('/api/population'))
+      if (needsTourism) await run('관광 시설 데이터 수집', async () => {
+        const { error } = await supabase.functions.invoke('analyze-tourism', { body: { project_id: projectId } })
+        if (error) throw error
+      })
+
+      setAutoStep(null)
+      if (failures.length > 0) setAutoError(`일부 자료를 확인하지 못했습니다. ${failures.join(' / ')}`)
+      if (successCount > 0) window.location.reload()
     })()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const workflowSteps = [
     { label: '좌표 변환', done: !!(project.lat && project.lng) },
     { label: 'POI 수집', done: hasPOI },
-    { label: '유동인구·상권', done: hasCommercial },
-    { label: '업종 밀집도', done: !!project.kakao_density },
-    { label: '배후 인구', done: !!project.population_data },
+    { label: '점포·업종 구성', done: hasCommercial },
+    { label: '시설 밀집 참고도', done: !!project.kakao_density },
+    { label: '주변 거주인구', done: !!project.population_data },
     { label: '관광 시설', done: hasTourism },
-    { label: '카드 이용 현황', done: hasCardData },
     { label: 'AI 입지 분석', done: hasAnalysis },
   ]
 
@@ -1606,7 +1546,7 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
       )}
 
       {/* 카드 이용 현황 (제주데이터허브) */}
-      {project.card_data?.has_data && (
+      {project.card_data?.has_data && hasDisplayableMetric(project.card_data) && (
         <div className="card p-5 bg-gray-50/50">
           <h3 className="section-title flex items-center gap-2 mb-4">
             <span className="text-base" aria-hidden="true">💳</span>

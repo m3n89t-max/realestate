@@ -88,13 +88,7 @@ function minDistToPolylineM(lat: number, lng: number, geom: { lat: number; lon: 
   return minDist
 }
 
-function accessibleRatio(d: number, r: number): number {
-  if (d >= r) return 1.0
-  const x = d / r
-  return 0.5 + Math.acos(x) / Math.PI - (x * Math.sqrt(1 - x * x)) / Math.PI
-}
-
-async function detectBarriers(lat: number, lng: number, radiusM: number): Promise<{ coeff: number; barriers: string[] }> {
+async function detectBarriers(lat: number, lng: number, radiusM: number): Promise<{ status: 'available' | 'failed'; barriers: string[] }> {
   const query = `[out:json][timeout:10];
 (
   way["highway"~"^(motorway|trunk|primary|secondary)$"](around:${radiusM},${lat},${lng});
@@ -108,6 +102,7 @@ out geom;`
       body: `data=${encodeURIComponent(query)}`,
       signal: AbortSignal.timeout(12000),
     })
+    if (!res.ok) throw new Error(`Overpass ${res.status}`)
     const data = await res.json()
     const roadMap = new Map<string, { dist: number; label: string }>()
     for (const way of (data.elements || []) as any[]) {
@@ -120,15 +115,11 @@ out geom;`
       const key = way.tags?.name || `${hw || ww}_${Math.round(dist)}`
       if (!roadMap.has(key) || roadMap.get(key)!.dist > dist) roadMap.set(key, { dist, label })
     }
-    let coeff = 1.0
     const barriers: string[] = []
-    for (const { dist, label } of roadMap.values()) {
-      const ratio = accessibleRatio(dist, radiusM)
-      if (ratio < 0.99) { coeff *= ratio; barriers.push(label) }
-    }
-    return { coeff: Math.max(0.25, coeff), barriers }
+    for (const { label } of roadMap.values()) barriers.push(label)
+    return { status: 'available', barriers }
   } catch {
-    return { coeff: 1.0, barriers: [] }
+    return { status: 'failed', barriers: [] }
   }
 }
 
@@ -145,7 +136,14 @@ Deno.serve(async (req) => {
 
     const serviceId = (Deno.env.get('SGIS_SERVICE_ID') ?? '').trim()
     const securityKey = (Deno.env.get('SGIS_SECURITY_KEY') ?? '').trim()
-    if (!serviceId || !securityKey) throw new Error('SGIS 인증키 미설정')
+    if (!serviceId || !securityKey) {
+      return new Response(JSON.stringify({
+        success: false,
+        status: 'unconfigured',
+        source: 'SGIS',
+        message: '관리자가 인구 통계 연결을 준비 중입니다.',
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
 
     const admin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -248,7 +246,7 @@ Deno.serve(async (req) => {
     // 6. 500m 추정 배후인구
     const adm_level = usedAdmCd.length >= 8 ? '읍면동' : usedAdmCd.length >= 5 ? '시군구' : '시도'
     let radius_500m_estimated: number | null = null
-    let barrier_coefficient = 1.0
+    let barrier_status: 'available' | 'failed' | 'not_collected' = 'not_collected'
     let barrier_names: string[] = []
 
     if (usedAdmCd.length >= 8) {
@@ -268,10 +266,10 @@ Deno.serve(async (req) => {
             const useDensity = totalArea > 0 ? totalPop / totalArea : 0
             if (useDensity > 0) {
               const barrier = await detectBarriers(lat, lng, 500)
-              barrier_coefficient = barrier.coeff
+              barrier_status = barrier.status
               barrier_names = barrier.barriers
-              radius_500m_estimated = Math.round(useDensity * Math.PI * 0.25 * barrier_coefficient)
-              console.log(`[population] 배후인구 ${radius_500m_estimated}명 (장벽계수 ${barrier_coefficient.toFixed(2)})`)
+              radius_500m_estimated = Math.round(useDensity * Math.PI * 0.25)
+              console.log(`[population] 500m 거주인구 단순 환산 ${radius_500m_estimated}명`)
             }
           }
         }
@@ -288,16 +286,20 @@ Deno.serve(async (req) => {
       avg_members: parseFloat(popData.avg_fmember_cnt || '0'),
       avg_age: parseFloat(popData.avg_age || '0'),
       adm_nm: popData.adm_nm || adm_nm,
+      adm_cd: usedAdmCd,
       adm_level,
+      source_year: targetYear,
       radius_500m_estimated,
-      barrier_coefficient: Math.round(barrier_coefficient * 100),
+      estimation_method: '행정구역 평균 인구밀도 × 반경 500m 원 면적 단순 환산',
+      barrier_status,
       barrier_names,
       housing_stat,
       industry_stat,
       collected_at: new Date().toISOString(),
     }
 
-    await admin.from('projects').update({ population_data }).eq('id', project_id).eq('org_id', project.org_id)
+    const { error: updateError } = await admin.from('projects').update({ population_data }).eq('id', project_id).eq('org_id', project.org_id)
+    if (updateError) throw new Error(`인구 통계 저장 실패: ${updateError.message}`)
 
     return new Response(JSON.stringify({ success: true, population_data }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
