@@ -1,3 +1,5 @@
+import { BRAND } from './brand'
+
 export type UserRole = 'owner' | 'admin' | 'viewer' | string
 
 export interface NavigationItem {
@@ -50,7 +52,7 @@ const pageMeta = [
 export function getPageMeta(pathname: string) {
   if (pathname === '/dashboard' || pathname === '/') return { eyebrow: '홈', title: '오늘 할 일' }
   const entry = pageMeta.find((item) => item.match(pathname))
-  return entry ? { eyebrow: entry.eyebrow, title: entry.title } : { eyebrow: 'RealEstate AI OS', title: '업무 공간' }
+  return entry ? { eyebrow: entry.eyebrow, title: entry.title } : { eyebrow: BRAND.name, title: '업무 공간' }
 }
 
 export function isNavigationItemActive(pathname: string, href: string): boolean {

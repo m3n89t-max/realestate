@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import zlib from 'zlib';
+import { AGENT_BRAND } from './brand';
 
 // Node.js 내장 zlib로 16x16 파란색 PNG 버퍼 생성 (외부 파일 불필요)
 function createIconBuffer(): Buffer {
@@ -144,7 +145,7 @@ const createTray = () => {
             click: () => app.quit()
         }
     ]);
-    tray.setToolTip('부동산 AI 에이전트 실행 중');
+    tray.setToolTip(`${AGENT_BRAND.localAgentName} 실행 중`);
     tray.setContextMenu(contextMenu);
 };
 
@@ -157,7 +158,7 @@ const showSetupWindow = () => {
             nodeIntegration: true,
             contextIsolation: false,
         },
-        title: '부동산 AI 에이전트 초기 설정',
+        title: `${AGENT_BRAND.localAgentName} 초기 설정`,
     });
     mainWindow.loadFile(path.join(__dirname, 'setup.html'));
     mainWindow.on('closed', () => { mainWindow = null; });

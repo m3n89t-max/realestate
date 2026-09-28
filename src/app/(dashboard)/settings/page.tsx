@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { createClient } from '@/lib/supabase/server'
 import { Building2, Users, Key, CreditCard, Plus } from 'lucide-react'
 import { version as agentVersion } from '../../../../package.json'
+import { BRAND } from '@/lib/brand'
 import StatusBadge from '@/components/ui/StatusBadge'
 import UsageMeter from '@/components/ui/UsageMeter'
 import AgentManager from './AgentManager'
@@ -192,7 +193,7 @@ export default async function SettingsPage() {
         {/* 다운로드 */}
         <div className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50 mb-4">
           <div>
-            <p className="text-sm font-medium text-gray-800">RealEstateAgent v{agentVersion}</p>
+            <p className="text-sm font-medium text-gray-800">{BRAND.localAgentName} v{agentVersion}</p>
             <p className="text-xs text-gray-400 mt-0.5">Windows 64bit · 설치 불필요 (portable)</p>
           </div>
           <a

@@ -1,13 +1,12 @@
 #!/usr/bin/env node
 /**
- * 부동산 AI OS - 로컬 에이전트 ZIP 패키지 빌더
+ * 집포터 - 로컬 에이전트 ZIP 패키지 빌더
  * electron-builder 없이 배포용 ZIP을 생성합니다.
  */
 
 const { execSync } = require('child_process')
 const fs = require('fs')
 const path = require('path')
-const { promisify } = require('util')
 
 const ROOT = path.join(__dirname, '..')
 const OUT_DIR = path.join(ROOT, 'release-agent')
@@ -18,7 +17,7 @@ function err(msg) { console.error(`  ✗ ${msg}`); process.exit(1) }
 
 async function main() {
   console.log('\n================================================')
-  console.log('  부동산 AI OS - 에이전트 배포 패키지 빌드')
+  console.log('  집포터 - 에이전트 배포 패키지 빌드')
   console.log('================================================\n')
 
   // 1. TypeScript 컴파일
@@ -47,7 +46,7 @@ async function main() {
   const agentPkg = {
     name: 'realestate-agent',
     version: '1.0.0',
-    description: '부동산 AI OS 로컬 자동화 에이전트',
+    description: '집포터 로컬 자동화 에이전트',
     main: 'dist-agent/worker.js',
     scripts: {
       start: 'node dist-agent/worker.js'
@@ -67,7 +66,7 @@ async function main() {
   // 6. .env.template 생성
   log('.env.template 생성 중...')
   const envTemplate = [
-    '# 부동산 AI OS 에이전트 환경변수',
+    '# 집포터 로컬 에이전트 환경변수',
     '# 이 파일을 .env 로 복사하고 값을 입력하세요',
     '',
     'NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co',

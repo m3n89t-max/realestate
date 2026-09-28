@@ -1,7 +1,9 @@
 @echo off
+chcp 65001 >nul
 setlocal
 echo ==================================================
-echo   RealEstate AI OS - Local Agent Setup
+echo   JIPPORTER - Local Agent Setup
+echo   집포터 로컬 에이전트
 echo ==================================================
 echo.
 

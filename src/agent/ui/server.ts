@@ -2,6 +2,7 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import { AGENT_BRAND } from '../brand';
 
 const PORT = 3005;
 
@@ -125,7 +126,7 @@ function getHtmlContent(creds: Record<string, any>, agentKey: string) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>부동산 AI OS - 에이전트 설정</title>
+    <title>${AGENT_BRAND.localAgentName} 설정</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -230,7 +231,7 @@ function getHtmlContent(creds: Record<string, any>, agentKey: string) {
     <div class="wrap">
         <div class="header">
             <div class="header-top">
-                <div class="logo">🏠 부동산 AI OS</div>
+                <div class="logo">🏠 ${AGENT_BRAND.productName}</div>
                 <div class="status-pill">
                     <span class="dot"></span>에이전트 실행 중
                 </div>

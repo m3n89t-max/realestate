@@ -1,6 +1,8 @@
 @echo off
+chcp 65001 >nul
 echo ==============================================
-echo RealEstate AI OS - Local Agent Setup
+echo JIPPORTER - Local Agent Setup
+echo 집포터 로컬 에이전트
 echo ==============================================
 echo 1. Creating necessary local directories...
 mkdir "%APPDATA%\RealEstateAIOS" 2>nul

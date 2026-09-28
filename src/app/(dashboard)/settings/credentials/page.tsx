@@ -3,7 +3,7 @@ import Link from 'next/link'
 import CredentialForm from './CredentialForm'
 
 export const metadata = {
-    title: '자동화 계정 관리 | 부동산 AI OS',
+    title: '자동화 계정 관리',
 }
 
 export default function CredentialsPage() {
