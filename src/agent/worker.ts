@@ -14,6 +14,7 @@ import { uploadNaverBlog } from './playwright/naver_upload';
 import { uploadYoutube } from './playwright/youtube_upload';
 import { uploadInstagram } from './playwright/instagram_upload';
 import { startUIServer } from './ui/server';
+import { AGENT_BRAND } from './brand';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -94,7 +95,7 @@ class LocalAgent {
         );
 
         log('===========================================');
-        log('  RealEstate AI OS — Local Agent v' + this.config.version);
+        log(`  ${AGENT_BRAND.localAgentName} v${this.config.version}`);
         log('  Agent: ' + this.config.agent_name);
         log('===========================================');
 

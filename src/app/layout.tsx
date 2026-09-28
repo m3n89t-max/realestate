@@ -1,13 +1,22 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { Toaster } from 'react-hot-toast'
+import { BRAND } from '@/lib/brand'
 
 export const metadata: Metadata = {
   title: {
-    default: 'RealEstate AI OS',
-    template: '%s | RealEstate AI OS',
+    default: BRAND.name,
+    template: `%s | ${BRAND.name}`,
   },
-  description: '공인중개사를 위한 AI 기반 부동산 마케팅 & 업무 자동화 플랫폼',
+  description: BRAND.description,
+  applicationName: BRAND.name,
+  openGraph: {
+    siteName: BRAND.name,
+    title: BRAND.name,
+    description: BRAND.description,
+    locale: 'ko_KR',
+    type: 'website',
+  },
   keywords: ['부동산', '공인중개사', 'AI', '마케팅자동화', '블로그자동화'],
 }
 

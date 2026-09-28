@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { BRAND } from '@/lib/brand'
 import { getNavigationSections, getPageMeta, isNavigationItemActive, type NavigationItem } from '@/lib/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
@@ -152,7 +153,7 @@ export default function AppShell({
             <Building2 size={17} aria-hidden="true" />
           </span>
           <span className="text-[15px] font-bold tracking-[-0.03em] text-slate-900">
-            새론 부동산 업무 도우미
+            {BRAND.name}
           </span>
         </Link>
         {mobile && (
