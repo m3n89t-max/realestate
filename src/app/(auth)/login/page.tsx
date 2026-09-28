@@ -32,8 +32,14 @@ export default function LoginPage() {
   const [cooldown, setCooldown] = useState(0)
 
   useEffect(() => {
-    const error = new URLSearchParams(window.location.search).get('error')
-    if (error) { toast.error('인증 링크를 확인할 수 없습니다. 새 인증 메일을 보내 주세요.'); window.history.replaceState({}, '', '/login') }
+    const searchParams = new URLSearchParams(window.location.search)
+    const error = searchParams.get('error')
+    if (error) {
+      toast.error('인증 링크를 확인할 수 없습니다. 새 인증 메일을 보내 주세요.')
+      window.history.replaceState({}, '', '/login')
+      return
+    }
+    if (searchParams.get('mode') === 'signup') setMode('signup')
   }, [])
   useEffect(() => {
     if (!cooldown) return

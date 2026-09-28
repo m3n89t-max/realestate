@@ -10,7 +10,7 @@ const readProjectFile = (path: string) => readFileSync(resolve(process.cwd(), pa
 test('집포터 브랜드의 공식 이름과 핵심 약속을 한 곳에서 제공한다', () => {
   assert.equal(BRAND.name, '집포터')
   assert.equal(BRAND.englishName, 'JIPPORTER')
-  assert.equal(BRAND.tagline, '주소와 사진만 넣으면, 집포터가 홍보 초안을 완성합니다.')
+  assert.equal(BRAND.tagline, '매물 정보를 한 번 입력하면, 집포터가 홍보 초안을 정리합니다.')
   assert.match(BRAND.description, /공인중개사/)
 })
 
