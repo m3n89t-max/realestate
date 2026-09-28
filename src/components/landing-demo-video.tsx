@@ -69,7 +69,7 @@ export function LandingDemoVideo() {
         </div>
       </div>
       <p id="demo-video-description" className="mt-3 text-center text-xs font-medium leading-5 text-slate-500">
-        밝은 중개사무소에서 시작해 집포터 화면으로 전환됩니다. 매물 정보를 한 번 입력하면 입지분석, 블로그 글, 카드뉴스, 쇼츠 스크립트가 준비되는 흐름입니다.
+        가상 매물의 주소, 아파트 종류, 가격을 입력하고 역세권·남향·주차가능 특징을 선택합니다. 사진을 추가한 뒤 입지분석을 시작하고, 입지분석, 블로그 글, 카드뉴스, 쇼츠 스크립트가 준비되는 흐름입니다.
       </p>
     </div>
   )
