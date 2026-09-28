@@ -223,39 +223,6 @@ Deno.serve(async (req) => {
       : formatRealPrice(project.real_price_data)
     const kakaoDensityText = formatKakaoDensity(project.kakao_density)
 
-    // ── 유동인구 추정 (TEAM5 스펙 공식) ──────────────────────
-    // foot_traffic_score = POI_density * 0.4 + transit_score * 0.3 + population_density * 0.3
-    const footTrafficLocal = (() => {
-      const density = project.kakao_density as any
-      const totalPoi = density?.categories
-        ? Object.values(density.categories as Record<string, any>)
-            .reduce((s: number, c: any) => s + (c.total_count ?? 0), 0)
-        : 0
-      // POI 밀도 점수: 총 300개 이상이면 만점
-      const poiScore = Math.min(totalPoi / 300, 1)
-
-      // 대중교통 점수: 가장 가까운 지하철 거리 기반
-      const nearestSubway = (poi_data as any)?.subway?.[0]?.distance_m ?? 99999
-      const transitScore = nearestSubway < 300 ? 1.0
-        : nearestSubway < 600 ? 0.75
-        : nearestSubway < 1000 ? 0.5
-        : nearestSubway < 2000 ? 0.25 : 0.05
-
-      // 배후인구 추정: 업종 밀도로 대체 (상권형=높음, 주거형=중간)
-      const hasFoodBiz = ((density?.categories?.FD6?.total_count ?? 0) + (density?.categories?.CE7?.total_count ?? 0))
-      const populationScore = hasFoodBiz >= 30 ? 0.8 : hasFoodBiz >= 10 ? 0.5 : 0.3
-
-      // 지하철이 없는 지역(제주 등)은 대중교통(지하철) 점수가 항상 최하가 되어
-      // 유동인구를 부당하게 깎으므로, 대중교통 가중치(0.3)를 POI·배후인구로 재분배한다.
-      const hasSubway = nearestSubway < 99999
-      const raw = hasSubway
-        ? poiScore * 0.4 + transitScore * 0.3 + populationScore * 0.3
-        : poiScore * 0.55 + populationScore * 0.45
-      const score = Math.round(raw * 100)
-      const label = score >= 75 ? '높음' : score >= 50 ? '보통' : score >= 25 ? '낮음' : '매우 낮음'
-      return { score, label, breakdown: { poi_score: Math.round(poiScore * 100), transit_score: hasSubway ? Math.round(transitScore * 100) : null, population_score: Math.round(populationScore * 100), total_poi: totalPoi, nearest_subway_m: hasSubway ? nearestSubway : null } }
-    })()
-
     // ── 매물 유형별 분석 관점 설정 ──────────────────────────
     const propertyTypeLabel: Record<string, string> = {
       apartment: '아파트', officetel: '오피스텔', villa: '빌라/다세대',
@@ -311,9 +278,15 @@ ${propertyType === 'forest' ? '- 임야 특성: 산지전용 가능 여부, 보�
 - 교통·생활편의·교육·상권을 균형 있게 평가
 - 실거래가 동향 분석 포함`
 
-    const systemPrompt = `당신은 대한민국 부동산 입지 분석 전문가입니다. 실측 데이터를 기반으로 매물 유형에 맞는 정밀한 입지 분석을 수행하세요.
+    const systemPrompt = `당신은 대한민국 부동산 입지 분석 전문가입니다. 제공된 데이터에서 직접 확인되는 사실만 짧고 쉽게 요약하세요.
 
-[출력 형식: JSON - 모든 필드 필수]
+[정확성 규칙]
+- 입력에 없는 시설명, 거리, 공실률, 수익률, 유동인구, 매출, 개발호재를 만들지 마세요.
+- 장소 검색 결과는 전수조사가 아니며 유동인구 측정값으로 해석하지 마세요.
+- 확인할 수 없는 항목은 null 또는 빈 배열로 반환하세요.
+- 상권등급, 상권유형, 업종추천은 이번 출력에서 생성하지 마세요.
+
+[출력 형식: JSON]
 {
   "advantages": ["장점1", "장점2", ..., "장점7"],
   "recommended_targets": [
@@ -330,27 +303,11 @@ ${propertyType === 'forest' ? '- 임야 특성: 산지전용 가능 여부, 보�
   },
   "land_use_summary": "용도지역/지구 요약 (1-2문장)",
   "price_trend": "실거래가 동향 분석 (1-2문장)",
-  "commercial_grade": "S 또는 A 또는 B 또는 C",
-  "commercial_type": "주거형 또는 직장인 또는 학원 또는 대학 또는 관광 또는 복합 중 택1",
-  "recommended_industries": {
-    "recommended": [
-      {"name": "업종명", "reason": "추천 이유 (데이터 기반)"},
-      {"name": "업종명", "reason": "추천 이유"},
-      {"name": "업종명", "reason": "추천 이유"}
-    ],
-    "not_recommended": [
-      {"name": "업종명", "reason": "비추천 이유 (경쟁 과밀 등)"},
-      {"name": "업종명", "reason": "비추천 이유"}
-    ]
-  },
-  "analysis_text": "종합 분석 문장 (200자 내외, 매물 유형에 맞는 핵심 지표 포함)"
+  "commercial_grade": null,
+  "commercial_type": null,
+  "recommended_industries": null,
+  "analysis_text": "종합 분석 문장 (200자 내외, 확인된 핵심 지표와 한계 포함)"
 }
-
-[상권 등급 평가 기준 — 상가/사무실 전용, 주거용은 생활편의 등급으로 전용]
-S: 유동인구 높음 + 업종밀집 300개 이상 OR 지하철 300m 이내
-A: 유동인구 보통 이상 + 업종 100개 이상
-B: 유동인구 낮음 이상 + 상권 기반 존재
-C: 고립 지역 또는 유동인구 매우 낮음
 
 ${typeGuide}`
 
@@ -358,21 +315,16 @@ ${typeGuide}`
     const areaStr  = project.area  ? `${project.area}㎡ (약 ${Math.round(project.area / 3.3)}평)` : null
 
     const analysisInstructions = isMixedUse
-      ? `- 1층 상가 상권 등급(S/A/B/C) 평가 및 추천 업종 도출
-- 위층 주거 임대 수요(1~2인 가구·직장인 등) 평가
-- 상가+주거 합산 예상 임대수익률 관점에서 투자 매력도 평가
-- 카카오맵 업종 밀집도 데이터를 상가 임차인 유치 전략에 연계`
+      ? `- 확인된 주변 시설과 업종 구성만 요약
+- 임대수요·수익률은 근거 데이터가 없으면 언급하지 않음`
       : isCommercial
-      ? `- 상권 등급(S/A/B/C)을 위 기준에 따라 부여하고 근거 명시
-- 카카오맵 업종 밀집도 숫자(음식점 N개, 카페 N개 등)를 분석에 직접 인용
-- 현재 부족한 업종과 과밀 업종을 분석하여 추천/비추천 업종 도출
-- 상권 유형(주거형/직장인/학원/복합 등)을 데이터 기반으로 판단`
+      ? `- 조회된 주변 점포·업종 구성 숫자만 인용
+- 조회 제한이 있는 참고자료이며 상권 전체 점포 수로 단정하지 않음`
       : isResidential
-      ? `- 학교·병원·마트 등 생활 인프라까지의 도보/차량 거리를 구체적으로 언급
+      ? `- 실제 수집된 학교·병원·마트 등 생활 인프라 거리만 언급
 - 실거래가 동향을 기반으로 시세 수준과 투자 매력도 평가
-- 교통 접근성(지하철·버스) 및 출퇴근 편의성 평가
-- 주거 쾌적성(공원·소음·채광 등) 평가
-- commercial_grade는 생활편의 등급으로 해석하여 작성`
+- 실제 수집된 교통시설만 언급
+- 소음·채광은 입력에 없으면 언급하지 않음`
       : isLand
       ? `- 용도지역 규제와 개발 가능성을 최우선 분석
 - 주변 개발 호재 및 지역 성장성 평가
@@ -406,16 +358,10 @@ ${poiText}
 [${isCommercial ? '상권 분석 데이터' : isLand ? '토지 실거래가 및 공시지가 참고' : isIndustrial ? '인근 공장/창고 실거래가 참고' : '최근 실거래가'}]
 ${realPriceText}
 
-[카카오맵 업종 밀집도 - 실측 데이터, 반드시 분석에 반영]
+[카카오맵 장소 검색 결과 - 전수조사가 아닌 참고자료]
 ${kakaoDensityText}
 
-[유동인구 추정 (로컬 계산 결과 - 참고용)]
-유동인구 지수: ${footTrafficLocal.score}/100 (${footTrafficLocal.label})
-- POI 밀도 점수: ${footTrafficLocal.breakdown.poi_score}/100 (반경 500m 총 ${footTrafficLocal.breakdown.total_poi}개)
-- 대중교통 점수: ${footTrafficLocal.breakdown.nearest_subway_m ? `${footTrafficLocal.breakdown.transit_score}/100 (가장 가까운 지하철 ${footTrafficLocal.breakdown.nearest_subway_m}m)` : '해당 없음 (지하철 미운행 지역 — POI·배후인구 가중 재분배)'}
-- 배후인구 점수: ${footTrafficLocal.breakdown.population_score}/100
-
-위 실측 데이터를 종합하여 ${ptLabel} 매물에 최적화된 분석을 수행하세요:
+위 확인된 데이터를 종합하여 ${ptLabel} 매물을 처음 보는 사람도 이해할 수 있게 요약하세요:
 ${analysisInstructions}
 - 중개사 메모에 특이사항이 있으면 분석에 반드시 반영`
 
@@ -439,10 +385,10 @@ ${analysisInstructions}
         analysis_text:            analysis.analysis_text,
         land_use_summary:         analysis.land_use_summary ?? null,
         price_trend:              analysis.price_trend ?? null,
-        commercial_grade:         analysis.commercial_grade ?? null,
-        commercial_type:          analysis.commercial_type ?? null,
-        foot_traffic:             { ...footTrafficLocal, ai_label: analysis.commercial_grade },
-        recommended_industries:   analysis.recommended_industries ?? null,
+        commercial_grade:         null,
+        commercial_type:          null,
+        foot_traffic:             null,
+        recommended_industries:   null,
         updated_at:               new Date().toISOString(),
       }, { onConflict: 'project_id' })
 
