@@ -2,7 +2,6 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import {
   ArrowRight,
-  BarChart3,
   Building2,
   Check,
   ChevronRight,
@@ -12,11 +11,11 @@ import {
   MapPin,
   MessageSquareText,
   PlaySquare,
-  ShieldCheck,
   Sparkles,
   Upload,
 } from 'lucide-react'
 import { BRAND } from '@/lib/brand'
+import { LandingDemoVideo } from '@/components/landing-demo-video'
 
 export const metadata: Metadata = {
   title: { absolute: `공인중개사를 위한 매물 콘텐츠 자동화 | ${BRAND.name}` },
@@ -177,7 +176,7 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <ProductPreview />
+          <LandingDemoVideo />
         </div>
       </section>
 
@@ -337,42 +336,4 @@ function SectionHeading({ eyebrow, title, description, centered = false }: { eye
   )
 }
 
-function ProductPreview() {
-  return (
-    <div className="relative mx-auto w-full max-w-2xl">
-      <div className="absolute -inset-5 -z-10 rounded-[2.5rem] bg-brand-200/35 blur-2xl" />
-      <div className="overflow-hidden rounded-[1.75rem] border border-black/10 bg-white shadow-[0_30px_80px_rgba(19,34,32,0.16)]">
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-          <div className="flex items-center gap-2"><span className="size-2.5 rounded-full bg-red-300" /><span className="size-2.5 rounded-full bg-amber-300" /><span className="size-2.5 rounded-full bg-emerald-300" /></div>
-          <span className="text-xs font-bold text-slate-600">집포터 업무 공간 · 예시 화면</span>
-        </div>
-        <div className="grid sm:grid-cols-[0.74fr_1.26fr]">
-          <div className="border-b border-slate-100 bg-[#f8f7f3] p-5 sm:border-b-0 sm:border-r">
-            <p className="text-xs font-bold text-brand-700">입력한 매물</p>
-            <div className="mt-4 rounded-2xl bg-[linear-gradient(135deg,#d9ebe6,#86bfb1)] p-5 text-brand-900">
-              <Building2 size={28} aria-hidden="true" />
-              <p className="mt-10 text-sm font-bold">제주시 주거 매물</p>
-              <p className="mt-1 text-xs text-brand-900">사진 8장 · 매매 · 예시</p>
-            </div>
-            <div className="mt-4 space-y-2">
-              {['주소와 가격', '사진과 특징', '거래 정보'].map(item => <div key={item} className="flex items-center gap-2 text-xs font-semibold text-slate-700"><Check size={14} className="text-brand-600" aria-hidden="true" />{item}</div>)}
-            </div>
-          </div>
-          <div className="p-5 sm:p-6">
-            <div className="flex items-center justify-between"><div><p className="text-xs font-bold text-brand-700">한 매물에서 이어지는 결과물</p><p className="mt-1 text-sm font-bold text-slate-900">필요한 작업을 선택하세요</p></div><BarChart3 className="text-brand-500" size={22} aria-hidden="true" /></div>
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              {outputs.map(({ icon: Icon, label, tone }, index) => (
-                <div key={label} className="rounded-2xl border border-slate-100 p-4 shadow-[0_2px_10px_rgba(19,34,32,0.04)]">
-                  <span className={`grid size-9 place-items-center rounded-xl ${tone}`}><Icon size={17} aria-hidden="true" /></span>
-                  <p className="mt-4 text-sm font-bold text-slate-900">{label}</p>
-                  <p className="mt-1 text-[11px] font-medium text-slate-600">{index < 2 ? '내용 준비됨' : '초안 만들기'}</p>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 flex items-center gap-2 rounded-xl bg-brand-50 px-3 py-2.5 text-xs font-semibold text-brand-800"><ShieldCheck size={16} aria-hidden="true" />결과를 확인하고 수정한 뒤 사용합니다.</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
+
