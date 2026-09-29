@@ -5,13 +5,20 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { ChevronLeft, ChevronRight, MapPin } from 'lucide-react'
 import { formatPrice, formatArea, getPropertyTypeLabel } from '@/lib/utils'
+import { formatPriceSourceLabel } from '@/lib/price-source'
 import { cn } from '@/lib/utils'
+import type { PriceValueType } from '@/lib/types'
 
 interface PropertyCardProps {
   id: string
   address: string
   price?: number
   monthly_rent?: number
+  // 값 출처 메타 4필드 — 가격 아래에 출처명·기준일을 함께 노출한다
+  value_type?: PriceValueType | null
+  source_name?: string | null
+  source_date?: string | null
+  source_channel?: string | null
   area?: number
   floor?: number
   total_floors?: number
@@ -30,6 +37,10 @@ export default function PropertyCard({
   address,
   price,
   monthly_rent,
+  value_type,
+  source_name,
+  source_date,
+  source_channel,
   area,
   floor,
   total_floors,
@@ -141,6 +152,10 @@ export default function PropertyCard({
               </span>
             ) : null}
           </h3>
+          {/* 가격 옆에 출처명·기준일을 함께 노출 (값 출처 메타 4필드) */}
+          <span className="mt-1 block text-xs font-medium text-slate-700">
+            {formatPriceSourceLabel({ value_type, source_name, source_date, source_channel })}
+          </span>
           <span className="mt-1.5 flex items-center gap-1 text-sm text-slate-600">
             <MapPin size={13} aria-hidden="true" className="shrink-0 text-slate-500" />
             <span className="truncate">{address}</span>

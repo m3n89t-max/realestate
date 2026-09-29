@@ -2,6 +2,13 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, handleCors } from '../_shared/cors.ts'
 import { getAuthenticatedUser, getOrgId, checkQuota } from '../_shared/auth.ts'
 import { callGemini, callGeminiVision } from '../_shared/gemini.ts'
+import {
+  assertRenderablePriceSource,
+  buildPriceSourcePromptBlock,
+  formatPriceSourceLabel,
+  REGION_PRICE_CLAIM_BAN_RULES,
+} from '../_shared/price-source.ts'
+
 
 type Platform = 'instagram' | 'kakao'
 
@@ -25,6 +32,8 @@ function buildInstagramSystemPrompt(): string {
 - ⚠️ 데이터 없음 → 생략 원칙: 제공된 데이터에 없는 정보는 절대 추측하거나 지어내지 말 것. 임대현황이 없으면 4장에 "임대 정보 없음"이라 쓰거나 알고 있는 정보만 기재. 층별 구성 모르면 spec_grid에 "미확인" 대신 알려진 내용만 기재. 빈 checkpoints/points는 실제 근거 있는 것만 포함하되 1개라도 무방
 
 ${CARD_HUMANIZER_RULES}
+
+${REGION_PRICE_CLAIM_BAN_RULES}
 
 [image_prompt 작성 규칙 - 매우 중요]
 ❌ 나쁜 예: "Professional real estate exterior photo, bright lighting"
@@ -99,6 +108,8 @@ function buildKakaoSystemPrompt(): string {
 
 ${CARD_HUMANIZER_RULES}
 
+${REGION_PRICE_CLAIM_BAN_RULES}
+
 [카드 6장 필수 구성 - 이 흐름을 반드시 준수]
 1장: Hook (시선을 끄는 카피 한 줄)
 2장: Location advantage (입지 장점)
@@ -139,6 +150,13 @@ Deno.serve(async (req) => {
       .eq('id', project_id)
       .single()
     if (pError || !project) throw new Error('프로젝트를 찾을 수 없습니다')
+
+    // ── 렌더 실패 규칙 ───────────────────────────────────────────────────────
+    // 값유형이 '실거래' 또는 '호가'인데 출처명/기준일이 비어 있으면
+    // 카드뉴스를 만들지 않고 명확한 한국어 오류로 실패시킨다.
+    assertRenderablePriceSource(project, 'card_news')
+    const priceSourceLabel = formatPriceSourceLabel(project)
+    const priceSourceBlock = buildPriceSourcePromptBlock(project)
 
     const { data: location } = await supabaseClient
       .from('location_analyses')
@@ -204,6 +222,7 @@ Deno.serve(async (req) => {
 주소: ${address}
 유형: ${propertyType}
 가격: ${priceText}${project.deposit ? ` / 보증금 ${Math.floor(project.deposit / 10000)}만원` : ''}${project.monthly_rent ? ` / 월세 ${Math.floor(project.monthly_rent / 10000)}만원` : ''}${project.key_money ? ` / 권리금 ${Math.floor(project.key_money / 10000)}만원` : ''}
+가격 출처 (가격을 카드에 쓸 때 반드시 함께 표기): ${priceSourceLabel}
 면적: ${project.area ? `${project.area}㎡` : '미정'}
 층수: ${project.floor ? `${project.floor}층` : '미정'}
 방향: ${project.direction ?? '미정'}
@@ -218,6 +237,8 @@ ${project.rental_status?.trim() || '정보 없음 - 4장 임대현황은 억지�
 
 [공인중개사 현장 메모 - 최우선 반영]
 ${project.note?.trim() || '없음'}
+
+${priceSourceBlock}
 
 입지 장점:
 ${advantages || '입지 정보 없음'}${photoAnalysis ? `\n\n[AI 사진 분석 결과]\n${photoAnalysis}` : ''}

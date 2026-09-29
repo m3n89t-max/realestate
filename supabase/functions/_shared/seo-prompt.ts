@@ -1,5 +1,11 @@
 // SEO 최적화 부동산 블로그 생성 프롬프트 템플릿
 
+import {
+  buildPriceSourcePromptBlock,
+  formatPriceSourceLabel,
+  REGION_PRICE_CLAIM_BAN_RULES,
+} from './price-source.ts'
+
 export interface BlogPromptContext {
   address: string
   property_type: string
@@ -10,6 +16,11 @@ export interface BlogPromptContext {
   monthly_rent?: number
   deposit?: number
   key_money?: number
+  // 값 출처 메타 4필드 — 가격을 언급할 때 함께 표기하고, 지역 시세 단정을 막는 근거
+  source_name?: string | null
+  source_date?: string | null
+  source_channel?: string | null
+  value_type?: string | null
   area?: number
   land_area?: number | null
   total_area?: number | null
@@ -136,6 +147,10 @@ export function buildBlogSystemPrompt(): string {
    - 특히 해당 매물과 면적·유형이 다른 사례를 근거로 "가격이 합리적"이라고 단정하지 말 것.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${REGION_PRICE_CLAIM_BAN_RULES}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [상업용 매물(상가/사무실) 특별 작성 원칙 - 수요자(창업자) 빙의]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 상권 분석 및 상가 매물인 경우, 단순 중개사가 아닌 "내가 직접 여기서 장사를 시작하려는 사람(창업자/수요자)"의 관점을 적극 반영하여 글을 깊이 있게 전개하세요.
@@ -217,6 +232,8 @@ export function buildBlogUserPrompt(ctx: BlogPromptContext): string {
     if (ctx.monthly_rent) priceLines.push(`- 월세: ${Math.floor(ctx.monthly_rent / 10000)}만원`)
   }
   if (ctx.key_money) priceLines.push(`- 권리금: ${Math.floor(ctx.key_money / 10000)}만원`)
+  // 가격 옆에 반드시 붙일 출처 한 줄 (값유형 · 출처명 · 기준일)
+  priceLines.push(`- 가격 출처(본문에서 금액을 쓸 때마다 함께 표기): ${formatPriceSourceLabel(ctx)}`)
 
   const extraInfo: string[] = []
   if (ctx.property_category) extraInfo.push(`- 중개대상물 종류: ${ctx.property_category}`)
@@ -257,6 +274,8 @@ ${ctx.rental_status?.trim() || '정보 없음 - 임대수익 관련 내용은 �
 
 [공인중개사 현장 메모 - 직접 방문 관찰 내용, 최우선 반영]
 ${ctx.note?.trim() || '없음'}
+
+${buildPriceSourcePromptBlock(ctx)}
 
 [입지 분석 결과]
 ${ctx.location_advantages?.map((a, i) => `${i + 1}. ${a}`).join('\n') || '입지 분석 결과 없음 - 주소 기반으로 추론 가능한 내용만 기재하고, 불확실한 내용은 "~로 알려져 있습니다" 형태로 표현'}

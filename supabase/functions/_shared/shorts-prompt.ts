@@ -1,5 +1,7 @@
 // 부동산 유튜브 쇼츠 스크립트 프롬프트 템플릿
 
+import { REGION_PRICE_CLAIM_BAN_RULES } from './price-source.ts'
+
 export interface ShortsScene {
   scene_number: number
   duration_sec: number
@@ -32,6 +34,8 @@ export function buildShortsSystemPrompt(): string {
 - 후킹이 강한 마케팅 메시지 구성
 - 매물 사진/동영상이 있는 경우 해당 장면 연출에 활용
 - 해시태그 15개 이상 (지역명, 매물유형, 투자 키워드 포함)
+
+${REGION_PRICE_CLAIM_BAN_RULES}
 
 응답 형식 (반드시 유효한 JSON):
 {

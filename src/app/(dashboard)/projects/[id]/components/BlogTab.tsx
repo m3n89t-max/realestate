@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { GeneratedContent, SeoScore } from '@/lib/types'
 import toast from 'react-hot-toast'
 import { cn, formatPrice, getPropertyTypeLabel } from '@/lib/utils'
+import { checkPriceSource, formatPriceSourceLabel } from '@/lib/price-source'
 
 interface BlogTabProps {
   projectId: string
@@ -279,6 +280,9 @@ export default function BlogTab({ projectId, orgId, project, contents, assets }:
   }
 
   const handleGenerate = async () => {
+    // 렌더 실패 규칙: 값유형이 '실거래'/'호가'인데 출처명·기준일이 비면 한국어 오류로 막는다.
+    const priceSourceCheck = checkPriceSource(project ?? {}, 'blog')
+    if (!priceSourceCheck.ok) { toast.error(priceSourceCheck.message, { duration: 10000 }); return }
     setGenerating(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -306,6 +310,9 @@ export default function BlogTab({ projectId, orgId, project, contents, assets }:
   // ── AI 디자인 썸네일(대표이미지) 생성 ──────────────────────────────────────
   // 매물 사진 위에 지역·유형·강점·가격을 얹은 클릭유도형 썸네일을 생성해 대표이미지로 설정.
   const handleGenerateThumbnail = async () => {
+    // 렌더 실패 규칙: 썸네일에도 가격이 들어가므로 동일하게 막는다.
+    const thumbPriceSourceCheck = checkPriceSource(project ?? {}, 'blog')
+    if (!thumbPriceSourceCheck.ok) { toast.error(thumbPriceSourceCheck.message, { duration: 10000 }); return }
     const imageAssets = (assets ?? []).filter((a: any) => a.type !== 'video' && a.file_url)
     // 베이스 사진: 지정된 대표사진(과거 생성된 data URL 제외) 또는 대표/첫 이미지
     const basePhoto = (coverImageUrl && !coverImageUrl.startsWith('data:')) ? coverImageUrl
@@ -330,7 +337,7 @@ export default function BlogTab({ projectId, orgId, project, contents, assets }:
       else price_badge = `매매 ${project?.price ? formatPrice(project.price) : '협의'}`
 
       const features: string[] = Array.isArray(project?.features) ? project.features : []
-      const badges = features.slice(0, 4).join(' · ')
+      const badges = [formatPriceSourceLabel(project ?? {}), ...features.slice(0, 3)].filter(Boolean).join(' · ')
       const tag = `${clean(parts[0] ?? '') || '부동산'} 부동산`
 
       const res = await fetch('/api/generate-thumbnail', {

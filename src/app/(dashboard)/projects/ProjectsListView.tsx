@@ -9,13 +9,18 @@ import {
 import PropertyCard from '@/components/projects/PropertyCard'
 import ProjectsMap from '@/components/projects/ProjectsMap'
 import { cn } from '@/lib/utils'
-import type { PropertyType } from '@/lib/types'
+import type { PropertyType, PriceValueType } from '@/lib/types'
 
 interface Project {
     id: string
     address: string
     price?: number
     monthly_rent?: number
+    // 값 출처 메타 4필드
+    value_type?: PriceValueType | null
+    source_name?: string | null
+    source_date?: string | null
+    source_channel?: string | null
     area?: number
     floor?: number
     total_floors?: number
@@ -256,6 +261,10 @@ export default function ProjectsListView({ projects, searchParams }: ProjectsLis
                                     address={project.address}
                                     price={project.price}
                                     monthly_rent={project.monthly_rent}
+                                    value_type={project.value_type}
+                                    source_name={project.source_name}
+                                    source_date={project.source_date}
+                                    source_channel={project.source_channel}
                                     area={project.area}
                                     floor={project.floor}
                                     total_floors={project.total_floors}

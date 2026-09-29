@@ -1,6 +1,7 @@
 'use client'
 
 import type { Project, Organization } from '@/lib/types'
+import { formatPriceSourceLabel } from '@/lib/price-source'
 
 const sqmToPyeong = (sqm: number) => (sqm * 0.3025).toFixed(0)
 
@@ -123,6 +124,10 @@ export default function PropertyInfoTable({ project, org, agentName, className =
                 : project.transaction_type === 'lease'
                 ? formatPrice(project.deposit)
                 : formatPrice(project.price)}
+              {/* 가격 옆에 출처명·기준일을 함께 노출 (값 출처 메타 4필드) */}
+              <span className="mt-0.5 block text-[11px] font-medium text-gray-700">
+                {formatPriceSourceLabel(project)}
+              </span>
             </td>
             <th scope="row" className="border border-gray-300 bg-blue-50 px-3 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap">권 리 금</th>
             <td className="border border-gray-300 px-3 py-2 text-xs text-gray-800">
@@ -240,7 +245,7 @@ export function buildPropertyInfoTableHtml(project: Project, org?: Organization 
     </tr>
     <tr>
       <td style="border:1px solid #bbb;padding:6px 10px;background:#dbeafe;font-weight:bold;">${priceLabel}</td>
-      <td style="border:1px solid #bbb;padding:6px 10px;color:#dc2626;font-weight:bold;">${priceValue}</td>
+      <td style="border:1px solid #bbb;padding:6px 10px;color:#dc2626;font-weight:bold;">${priceValue}<br /><span style="color:#374151;font-weight:500;font-size:11px;">${esc(formatPriceSourceLabel(project))}</span></td>
       <td style="border:1px solid #bbb;padding:6px 10px;background:#dbeafe;font-weight:bold;">입주가능일</td>
       <td style="border:1px solid #bbb;padding:6px 10px;">${esc(project.move_in_date) || '협의'}</td>
       <td style="border:1px solid #bbb;padding:6px 10px;background:#dbeafe;font-weight:bold;">방향</td>

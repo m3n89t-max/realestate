@@ -5,6 +5,11 @@ import { callGemini } from '../_shared/gemini.ts'
 import { maskPersonalInfo } from '../_shared/masking.ts'
 import { ok, err } from '../_shared/response.ts'
 import { buildShortsSystemPrompt } from '../_shared/shorts-prompt.ts'
+import {
+  assertRenderablePriceSource,
+  buildPriceSourcePromptBlock,
+  formatPriceSourceLabel,
+} from '../_shared/price-source.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -24,6 +29,13 @@ Deno.serve(async (req) => {
       .eq('id', project_id)
       .single()
     if (pError || !project) throw new Error('프로젝트를 찾을 수 없습니다')
+
+    // ── 렌더 실패 규칙 ───────────────────────────────────────────────────────
+    // 값유형이 '실거래' 또는 '호가'인데 출처명/기준일이 비어 있으면
+    // 쇼츠 대본을 만들지 않고 명확한 한국어 오류로 실패시킨다.
+    assertRenderablePriceSource(project, 'shorts')
+    const priceSourceLabel = formatPriceSourceLabel(project)
+    const priceSourceBlock = buildPriceSourcePromptBlock(project)
 
     const [{ data: location }, { data: assets }] = await Promise.all([
       supabaseClient
@@ -60,11 +72,14 @@ Deno.serve(async (req) => {
 주소: ${maskedAddress}
 매물 유형: ${project.property_type ?? '아파트'}
 가격: ${priceText}
+가격 출처 (나레이션·자막에서 금액을 말할 때 반드시 함께 표기): ${priceSourceLabel}
 면적: ${project.area ? `${project.area}㎡` : ''}
 층수: ${project.floor ? `${project.floor}층` : ''}
 방향: ${project.direction ?? ''}
 특징: ${(project.features ?? []).join(', ')}${locationInfo}
 ${assetInfo ? `\n[업로드된 미디어]\n${assetInfo}` : ''}
+
+${priceSourceBlock}
 
 [작성 가이드]
 1. hook은 시청자가 멈춰보게 만드는 강렬한 첫 문장

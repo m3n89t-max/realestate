@@ -1,9 +1,16 @@
 import { Project, GenerateCardNewsRequest, CardNewsSlide } from '../types';
+import { assertRenderablePriceSource, formatPriceSourceLabel } from '../price-source';
 
 export async function generateCardNews(
     project: Project,
     request: GenerateCardNewsRequest
 ): Promise<CardNewsSlide[]> {
+
+    // 값유형이 '실거래'/'호가'인데 출처명·기준일이 비어 있으면 여기서 한국어 오류로 중단한다.
+    // 빈 값으로 렌더하거나 조용히 넘기지 않는다.
+    assertRenderablePriceSource(project, 'card_news');
+
+    const priceSource = formatPriceSourceLabel(project);
 
     // In a real application, we would use an LLM to craft snappy copy for the slides.
     const slides: CardNewsSlide[] = [
@@ -16,8 +23,9 @@ export async function generateCardNews(
         {
             order: 2,
             title: '핵심 스펙 파헤치기',
-            body: `가격: ${project.price || '상담가능'}\n면적: ${project.area || '?'}㎡`,
-            highlight: '놓치면 후회할 가격!',
+            // 가격 옆에 값유형·출처명·기준일을 함께 노출한다.
+            body: `가격: ${project.price || '상담가능'}\n(${priceSource})\n면적: ${project.area || '?'}㎡`,
+            highlight: '이 매물 가격입니다',
             emoji: '',
         },
         {

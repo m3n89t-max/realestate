@@ -280,7 +280,7 @@ export default async function ProjectDetailPage({
       )}
 
       {tab === 'card_news' && (
-        <CardNewsTab projectId={id} contents={cardNewsContents} assets={assets ?? []} />
+        <CardNewsTab projectId={id} project={project} contents={cardNewsContents} assets={assets ?? []} />
       )}
 
       {tab === 'docs' && (
@@ -288,7 +288,7 @@ export default async function ProjectDetailPage({
       )}
 
       {tab === 'shorts' && (
-        <ShortsTab projectId={id} assets={assets ?? []} contents={shortsContents} />
+        <ShortsTab projectId={id} project={project} assets={assets ?? []} contents={shortsContents} />
       )}
 
       {tab === 'tasks' && (

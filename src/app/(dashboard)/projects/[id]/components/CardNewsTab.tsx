@@ -6,12 +6,14 @@ import {
   ChevronLeft, ChevronRight, Copy, Check, RefreshCw, X,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import type { GeneratedContent } from '@/lib/types'
+import type { GeneratedContent, Project } from '@/lib/types'
+import { checkPriceSource } from '@/lib/price-source'
 import toast from 'react-hot-toast'
 import { cn } from '@/lib/utils'
 
 interface CardNewsTabProps {
   projectId: string
+  project?: Project | null
   contents: GeneratedContent[]
   assets: any[]
 }
@@ -220,8 +222,11 @@ function TextEditor({ card, onUpdate, onReset, hasEdits }: {
 
 /* ══════════════════════ Main Component ══════════════════════ */
 
-export default function CardNewsTab({ projectId, contents, assets }: CardNewsTabProps) {
+export default function CardNewsTab({ projectId, project, contents, assets }: CardNewsTabProps) {
   const supabase = createClient()
+
+  // 값유형이 '실거래'/'호가'인데 출처명·기준일이 비어 있으면 생성 버튼 자체를 막는다.
+  const priceSourceCheck = checkPriceSource(project ?? {}, 'card_news')
 
   // content에서 저장된 ai_image_url 복원
   const extractSavedImages = (contentId: string | null): Record<number, string> => {
@@ -307,6 +312,8 @@ export default function CardNewsTab({ projectId, contents, assets }: CardNewsTab
 
   /* ── 텍스트 구조 생성 (Edge Function) ── */
   const handleGenerate = async () => {
+    // 렌더 실패 규칙: 출처 미비 시 서버 호출 없이 한국어 오류로 막는다.
+    if (!priceSourceCheck.ok) { toast.error(priceSourceCheck.message, { duration: 10000 }); return }
     setGenerating(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()

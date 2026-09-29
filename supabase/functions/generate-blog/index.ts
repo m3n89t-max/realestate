@@ -5,6 +5,7 @@ import { countTokens } from '../_shared/openai.ts'
 import { callGemini } from '../_shared/gemini.ts'
 import { maskPersonalInfo } from '../_shared/masking.ts'
 import { buildBlogSystemPrompt, buildBlogUserPrompt, type BlogPromptContext } from '../_shared/seo-prompt.ts'
+import { assertRenderablePriceSource, formatPriceSourceLabel } from '../_shared/price-source.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -92,7 +93,12 @@ Deno.serve(async (req) => {
       .single()
     if (pError || !project) throw new Error('프로젝트를 찾을 수 없습니다')
 
-    // 입지 분석 데이터 조회
+    // ── 렌더 실패 규칙 ───────────────────────────────────────────────────────
+    // 값유형이 '실거래' 또는 '호가'인데 출처명/기준일이 비어 있으면
+    // 블로그 글을 만들지 않고 명확한 한국어 오류로 실패시킨다.
+    assertRenderablePriceSource(project, 'blog')
+    const priceSourceLabel = formatPriceSourceLabel(project)
+
     const { data: location } = await supabaseClient
       .from('location_analyses')
       .select('*')
@@ -140,7 +146,7 @@ Deno.serve(async (req) => {
       : project.transaction_type === 'lease' ? fmt(project.deposit) : fmt(project.price)
     const agRow = org ? `<tr><td colspan="6" style="border:1px solid #bbb;padding:8px 12px;background:#f5f5f5;font-size:12px;color:#444;line-height:1.8;">${org.name ? `■ 상호: ${org.name}&nbsp;&nbsp;` : ''}${org.business_number ? `■ 중개등록번호: ${org.business_number}&nbsp;&nbsp;` : ''}${org.address ? `■ 주소: ${org.address}&nbsp;&nbsp;` : ''}${org.phone ? `■ 전화번호: ${org.phone}` : ''}</td></tr>` : ''
     const s = 'border:1px solid #bbb;padding:6px 10px;', h = s + 'background:#dbeafe;font-weight:bold;'
-    const propertyTableHtml = `<table style="width:100%;border-collapse:collapse;font-size:13px;margin:16px 0;"><tbody><tr><td style="${h}">소재지</td><td style="${s}" colspan="3">${maskPersonalInfo(project.address)}</td><td style="${h}">중개대상물 종류</td><td style="${s}">${project.property_category || '-'}</td></tr><tr><td style="${h}">주용도</td><td style="${s}">${project.main_use || '-'}</td><td style="${h}">해당층/총층</td><td style="${s}">${project.floor != null || project.total_floors != null ? `${project.floor ?? '-'}층/${project.total_floors ?? '-'}층` : '-'}</td><td style="${h}">거래형태</td><td style="${s}">${txType}</td></tr><tr><td style="${h}">대지면적</td><td style="${s}">${fmtArea(project.land_area)}</td><td style="${h}">사용승인일</td><td style="${s}">${project.approval_date || '-'}</td><td style="${h}">연면적</td><td style="${s}">${fmtArea(project.total_area)}</td></tr><tr><td style="${h}">전용면적</td><td style="${s}">${fmtArea(project.area)}</td><td style="${h}">방/화장실</td><td style="${s}">${project.rooms_count != null || project.bathrooms_count != null ? `${project.rooms_count ?? '-'}/${project.bathrooms_count ?? '-'}` : '-'}</td><td style="${h}">주차</td><td style="${s}">${project.parking_legal != null || project.parking_actual != null ? `대장:${project.parking_legal ?? '-'}대/실:${project.parking_actual ?? '-'}대` : '-'}</td></tr><tr><td style="${h}">${priceLabel}</td><td style="${s}color:#dc2626;font-weight:bold;">${priceVal}</td><td style="${h}">입주가능일</td><td style="${s}">${project.move_in_date || '협의'}</td><td style="${h}">방향</td><td style="${s}">${project.direction || '-'}</td></tr><tr><td style="${h}">권리금</td><td style="${s}">${project.key_money ? fmt(project.key_money) : '무권리'}</td><td style="${h}">관리비</td><td style="${s}" colspan="3">${project.management_fee_detail || '-'}</td></tr>${agRow}</tbody></table>`
+    const propertyTableHtml = `<table style="width:100%;border-collapse:collapse;font-size:13px;margin:16px 0;"><tbody><tr><td style="${h}">소재지</td><td style="${s}" colspan="3">${maskPersonalInfo(project.address)}</td><td style="${h}">중개대상물 종류</td><td style="${s}">${project.property_category || '-'}</td></tr><tr><td style="${h}">주용도</td><td style="${s}">${project.main_use || '-'}</td><td style="${h}">해당층/총층</td><td style="${s}">${project.floor != null || project.total_floors != null ? `${project.floor ?? '-'}층/${project.total_floors ?? '-'}층` : '-'}</td><td style="${h}">거래형태</td><td style="${s}">${txType}</td></tr><tr><td style="${h}">대지면적</td><td style="${s}">${fmtArea(project.land_area)}</td><td style="${h}">사용승인일</td><td style="${s}">${project.approval_date || '-'}</td><td style="${h}">연면적</td><td style="${s}">${fmtArea(project.total_area)}</td></tr><tr><td style="${h}">전용면적</td><td style="${s}">${fmtArea(project.area)}</td><td style="${h}">방/화장실</td><td style="${s}">${project.rooms_count != null || project.bathrooms_count != null ? `${project.rooms_count ?? '-'}/${project.bathrooms_count ?? '-'}` : '-'}</td><td style="${h}">주차</td><td style="${s}">${project.parking_legal != null || project.parking_actual != null ? `대장:${project.parking_legal ?? '-'}대/실:${project.parking_actual ?? '-'}대` : '-'}</td></tr><tr><td style="${h}">${priceLabel}</td><td style="${s}color:#dc2626;font-weight:bold;">${priceVal}</td><td style="${h}">가격 출처</td><td style="${s}" colspan="3">${priceSourceLabel}</td></tr><tr><td style="${h}">입주가능일</td><td style="${s}">${project.move_in_date || '협의'}</td><td style="${h}">방향</td><td style="${s}">${project.direction || '-'}</td><td style="${h}">권리금</td><td style="${s}">${project.key_money ? fmt(project.key_money) : '무권리'}</td></tr><tr><td style="${h}">관리비</td><td style="${s}" colspan="5">${project.management_fee_detail || '-'}</td></tr>${agRow}</tbody></table>`
 
     // 프롬프트 컨텍스트 구성 (개인정보 마스킹)
     const ctx: BlogPromptContext = {
@@ -153,6 +159,10 @@ Deno.serve(async (req) => {
       monthly_rent: project.monthly_rent,
       deposit: project.deposit,
       key_money: project.key_money,
+      source_name: project.source_name,
+      source_date: project.source_date,
+      source_channel: project.source_channel,
+      value_type: project.value_type,
       area: project.area,
       land_area: project.land_area,
       total_area: project.total_area,
