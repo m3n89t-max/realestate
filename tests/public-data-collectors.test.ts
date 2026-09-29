@@ -232,18 +232,24 @@ test('서울 상권: 금액·건수 결측을 0으로 만들지 않는다', () =
   assert.equal(parsed.categories[0].merchantCount, null)
 })
 
-test('서울 상권 호출은 https만 사용한다', async () => {
-  let requested = ''
+test('서울 상권 호출 실패 시 인증키가 포함된 URL을 밖으로 흘리지 않는다', async () => {
+  // 서울 openapi는 https를 제공하지 않아 http가 유일한 경로다(2026-09-29 확인).
+  // 키가 경로 세그먼트에 실리므로, 실패 결과에 URL이나 에러 원문이 실리면 키가 노출된다.
+  const SECRET = 'super-secret-seoul-key'
   const env: CollectorEnv = {
-    seoulOpenApiKey: 'test-key',
+    seoulOpenApiKey: SECRET,
     dataGoKrKey: null,
-    fetchImpl: async (input) => { requested = String(input); return new Response('{}', { status: 200 }) },
+    fetchImpl: async (input) => { throw new Error(`요청 실패: ${String(input)}`) },
   }
-  await collectPublicDataLayers(
+  const results = await collectPublicDataLayers(
     { address: '서울특별시 중구 세종대로 110', lat: 37.5665, lng: 126.978, seoulPlaceName: '광화문·덕수궁' },
     env,
   )
-  assert.ok(requested.startsWith('https://'), '키가 경로에 실리므로 평문 http는 키 노출이다')
+  const seoul = results.find(r => r.layerId === 'seoul_realtime_commercial')
+  assert.equal(seoul?.status, 'failed')
+  const serialized = JSON.stringify(results)
+  assert.ok(!serialized.includes(SECRET), '수집 결과에 인증키가 실려서는 안 된다')
+  assert.ok(!serialized.includes('openapi.seoul.go.kr'), '결과에 요청 URL을 남기지 않는다')
 })
 
 test('수집기가 없는 레이어는 미수집이 아니라 미연결로 표기한다', async () => {

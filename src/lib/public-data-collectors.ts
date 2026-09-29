@@ -225,8 +225,12 @@ async function collectSeoulCommercial(
   if (!placeName) return emptyResult(layerId, 'empty')
 
   const doFetch = env.fetchImpl ?? fetch
-  // https만 사용한다. 키가 경로 세그먼트에 실리므로 평문 http는 키 노출이다.
-  const url = `https://openapi.seoul.go.kr:8088/${env.seoulOpenApiKey}/json/citydata_cmrcl/1/5/${encodeURIComponent(placeName)}`
+  // 서울 열린데이터광장 openapi는 https를 제공하지 않는다 (2026-09-29 확인:
+  // 8088 https는 SSL 오류, 443은 타임아웃). http가 유일한 경로다.
+  //
+  // 키가 경로 세그먼트에 실리므로 이 URL은 절대 로그·에러 응답에 남기지 않는다.
+  // catch 블록에서 에러 객체를 그대로 흘리면 키가 노출된다.
+  const url = `http://openapi.seoul.go.kr:8088/${env.seoulOpenApiKey}/json/citydata_cmrcl/1/5/${encodeURIComponent(placeName)}`
 
   try {
     const res = await doFetch(url)
