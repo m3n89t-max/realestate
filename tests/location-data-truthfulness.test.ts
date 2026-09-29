@@ -64,6 +64,15 @@ test('장벽 미수집과 조회 결과 없음은 서로 다르게 설명한다'
   assert.equal(describeBarrierStatus({ barrier_status: 'available', barrier_names: [] }), '조회 범위에서 주요 장벽이 확인되지 않았습니다.')
 })
 
+test('인구 자료가 없는 매물에서도 표시 헬퍼가 죽지 않는다', () => {
+  // population_data는 수집 전 매물에서 null이다. 여기서 던지면 입지분석 페이지 전체가
+  // 'This page couldn\'t load'로 죽는다(실제 장애: Cannot read properties of null (reading 'barrier_status')).
+  for (const empty of [null, undefined]) {
+    assert.equal(describeBarrierStatus(empty as never), null)
+    assert.equal(getPopulationEstimate(empty as never), null)
+  }
+})
+
 test('제품 화면은 오해를 부르는 입지분석 문구를 사용하지 않는다', () => {
   const surfaces = [
     readProjectFile('src/components/KakaoMap.tsx'),

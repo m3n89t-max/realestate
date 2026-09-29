@@ -52,7 +52,8 @@ const FACILITY_WEIGHT: Record<string, number> = {
   culture: 2,
 }
 
-export function getPopulationEstimate(input: PopulationEstimateInput): PopulationEstimate | null {
+export function getPopulationEstimate(input: PopulationEstimateInput | null | undefined): PopulationEstimate | null {
+  if (!input) return null
   const raw = input.radius_500m_estimated
   if (raw == null || !Number.isFinite(raw) || raw < 0) return null
 
@@ -114,7 +115,10 @@ export function hasDisplayableMetric(metric: unknown): boolean {
 export function describeBarrierStatus(input: {
   barrier_status?: string | null
   barrier_names?: string[] | null
-}): string | null {
+} | null | undefined): string | null {
+  // 인구 자료를 아직 수집하지 않은 매물은 population_data 자체가 null이다.
+  // 여기서 막지 않으면 호출부 한 곳만 가드를 빠뜨려도 페이지 전체가 죽는다.
+  if (!input) return null
   if (input.barrier_status === 'failed') return '장벽 자료를 확인하지 못했습니다.'
   if (input.barrier_status === 'not_collected') return '장벽 자료를 아직 수집하지 않았습니다.'
   if (input.barrier_status === 'available' && (input.barrier_names?.length ?? 0) === 0) {
