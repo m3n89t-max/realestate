@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
 
     const { data: project } = await supabase
       .from('projects')
-      .select('id, org_id, address, road_address, lat, lng')
+      .select('id, org_id, address, jibun_address, lat, lng')
       .eq('id', project_id)
       .single()
 
@@ -42,7 +42,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '이 프로젝트를 수정할 권한이 없습니다' }, { status: 403 })
     }
 
-    const address: string | null = project.road_address ?? project.address ?? null
+    // projects 테이블에 road_address 컬럼은 없다. address가 정본이다.
+    const address: string | null = project.address ?? project.jibun_address ?? null
     const lat: number | null = project.lat ?? null
     const lng: number | null = project.lng ?? null
 

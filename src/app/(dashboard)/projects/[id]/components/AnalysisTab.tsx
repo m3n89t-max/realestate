@@ -1472,7 +1472,7 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
           commercial_data={project.commercial_data}
           card_data={project.card_data}
           public_data_layers={project.public_data_layers}
-          address={project.road_address ?? project.address ?? null}
+          address={project.address ?? project.jibun_address ?? null}
         />
       </div>
 
