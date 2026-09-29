@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
 import type { POIItem, RealPriceItem } from '@/lib/types'
 import KakaoMap from '@/components/KakaoMap'
+import PublicDataLayerPanel from '@/components/PublicDataLayerPanel'
 import {
   describeBarrierStatus,
   getPopulationEstimate,
@@ -583,7 +584,7 @@ function KakaoDensityPanel({ kakao_density, projectId, lat, lng }: {
 
 // ── 지도 섹션 ─────────────────────────────────────────────────
 function MapSection({
-  lat, lng, poi_data, kakao_density, locationAnalysis, population_data, real_price_data, projectId, commercial_data, card_data,
+  lat, lng, poi_data, kakao_density, locationAnalysis, population_data, real_price_data, projectId, commercial_data, card_data, public_data_layers, address,
 }: {
   lat: number | null
   lng: number | null
@@ -595,9 +596,12 @@ function MapSection({
   projectId: string
   commercial_data?: any
   card_data?: any
+  public_data_layers?: any
+  address?: string | null
 }) {
   const [loading, setLoading] = useState(false)
   const [popLoading, setPopLoading] = useState(false)
+  const [publicLoading, setPublicLoading] = useState(false)
   const supabase = createClient()
 
   const geocode = async () => {
@@ -647,16 +651,40 @@ function MapSection({
     }
   }
 
+  const collectPublicData = async () => {
+    setPublicLoading(true)
+    try {
+      const res = await fetch('/api/public-data-layers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_id: projectId }),
+      })
+      const json = await res.json()
+      if (!res.ok || json.success === false) throw new Error(json.error ?? '공공 자료 수집 실패')
+      toast.success('공공 자료를 불러왔습니다')
+      window.location.reload()
+    } catch (e: any) {
+      toast.error(e.message ?? '공공 자료 수집 실패')
+    } finally {
+      setPublicLoading(false)
+    }
+  }
+
   return (
     <div className="space-y-3">
-      <div className="flex justify-between items-center px-1">
+      <div className="flex justify-between items-center px-1 gap-2">
         <p className="text-xs text-gray-500">지도의 마커와 팝업으로 상세 위치 정보를 확인하세요.</p>
-        <button onClick={analyzePopulation} disabled={popLoading || !lat} className="btn-secondary text-[11px] py-1 px-2.5 h-7">
-          {popLoading ? <><Loader2 size={11} className="animate-spin" /> 수집 중…</> : <><Users size={11} /> 배후 인구 분석</>}
-        </button>
+        <div className="flex gap-1.5 flex-shrink-0">
+          <button onClick={collectPublicData} disabled={publicLoading || !lat} className="btn-secondary text-[11px] py-1 px-2.5 h-7">
+            {publicLoading ? <><Loader2 size={11} className="animate-spin" /> 수집 중…</> : <><Layers size={11} /> 공공 자료 불러오기</>}
+          </button>
+          <button onClick={analyzePopulation} disabled={popLoading || !lat} className="btn-secondary text-[11px] py-1 px-2.5 h-7">
+            {popLoading ? <><Loader2 size={11} className="animate-spin" /> 수집 중…</> : <><Users size={11} /> 배후 인구 분석</>}
+          </button>
+        </div>
       </div>
       <div className="rounded-xl overflow-hidden border border-gray-100 relative">
-        <KakaoMap lat={lat} lng={lng} level={4} style={{ width: '100%', height: 380 }} poiData={poi_data} kakaoDensity={kakao_density} locationAnalysis={locationAnalysis} populationData={population_data} commercialData={commercial_data} cardData={card_data} />
+        <KakaoMap lat={lat} lng={lng} level={4} style={{ width: '100%', height: 380 }} poiData={poi_data} kakaoDensity={kakao_density} locationAnalysis={locationAnalysis} populationData={population_data} commercialData={commercial_data} cardData={card_data} publicDataLayers={public_data_layers} />
         <a
           href={`https://map.kakao.com/link/map/${lat},${lng}`}
           target="_blank"
@@ -667,6 +695,9 @@ function MapSection({
           카카오지도
         </a>
       </div>
+
+      {/* 무료 공공 데이터 레이어 */}
+      <PublicDataLayerPanel address={address ?? null} results={public_data_layers?.results ?? null} />
 
       {/* 지도 분석 가이드 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 text-[11px]">
@@ -1330,8 +1361,9 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
     const needsKakao = !project.kakao_density
     const needsPopulation = !project.population_data
     const needsTourism = !hasTourism
+    const needsPublicData = !project.public_data_layers
 
-    if (!needsPOI && !needsRealPrice && !needsCommercial && !needsKakao && !needsPopulation && !needsTourism) return
+    if (!needsPOI && !needsRealPrice && !needsCommercial && !needsKakao && !needsPopulation && !needsTourism && !needsPublicData) return
 
     const supabase = createClient()
     const post = async (url: string) => {
@@ -1373,6 +1405,7 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
         const { error } = await supabase.functions.invoke('analyze-tourism', { body: { project_id: projectId } })
         if (error) throw error
       })
+      if (needsPublicData) await run('공공 자료 수집', () => post('/api/public-data-layers'))
 
       setAutoStep(null)
       if (failures.length > 0) setAutoError(`일부 자료를 확인하지 못했습니다. ${failures.join(' / ')}`)
@@ -1387,6 +1420,7 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
     { label: '시설 밀집 참고도', done: !!project.kakao_density },
     { label: '주변 거주인구', done: !!project.population_data },
     { label: '관광 시설', done: hasTourism },
+    { label: '공공 자료', done: !!project.public_data_layers },
     { label: 'AI 입지 분석', done: hasAnalysis },
   ]
 
@@ -1437,6 +1471,8 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
           projectId={projectId}
           commercial_data={project.commercial_data}
           card_data={project.card_data}
+          public_data_layers={project.public_data_layers}
+          address={project.road_address ?? project.address ?? null}
         />
       </div>
 
