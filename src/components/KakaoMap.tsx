@@ -8,6 +8,8 @@ import {
   getPopulationEstimate,
   hasDisplayableMetric,
 } from '@/lib/location-data-truthfulness'
+import type { PublicDataLayerResult } from '@/lib/public-data-layers'
+import type { SeoulCommercial, LocalCurrencySpending } from '@/lib/public-data-collectors'
 
 declare global {
   interface Window { kakao: any }
@@ -25,6 +27,11 @@ interface KakaoMapProps {
   populationData?: any
   commercialData?: any
   cardData?: any
+  /** 무료 공공 데이터 레이어 수집 결과. */
+  publicDataLayers?: {
+    results?: PublicDataLayerResult[] | null
+    seoul_nearest_place?: { area_nm: string; area_cd: string | null; distance_m: number } | null
+  } | null
 }
 
 // 네이티브 Canvas 히트맵 렌더러 (heatmap.js 불필요)
@@ -52,7 +59,7 @@ function drawHeatmap(
 }
 
 export default function KakaoMap({
-  lat, lng, level = 4, className, style, poiData, kakaoDensity, locationAnalysis, populationData, commercialData, cardData
+  lat, lng, level = 4, className, style, poiData, kakaoDensity, locationAnalysis, populationData, commercialData, cardData, publicDataLayers
 }: KakaoMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef    = useRef<HTMLCanvasElement>(null)
@@ -63,8 +70,10 @@ export default function KakaoMap({
   const flpopLabelRef   = useRef<any>(null)
   const cardOverlayRef  = useRef<any>(null)
   const cardNoDataRef   = useRef<any>(null)
+  const publicLayerRef  = useRef<any>(null)
   const kakaoDensityRef = useRef(kakaoDensity)
   const [showHeatmap, setShowHeatmap] = useState(false)
+  const [showPublicLayer, setShowPublicLayer] = useState(true)
   const [mapReady, setMapReady] = useState(false)
   const appKey = process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY
 
@@ -415,6 +424,135 @@ export default function KakaoMap({
     cardOverlayRef.current = overlay
   }, [cardData, commercialData, lat, lng, mapReady])
 
+  // ── Effect 5: 무료 공공 데이터 레이어 오버레이
+  // 서울 실시간 상권 결제 동향과 지역화폐 업종별 소비를 지도에 표시한다.
+  // 금액은 구간값으로만 공개되므로 구간 그대로 보여준다.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady || !window.kakao?.maps) return
+
+    if (publicLayerRef.current) { publicLayerRef.current.setMap(null); publicLayerRef.current = null }
+    if (!showPublicLayer) return
+
+    const results = publicDataLayers?.results ?? []
+    const seoulResult = results.find(r => r.layerId === 'seoul_realtime_commercial' && r.status === 'available')
+    const localResult = results.find(r => r.layerId === 'local_currency_spending' && r.status === 'available')
+    if (!seoulResult && !localResult) return
+
+    const escapeHtml = (value: string) =>
+      value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+    // 반올림하지 않는다. 5만원 단위 구간 경계를 접으면 서로 다른 구간이
+    // 같은 문자열이 되어 사용자가 '확정 금액'으로 읽는다.
+    const won = (amount: number) => {
+      const man = amount / 10000
+      const text = Number.isInteger(man) ? man.toLocaleString() : man.toFixed(1)
+      return `${text}만원`
+    }
+    /** 구간 표기. 결측이면 null을 돌려 행 자체를 생략한다. */
+    const wonRange = (min: number | null, max: number | null): string | null => {
+      if (min == null && max == null) return null
+      if (min == null) return `${won(max as number)} 이하`
+      if (max == null) return `${won(min)} 이상`
+      return `${won(min)}~${won(max)}`
+    }
+    /** 결측을 0건으로 표시하지 않는다. */
+    const count = (value: number | null, unit: string): string | null =>
+      value == null ? null : `${value.toLocaleString()}${unit}`
+
+    let blocks = ''
+
+    if (seoulResult) {
+      const seoul = seoulResult.value as SeoulCommercial
+      // 서울시가 실제로 쓰는 4단계만 색으로 표현한다.
+      // 미지의 등급을 기본색으로 칠하면 '붐비는'이 '보통' 색으로 렌더될 수 있다.
+      const LEVEL_COLOR: Record<string, string> = {
+        '한산한': '#64748b',
+        '보통': '#0284c7',
+        '바쁜': '#d97706',
+        '붐비는': '#dc2626',
+      }
+      const knownLevel = Object.prototype.hasOwnProperty.call(LEVEL_COLOR, seoul.congestionLevel)
+      const color = knownLevel ? LEVEL_COLOR[seoul.congestionLevel] : '#94a3b8'
+      const topCategories = seoul.categories
+        .slice()
+        .sort((a, b) => (b.paymentCount ?? -1) - (a.paymentCount ?? -1))
+        .slice(0, 3)
+
+      // 상권이 매물에서 얼마나 먼지 반드시 보여준다.
+      // 서울 공식 장소는 최대 5km 간격이라, 거리 없이 '지금 이 상권'이라고 하면
+      // 다른 생활권 지표를 자기 동네로 읽는다.
+      const distM = publicDataLayers?.seoul_nearest_place?.distance_m
+      const distanceLabel =
+        typeof distM === 'number'
+          ? ` · 매물에서 ${distM < 1000 ? `${Math.round(distM)}m` : `${(distM / 1000).toFixed(1)}km`}`
+          : ''
+
+      blocks += `
+        <div style="margin-bottom:8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+            <span style="font-size:11px;font-weight:700;color:#334155;">가까운 상권 지금 상황</span>
+            <span style="font-size:10px;font-weight:700;color:#fff;background:${color};padding:2px 8px;border-radius:99px;">${escapeHtml(seoul.congestionLevel)}</span>
+          </div>
+          <div style="font-size:9px;color:#64748b;margin-bottom:5px;">${escapeHtml(seoul.placeName)}${distanceLabel}</div>
+          ${count(seoul.paymentCount, '건') ? `
+          <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px;">
+            <span style="color:#6b7280;">결제 건수</span>
+            <span style="font-weight:600;color:#1e293b;">${count(seoul.paymentCount, '건')}</span>
+          </div>` : ''}
+          ${wonRange(seoul.paymentAmountMin, seoul.paymentAmountMax) ? `
+          <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:4px;">
+            <span style="color:#6b7280;">결제 금액대</span>
+            <span style="font-weight:600;color:#1e293b;">${wonRange(seoul.paymentAmountMin, seoul.paymentAmountMax)}</span>
+          </div>` : ''}
+          ${topCategories.map(cat => {
+            const detail = [count(cat.paymentCount, '건'), count(cat.merchantCount, '곳')]
+              .filter(Boolean).join(' · ')
+            if (!detail) return ''
+            return `
+            <div style="display:flex;justify-content:space-between;font-size:9px;color:#94a3b8;">
+              <span>${escapeHtml(cat.midCategory)}</span>
+              <span>${detail}</span>
+            </div>`
+          }).join('')}
+          <div style="font-size:8px;color:#cbd5e1;margin-top:4px;">금액은 구간으로만 공개돼요 · 서울시(신한카드 제공)</div>
+        </div>
+      `
+    }
+
+    if (localResult) {
+      const local = localResult.value as LocalCurrencySpending
+      const top = local.categories.slice(0, 3)
+      blocks += `
+        <div style="${seoulResult ? 'border-top:1px solid #f1f5f9;padding-top:7px;' : ''}">
+          <div style="font-size:11px;font-weight:700;color:#334155;margin-bottom:4px;">지역화폐가 많이 쓰이는 업종</div>
+          <div style="font-size:9px;color:#64748b;margin-bottom:5px;">${escapeHtml(local.region)}</div>
+          ${top.map(cat => `
+            <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px;">
+              <span style="color:#6b7280;">${escapeHtml(cat.industry)}</span>
+              <span style="font-weight:600;color:#1e293b;">${won(cat.settlementAmount)}</span>
+            </div>
+          `).join('')}
+          <div style="font-size:8px;color:#cbd5e1;margin-top:4px;">지역화폐 결제분만 포함돼요 · 한국조폐공사</div>
+        </div>
+      `
+    }
+
+    const overlay = new window.kakao.maps.CustomOverlay({
+      map,
+      position: new window.kakao.maps.LatLng(lat, lng - 0.004),
+      content: `
+        <div style="background:#fff;border:2px solid #cbd5e1;border-radius:12px;padding:10px 13px;box-shadow:0 2px 12px rgba(0,0,0,0.13);min-width:195px;max-width:235px;font-family:sans-serif;">
+          ${blocks}
+        </div>
+      `,
+      yAnchor: 0.5,
+      xAnchor: 1,
+    })
+    overlay.setMap(map)
+    publicLayerRef.current = overlay
+  }, [publicDataLayers, showPublicLayer, lat, lng, mapReady])
+
   if (!appKey) {
     return (
       <div className="flex items-center justify-center bg-gray-100 text-gray-400 text-xs rounded-lg" style={style}>
@@ -424,6 +562,11 @@ export default function KakaoMap({
   }
 
   const hasPoi = poiData && Object.keys(poiData).length > 0
+  const hasPublicLayerData = (publicDataLayers?.results ?? []).some(
+    r =>
+      (r.layerId === 'seoul_realtime_commercial' || r.layerId === 'local_currency_spending') &&
+      r.status === 'available',
+  )
 
   return (
     <div className={`relative ${className || ''}`} style={style}>
@@ -442,19 +585,33 @@ export default function KakaoMap({
         }}
       />
 
-      {/* 하단 좌측: 히트맵 토글 버튼 */}
-      {hasPoi && (
-        <button
-          onClick={() => setShowHeatmap(v => !v)}
-          className={`absolute bottom-2 left-2 z-20 text-[11px] px-2.5 py-1.5 rounded-full shadow-md border font-medium transition-all ${
-            showHeatmap
-              ? 'bg-orange-500 text-white border-orange-400'
-              : 'bg-white/90 backdrop-blur-sm text-gray-600 border-gray-200 hover:bg-gray-50'
-          }`}
-        >
-          시설 밀집 참고도
-        </button>
-      )}
+      {/* 하단 좌측: 레이어 토글 버튼 */}
+      <div className="absolute bottom-2 left-2 z-20 flex gap-1.5">
+        {hasPoi && (
+          <button
+            onClick={() => setShowHeatmap(v => !v)}
+            className={`text-[11px] px-2.5 py-1.5 rounded-full shadow-md border font-medium transition-all ${
+              showHeatmap
+                ? 'bg-orange-500 text-white border-orange-400'
+                : 'bg-white/90 backdrop-blur-sm text-gray-600 border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            시설 밀집 참고도
+          </button>
+        )}
+        {hasPublicLayerData && (
+          <button
+            onClick={() => setShowPublicLayer(v => !v)}
+            className={`text-[11px] px-2.5 py-1.5 rounded-full shadow-md border font-medium transition-all ${
+              showPublicLayer
+                ? 'bg-sky-600 text-white border-sky-500'
+                : 'bg-white/90 backdrop-blur-sm text-gray-600 border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            상권·소비
+          </button>
+        )}
+      </div>
 
       {/* 배후 인구 분석 팝업 */}
       {populationData && (

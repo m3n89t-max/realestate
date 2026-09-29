@@ -172,6 +172,20 @@ export interface Project {
   population_data?: PopulationData | null
   tourism_data?: any | null
   card_data?: any | null
+  /** 무료 공공 데이터 레이어 수집 결과. 레이어별 status와 provenance를 포함한다. */
+  public_data_layers?: {
+    collected_at?: string | null
+    region_address?: string | null
+    seoul_nearest_place?: { area_nm: string; area_cd: string | null; distance_m: number } | null
+    /** 구조는 src/lib/public-data-layers.ts 의 PublicDataLayerResult 와 같다. 순환 import를 피하려고 여기서 구조로 선언한다. */
+    results?: Array<{
+      layerId: string
+      status: string
+      value: unknown
+      collectedAt: string | null
+      sourceAsOf: string | null
+    }> | null
+  } | null
   created_at: string
   updated_at: string
 }
