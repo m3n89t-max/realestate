@@ -135,7 +135,62 @@ Supabase는 번호(버전 문자열) 하나당 한 줄만 기록하므로, 겹�
 
 ---
 
-## 4. 아직 남은 항목: 026 (canva_template_sets)
+## 4. 현재 상태 (2026-09-30 정리 완료 시점)
+
+`migration list --linked` 결과, 아래 3건을 뺀 **모든 번호가 local/remote 양쪽에
+맞춰졌습니다.** 남은 3건은 **일부러 남긴 것**입니다.
+
+| 번호 | 상태 | 왜 남겨두었나 |
+|---|---|---|
+| `026` | 미적용 | 적용 여부를 담당자가 결정해야 함 (아래 5절) |
+| `029` | 미적용 | 위험 구문을 걷어냈지만, 운영 적용은 담당자 승인 후 |
+| `20260930130000` | 미적용 | tasks 상태 정정. 운영 데이터를 바꾸므로 승인 후 |
+
+기록표에는 "적용됨"으로만 표시(`migration repair --status applied`)했고,
+**운영 DB의 구조와 자료는 하나도 바꾸지 않았습니다.** 정리 후 실측 확인:
+
+- `tasks_status_check` 제약: 그대로 (`'pending'` 포함)
+- `tasks.status` 기본값: 그대로 `'pending'`
+- `pending` 작업 2건: 그대로
+- 회원가입 트리거 `auth_autoconfirm_email_trigger`: **살아 있음**
+- 기록표 행 수: 31 → 40 (추가한 9건만 증가)
+
+### 수정된 029 의 멱등성 판정 (구문별)
+
+지금 운영 상태에서 실행해도 안전한지 한 줄씩 확인한 결과입니다.
+
+| 구문 | 판정 | 근거 |
+|---|---|---|
+| `CREATE SCHEMA IF NOT EXISTS extensions` | 안전 | `IF NOT EXISTS`, 이미 존재 |
+| `CREATE EXTENSION IF NOT EXISTS pgcrypto` | 안전 | 이미 `extensions` 스키마에 설치됨 |
+| `memberships_update` 정책 DROP→CREATE | 안전 | 반복 가능. **단 동작이 바뀜** (아래 주의) |
+| `memberships_delete` 정책 DROP→CREATE | 안전 | 현재 운영 정의와 동일 |
+| 조직 불일치 작업 격리 UPDATE | 안전(무동작) | 해당 행 0건으로 실측 확인 |
+| `enforce_task_project_org()` 함수 + 트리거 | 안전 | `CREATE OR REPLACE` / `DROP IF EXISTS` |
+| `tasks_insert` / `tasks_update` 정책 | 안전 | DROP IF EXISTS 후 재생성. `can_write_to_org` 존재 확인 |
+| 개발용 에이전트 키 폐기 UPDATE | 안전(무동작) | `agent_connections` 0건 |
+| `trg_on_location_analyze_task()` | 생성은 안전, **실행하면 실패** | 아래 주의 참고 |
+| `generate_agent_key()` | 안전 | `BEGIN;` 수정 후 문법 정상 |
+| `ALTER FUNCTION ... SET search_path` 4건 | 안전 | 대상 4개 함수 모두 존재 확인 |
+
+**주의 — `memberships_update` 는 동작이 실제로 바뀝니다.**
+현재 운영 정책은 `is_org_admin(org_id) OR user_id = auth.uid()` 여서
+**일반 멤버가 자기 역할을 스스로 바꿀 수 있습니다.** 029는 이것을 관리자만
+가능하게 좁힙니다(권한 상승 차단이 이 마이그레이션의 목적). 역할 변경 화면은
+`src/app/(dashboard)/admin/members/page.tsx:90` 한 곳이고 관리자용이므로
+정상 사용에는 영향이 없을 것으로 보이지만, **적용 후 역할 변경 기능을 한 번
+확인해 보세요.**
+
+**주의 — `trg_on_location_analyze_task()` 는 만들어도 실제로는 못 돕니다.**
+이 함수 본문이 `extensions.http_post` 를 부르는데, 운영에는 `http` 확장이
+설치되어 있지 않습니다(6절 참고). PostgreSQL은 함수를 만들 때 본문 안의 이름을
+검사하지 않으므로 **생성 자체는 성공**하고, 029 적용이 중간에 깨지지는 않습니다.
+다만 이 함수를 호출하는 트리거가 운영에 없어서 실행되지도 않습니다.
+즉 "적용해도 지금과 달라지는 것이 없는" 구문입니다.
+
+---
+
+## 5. 아직 남은 항목: 026 (canva_template_sets)
 
 - 운영 DB에 `canva_template_sets` 테이블이 **없습니다.**
 - 그런데 코드는 이 테이블을 조회합니다:
@@ -147,9 +202,29 @@ Supabase는 번호(버전 문자열) 하나당 한 줄만 기록하므로, 겹�
 이건 마이그레이션 정리 문제가 아니라 **별도의 기능 결함**입니다.
 026을 적용할지는 담당자가 결정해야 하므로 여기서는 손대지 않았습니다.
 
+`026` 은 전체가 `CREATE TABLE IF NOT EXISTS` + `CREATE POLICY` 로 되어 있어
+지금 운영에 적용해도 다른 것을 망가뜨리지 않습니다. 다만 테이블만 만들어도
+내용(템플릿 ID)이 비어 있으면 화면은 그대로 빈 목록입니다.
+
 ---
 
-## 5. 앞으로 새 마이그레이션을 만들 때
+## 6. 곁들여 발견한 별개 문제: 입지분석 자동호출이 꺼져 있음
+
+정리 중 확인된 사실입니다. 이번 작업 범위는 아니지만 기록해 둡니다.
+
+- `010_location_analyze_webhook.sql` 은 기록표에 "적용됨"으로 있지만,
+  실제 운영에는 **반영되지 않았습니다.**
+- 실측: `http` 확장 없음, `extensions.http_post` 함수 없음,
+  `public.trg_on_location_analyze_task` 함수 없음,
+  `tasks` 테이블에 트리거 0건.
+- 즉 작업이 들어오면 자동으로 입지분석 함수를 호출하는 경로가 없습니다.
+
+007 과 010 처럼 **"기록표에는 적용됨인데 실제로는 안 된" 항목이 더 있습니다.**
+기록표만 믿지 말고, 중요한 기능은 실제 DB를 조회해 확인하세요.
+
+---
+
+## 7. 앞으로 새 마이그레이션을 만들 때
 
 1. 파일 이름은 **`YYYYMMDDHHMMSS_설명.sql`** 형태로 만드세요.
    (예: `20261001093000_add_something.sql`)
@@ -170,3 +245,12 @@ Supabase는 번호(버전 문자열) 하나당 한 줄만 기록하므로, 겹�
 
 5. 적용 후에는 `migration list --linked` 로
    **local 과 remote 양쪽에 번호가 생겼는지** 확인하세요.
+
+6. push 전에 아래 검사를 돌리세요. 위 사고 유형을 자동으로 잡아냅니다.
+
+   ```
+   npm run check:migrations
+   ```
+
+   버전 번호 중복, 파일명 형식 오류, 되살리지 않는 인증 트리거 DROP,
+   `BEGIN;` 문법 오류를 찾아냅니다. 문제가 있으면 실패(exit 1)합니다.
