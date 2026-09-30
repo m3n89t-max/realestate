@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
 import type { POIItem, RealPriceItem } from '@/lib/types'
 import KakaoMap from '@/components/KakaoMap'
+import { AI_TREND_NOTICE, AI_TREND_TITLE } from '@/lib/price-source'
 import PublicDataLayerPanel from '@/components/PublicDataLayerPanel'
 import {
   describeBarrierStatus,
@@ -348,11 +349,17 @@ function AIAnalysisReport({ analysis, projectId, hasCoords, hasPOI, hasData, isC
             </div>
           )}
           {analysis.price_trend && (
-            <div className="card p-4">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                <TrendingUp size={12} /> {isCommercial ? '상권 현황' : '실거래가 동향'}
+            /* 공공 실거래 자료를 가리키는 제목은 쓰지 않는다 — 공적 데이터로 오해된다.
+               AI가 자동 생성한 참고 메모임을 제목과 안내문으로 분명히 밝힌다. */
+            <div className="card border-2 border-amber-300 bg-amber-50 p-4">
+              <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-amber-900">
+                <TrendingUp size={14} aria-hidden="true" />
+                {isCommercial ? `상권 현황 — ${AI_TREND_TITLE}` : AI_TREND_TITLE}
               </h3>
-              <p className="text-sm text-gray-700 leading-relaxed">{analysis.price_trend}</p>
+              <p className="mb-2.5 rounded-md bg-white px-3 py-2 text-xs font-semibold leading-relaxed text-amber-900">
+                ⚠️ {AI_TREND_NOTICE}
+              </p>
+              <p className="text-sm leading-relaxed text-gray-800">{analysis.price_trend}</p>
             </div>
           )}
         </div>

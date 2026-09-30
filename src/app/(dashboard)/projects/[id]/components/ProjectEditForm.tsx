@@ -4,7 +4,9 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
-import type { Project, PropertyType } from '@/lib/types'
+import type { Project, PropertyType, PriceValueType } from '@/lib/types'
+import { PRICE_VALUE_TYPES, checkPriceSource } from '@/lib/price-source'
+import { parseManInputToWon, validateManInput } from '@/lib/property-form'
 
 const PROPERTY_TYPES: { value: PropertyType; label: string }[] = [
   { value: 'apartment', label: '아파트' },
@@ -56,9 +58,11 @@ function TInput({ value, onChange, placeholder, type = 'text', className = '', d
   )
 }
 
-// 원 → 만원 문자열 변환
+// 원 → 만원 문자열 변환. 0 은 '0'으로 남겨야 한다 —
+// 이전에는 `if (!won) return ''` 이라 실제 0원이 빈칸(미입력)으로 바뀌어
+// 저장 시 NULL 이 되면서 사용자가 입력한 0이 조용히 사라졌다.
 function wonToMan(won: number | null | undefined): string {
-  if (!won) return ''
+  if (won === null || won === undefined || !Number.isFinite(won)) return ''
   return String(Math.round(won / 10000))
 }
 
@@ -79,6 +83,11 @@ export default function ProjectEditForm({ project }: { project: Project }) {
     monthly_rent: wonToMan(project.monthly_rent),
     deposit: wonToMan(project.deposit),
     key_money: wonToMan(project.key_money),
+    // 값 출처 메타 4필드
+    value_type: (project.value_type ?? '중개사 제공') as PriceValueType,
+    source_name: project.source_name ?? '',
+    source_date: project.source_date ?? '',
+    source_channel: project.source_channel ?? '',
     area: project.area ? String(project.area) : '',
     land_area: project.land_area ? String(project.land_area) : '',
     total_area: project.total_area ? String(project.total_area) : '',
@@ -103,6 +112,18 @@ export default function ProjectEditForm({ project }: { project: Project }) {
   const set = (field: keyof typeof form, value: string | string[] | boolean) =>
     setForm(prev => ({ ...prev, [field]: value }))
 
+  // 값유형이 '실거래'/'호가'면 출처명·기준일이 필수다. 비어 있으면 콘텐츠 생성이 막힌다.
+  const priceSourceCheck = checkPriceSource(
+    {
+      value_type: form.value_type,
+      source_name: form.source_name,
+      source_date: form.source_date,
+      source_channel: form.source_channel,
+    },
+    'card_news',
+  )
+  const sourceRequired = form.value_type === '실거래' || form.value_type === '호가'
+
   const toggleFeature = (f: string) =>
     setForm(prev => ({
       ...prev,
@@ -118,7 +139,28 @@ export default function ProjectEditForm({ project }: { project: Project }) {
       return { ...prev, whole_building: next, floor: next ? '' : prev.floor, features }
     })
 
+  // 금액 4칸 검증 — 빈칸은 NULL 로 저장하고, 잘못 입력한 값은 저장 자체를 막는다.
+  // 이전에는 검증이 없어 "0"이 그대로 0원으로 저장되고 문자 입력은 NaN 이 되어
+  // 화면에 '0원'이라는 사실과 다른 금액이 표시됐다.
+  const priceFieldLabels = {
+    price: '매매가',
+    deposit: '보증금',
+    monthly_rent: '월세',
+    key_money: '권리금',
+  } as const
+
+  const priceErrors: Partial<Record<keyof typeof priceFieldLabels, string>> = {}
+  for (const field of Object.keys(priceFieldLabels) as (keyof typeof priceFieldLabels)[]) {
+    const message = validateManInput(form[field], priceFieldLabels[field])
+    if (message) priceErrors[field] = message
+  }
+
   const handleSave = async () => {
+    const firstPriceError = Object.values(priceErrors)[0]
+    if (firstPriceError) {
+      toast.error(firstPriceError)
+      return
+    }
     setSaving(true)
     try {
       const { error } = await supabase.from('projects').update({
@@ -127,10 +169,16 @@ export default function ProjectEditForm({ project }: { project: Project }) {
         property_category: form.property_category || null,
         main_use: form.main_use || null,
         transaction_type: form.transaction_type,
-        price: form.price ? parseInt(form.price) * 10000 : null,
-        monthly_rent: form.monthly_rent ? parseInt(form.monthly_rent) * 10000 : null,
-        deposit: form.deposit ? parseInt(form.deposit) * 10000 : null,
-        key_money: form.key_money ? parseInt(form.key_money) * 10000 : null,
+        // 빈칸은 NULL. '0'을 실제로 입력했으면 0 그대로 저장한다(미입력과 구분).
+        price: parseManInputToWon(form.price),
+        monthly_rent: parseManInputToWon(form.monthly_rent),
+        deposit: parseManInputToWon(form.deposit),
+        key_money: parseManInputToWon(form.key_money),
+        // 값 출처 메타 4필드
+        value_type: form.value_type,
+        source_name: form.source_name.trim() || null,
+        source_date: form.source_date || null,
+        source_channel: form.source_channel.trim() || null,
         area: form.area ? parseFloat(form.area) : null,
         land_area: form.land_area ? parseFloat(form.land_area) : null,
         total_area: form.total_area ? parseFloat(form.total_area) : null,
@@ -333,7 +381,7 @@ export default function ProjectEditForm({ project }: { project: Project }) {
                   <tr>
                     <TLabel>권 리 금<br />(만원)</TLabel>
                     <TCell colSpan={2}>
-                      <TInput value={form.key_money} onChange={v => set('key_money', v)} placeholder="무권리" />
+                      <TInput value={form.key_money} onChange={v => set('key_money', v)} placeholder="비워두면 '미입력'으로 표시됩니다" type="number" />
                     </TCell>
                     <TLabel>관 리 비</TLabel>
                     <TCell colSpan={2}>
@@ -341,6 +389,53 @@ export default function ProjectEditForm({ project }: { project: Project }) {
                     </TCell>
                   </tr>
                 </>
+              )}
+
+              {/* 가격 출처 (값 출처 메타 4필드) */}
+              <tr>
+                <TLabel>값 유 형<br />(가격 근거)</TLabel>
+                <TCell colSpan={5}>
+                  <div className="flex flex-wrap items-center gap-1.5 py-0.5">
+                    {PRICE_VALUE_TYPES.map(vt => (
+                      <button key={vt} type="button"
+                        onClick={() => set('value_type', vt)}
+                        aria-pressed={form.value_type === vt}
+                        className={`px-3 py-1.5 rounded text-xs border transition-colors ${form.value_type === vt ? 'bg-brand-600 text-white border-brand-600 font-semibold' : 'border-gray-300 text-gray-700 hover:border-brand-400'}`}>
+                        {vt}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-1 text-[11px] leading-relaxed text-gray-600">
+                    이 가격이 어디서 온 값인지 골라 주세요. <b>실거래</b>와 <b>호가</b>를 고르면 아래 <b>출처명</b>과 <b>기준일</b>을 반드시 채워야 카드뉴스·블로그·쇼츠를 만들 수 있습니다.
+                  </p>
+                </TCell>
+              </tr>
+              <tr>
+                <TLabel>출 처 명{sourceRequired ? ' *' : ''}</TLabel>
+                <TCell colSpan={2}>
+                  <TInput value={form.source_name} onChange={v => set('source_name', v)}
+                    placeholder="예: 국토교통부 실거래가 / 매도인 제시" />
+                </TCell>
+                <TLabel>기 준 일{sourceRequired ? ' *' : ''}</TLabel>
+                <TCell colSpan={2}>
+                  <TInput value={form.source_date} onChange={v => set('source_date', v)} type="date" />
+                </TCell>
+              </tr>
+              <tr>
+                <TLabel>수 집 경 로</TLabel>
+                <TCell colSpan={5}>
+                  <TInput value={form.source_channel} onChange={v => set('source_channel', v)}
+                    placeholder="예: 공공데이터 API / 전화 확인 / 방문 확인 / 중개사 직접 입력" />
+                </TCell>
+              </tr>
+              {priceSourceCheck.ok ? null : (
+                <tr>
+                  <td colSpan={6} className="border border-gray-300 bg-red-50 px-3 py-3">
+                    <p role="alert" className="text-xs font-semibold leading-relaxed text-red-800">
+                      ⚠ {priceSourceCheck.message}
+                    </p>
+                  </td>
+                </tr>
               )}
 
               {/* 방향 */}

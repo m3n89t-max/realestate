@@ -1,20 +1,22 @@
 'use client'
 
 import type { Project, Organization } from '@/lib/types'
+import {
+  PRICE_UNKNOWN_TEXT,
+  formatKeyMoney,
+  formatPriceOrUnknown,
+  formatPriceSourceLabel,
+} from '@/lib/price-source'
 
 const sqmToPyeong = (sqm: number) => (sqm * 0.3025).toFixed(0)
 
-function formatPrice(won: number | undefined) {
-  if (!won) return '-'
-  const eok = Math.floor(won / 100000000)
-  const man = Math.floor((won % 100000000) / 10000)
-  if (eok > 0 && man > 0) return `${eok}억 ${man}만원`
-  if (eok > 0) return `${eok}억원`
-  return `${man}만원`
-}
+// 금액 포맷터는 src/lib/price-source.ts 한 곳에만 둔다.
+// 이전에는 이 파일에 동명의 별도 formatPrice 가 있어 '-' 를 돌려줬고,
+// 앱 전체에서 빈 값 표기가 7종으로 갈렸다. 이제 '미입력' 한 종으로 통일한다.
+const formatPrice = formatPriceOrUnknown
 
 function formatArea(sqm: number | undefined) {
-  if (!sqm) return '-'
+  if (!sqm) return PRICE_UNKNOWN_TEXT
   return `${sqm}㎡(${sqmToPyeong(sqm)}평)`
 }
 
@@ -123,10 +125,15 @@ export default function PropertyInfoTable({ project, org, agentName, className =
                 : project.transaction_type === 'lease'
                 ? formatPrice(project.deposit)
                 : formatPrice(project.price)}
+              {/* 가격 옆에 출처명·기준일을 함께 노출 (값 출처 메타 4필드) */}
+              <span className="mt-0.5 block text-[11px] font-medium text-gray-700">
+                {formatPriceSourceLabel(project)}
+              </span>
             </td>
             <th scope="row" className="border border-gray-300 bg-blue-50 px-3 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap">권 리 금</th>
             <td className="border border-gray-300 px-3 py-2 text-xs text-gray-800">
-              {project.key_money ? formatPrice(project.key_money) : '무권리'}
+              {/* 미입력을 '무권리'로 단정하지 않는다. 0원이면 '무권리', 비었으면 '미입력' */}
+              {formatKeyMoney(project.key_money)}
             </td>
             <th scope="row" className="border border-gray-300 bg-blue-50 px-3 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap">관 리 비</th>
             <td className="border border-gray-300 px-3 py-2 text-xs text-gray-800 whitespace-pre-line">
@@ -240,7 +247,7 @@ export function buildPropertyInfoTableHtml(project: Project, org?: Organization 
     </tr>
     <tr>
       <td style="border:1px solid #bbb;padding:6px 10px;background:#dbeafe;font-weight:bold;">${priceLabel}</td>
-      <td style="border:1px solid #bbb;padding:6px 10px;color:#dc2626;font-weight:bold;">${priceValue}</td>
+      <td style="border:1px solid #bbb;padding:6px 10px;color:#dc2626;font-weight:bold;">${priceValue}<br /><span style="color:#374151;font-weight:500;font-size:11px;">${esc(formatPriceSourceLabel(project))}</span></td>
       <td style="border:1px solid #bbb;padding:6px 10px;background:#dbeafe;font-weight:bold;">입주가능일</td>
       <td style="border:1px solid #bbb;padding:6px 10px;">${esc(project.move_in_date) || '협의'}</td>
       <td style="border:1px solid #bbb;padding:6px 10px;background:#dbeafe;font-weight:bold;">방향</td>
@@ -248,7 +255,7 @@ export function buildPropertyInfoTableHtml(project: Project, org?: Organization 
     </tr>
     <tr>
       <td style="border:1px solid #bbb;padding:6px 10px;background:#dbeafe;font-weight:bold;">권리금</td>
-      <td style="border:1px solid #bbb;padding:6px 10px;">${project.key_money ? formatPrice(project.key_money) : '무권리'}</td>
+      <td style="border:1px solid #bbb;padding:6px 10px;">${esc(formatKeyMoney(project.key_money))}</td>
       <td style="border:1px solid #bbb;padding:6px 10px;background:#dbeafe;font-weight:bold;">관리비</td>
       <td style="border:1px solid #bbb;padding:6px 10px;white-space:pre-line;" colspan="3">${esc(project.management_fee_detail) || '-'}</td>
     </tr>

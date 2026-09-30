@@ -1,5 +1,17 @@
 // SEO 최적화 부동산 블로그 생성 프롬프트 템플릿
 
+import {
+  PRICE_UNKNOWN_PROMPT_RULE,
+  PRICE_UNKNOWN_TEXT,
+  buildAiTrendPromptLine,
+  buildPriceSourcePromptBlock,
+  formatKeyMoney,
+  formatPriceOrUnknown,
+  formatPriceSourceLabel,
+  REGION_PRICE_CLAIM_BAN_REMINDER,
+  REGION_PRICE_CLAIM_BAN_RULES,
+} from './price-source.ts'
+
 export interface BlogPromptContext {
   address: string
   property_type: string
@@ -10,6 +22,11 @@ export interface BlogPromptContext {
   monthly_rent?: number
   deposit?: number
   key_money?: number
+  // 값 출처 메타 4필드 — 가격을 언급할 때 함께 표기하고, 지역 시세 단정을 막는 근거
+  source_name?: string | null
+  source_date?: string | null
+  source_channel?: string | null
+  value_type?: string | null
   area?: number
   land_area?: number | null
   total_area?: number | null
@@ -136,6 +153,10 @@ export function buildBlogSystemPrompt(): string {
    - 특히 해당 매물과 면적·유형이 다른 사례를 근거로 "가격이 합리적"이라고 단정하지 말 것.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${REGION_PRICE_CLAIM_BAN_RULES}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [상업용 매물(상가/사무실) 특별 작성 원칙 - 수요자(창업자) 빙의]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 상권 분석 및 상가 매물인 경우, 단순 중개사가 아닌 "내가 직접 여기서 장사를 시작하려는 사람(창업자/수요자)"의 관점을 적극 반영하여 글을 깊이 있게 전개하세요.
@@ -165,16 +186,16 @@ export function buildBlogSystemPrompt(): string {
 export function buildBlogUserPrompt(ctx: BlogPromptContext): string {
   const styleGuide = {
     informative: '실거주자를 위한 정보 중심 글. 입지/인프라/생활환경을 상세히 설명.',
-    investment: '투자자를 위한 시세분석 및 수익률 관점의 글. 시장 동향/가치 상승 요인 강조.',
+    investment: '투자자가 검토할 항목을 정리하는 글. 근거 있는 사실만 다룬다 — 제공된 매물 스펙·입지 데이터·계약 조건(면적, 층, 주차, 용도지역, 임대현황 등)과 "직접 확인해야 할 체크 항목"을 짚어 준다. 시세 분석·수익률 계산·가치 상승 전망은 근거 데이터가 제공되지 않았다면 쓰지 말고 "정확한 시세와 수익률은 문의 바랍니다"로 처리한다.',
     lifestyle: '라이프스타일 중심의 감성적 글. 동네 분위기/생활 편의/커뮤니티 강조.',
   }[ctx.style]
 
   const toneGuide = {
     professional: '전문가 말투: 신뢰감 있고 격식 있는 문체. "~입니다", "~합니다" 등 합쇼체 사용. 공인중개사의 전문성을 드러내는 어휘 활용.',
     friendly: '친근한 말투: 독자와 대화하듯 편안하고 부드러운 문체. "~에요", "~이에요" 등 해요체 사용. 이웃에게 소개하듯 자연스럽게.',
-    passionate: '열정적인 말투: 적극적으로 매물을 추천하는 에너지 넘치는 문체. 감탄사와 강조 표현 적극 활용. "정말", "꼭", "놓치면 안 돼요" 등의 표현 사용.',
+    passionate: '적극적인 말투: 매물의 장점을 분명하게 짚어 주는 자신감 있는 문체. 단, 과장 형용사와 긴박감 조성 문구("놓치면 안 돼요", "지금이 기회", "급매")는 쓰지 않는다. 열정은 구체적인 사실을 자세히 알려 주는 방식으로 표현한다.',
     storytelling: '스토리텔링 말투: 이야기를 들려주듯 감성적이고 생동감 있는 문체. 가상의 일상 장면("아침에 눈을 뜨면...", "퇴근 후 돌아오는 길...")을 그려내며 독자의 감정을 자극.',
-    analytical: '분석적인 말투: 데이터와 수치 중심의 냉철하고 객관적인 문체. "~에 따르면", "~대비 ~% 수준", "시세 분석 결과" 등 근거 중심 표현 사용. 감정보다 팩트로 설득.',
+    analytical: '분석적인 말투: 냉철하고 객관적인 문체. 감정보다 팩트로 설득한다. 단, 실제로 제공된 데이터(면적·층·거리·시설 개수 등)만 인용하고 출처를 문장에 밝힌다. 제공되지 않은 수치를 만들어 쓰거나 "~대비 ~% 수준", "시세 분석 결과", "평단가" 같은 비교·분석 표현을 근거 없이 쓰는 것은 금지다.',
   } as Record<string, string>
 
   const formatGuide = {
@@ -186,9 +207,9 @@ export function buildBlogUserPrompt(ctx: BlogPromptContext): string {
 
   const focusGuide = {
     location: '주변 입지, 교통, 학군, 상권 등 인프라의 장점을 가장 크게 부각하세요.',
-    investment: '향후 가치 상승 여력, 수익률, 개발 호재 등 투자 가치를 중점적으로 강조하세요.',
+    investment: '투자 검토에 필요한 확인 가능한 사실을 중점적으로 다루세요 — 용도지역·임대현황·관리비·주차·접근성 등. 공개 자료로 확인되는 개발 계획은 "공개된 계획 기준"이라고 밝혀 언급하고, 가치 상승·수익률은 단정하지 말고 "직접 확인이 필요한 항목"으로 제시하세요.',
     interior: '건물 내부 구조, 인테리어, 채광, 실사용 공간의 효율성을 가장 중요하게 다루세요.',
-    price: '매매가/전월세 가격의 합리성, 가성비, 특별한 혜택이나 조건 등 가격 경쟁력을 강조하세요.'
+    price: '가격과 관련된 사실 정보를 정확히 정리하세요 — 매매가/보증금/월세/권리금/관리비 각 항목의 금액과 값유형·출처명·기준일, 협의 가능 여부, 대출·입주 조건 등. 가격이 "합리적"·"가성비 좋다"·"주변보다 저렴"이라고 판단해 주지 마세요. 근거 데이터가 없으면 비교 자체를 하지 말고 "시세 비교는 문의 바랍니다"로 처리하세요.'
   } as Record<string, string>
 
   const customStyleInstructions: string[] = []
@@ -196,27 +217,30 @@ export function buildBlogUserPrompt(ctx: BlogPromptContext): string {
   if (ctx.format && formatGuide[ctx.format]) customStyleInstructions.push(`- 글 구조(Format): ${formatGuide[ctx.format]}`)
   if (ctx.focus && focusGuide[ctx.focus]) customStyleInstructions.push(`- 강조 포인트(Focus): ${focusGuide[ctx.focus]}`)
 
-  const fmtWon = (v: number) => {
-    const billions = Math.floor(v / 100000000)
-    const tenThousands = Math.floor((v % 100000000) / 10000)
-    return [billions > 0 ? `${billions}억` : '', tenThousands > 0 ? `${tenThousands}만원` : ''].filter(Boolean).join(' ') || `${v.toLocaleString()}원`
-  }
+  // 금액 표기는 _shared/price-source.ts 한 곳만 쓴다.
+  // 미입력은 '미입력'으로 넘겨 모델이 금액을 지어내지 못하게 하고,
+  // 실제 0원은 '0원'으로 그대로 넘긴다. '가격 협의'/'협의' 같은 추측 표기는 쓰지 않는다.
+  const fmtWon = formatPriceOrUnknown
 
   const txType = ctx.transaction_type ?? (ctx.price ? 'sale' : ctx.monthly_rent ? 'monthly_rent' : ctx.deposit ? 'jeonse' : 'sale')
   const priceLines: string[] = []
 
   if (txType === 'sale') {
     priceLines.push(`- 거래 유형: 매매`)
-    priceLines.push(`- 매매가: ${ctx.price ? fmtWon(ctx.price) : '가격 협의'}`)
+    priceLines.push(`- 매매가: ${fmtWon(ctx.price)}`)
   } else if (txType === 'jeonse') {
     priceLines.push(`- 거래 유형: 전세`)
-    priceLines.push(`- 전세 보증금: ${ctx.deposit ? fmtWon(ctx.deposit) : '협의'}`)
+    priceLines.push(`- 전세 보증금: ${fmtWon(ctx.deposit)}`)
   } else if (txType === 'monthly_rent') {
     priceLines.push(`- 거래 유형: 월세`)
-    if (ctx.deposit) priceLines.push(`- 보증금: ${fmtWon(ctx.deposit)}`)
-    if (ctx.monthly_rent) priceLines.push(`- 월세: ${Math.floor(ctx.monthly_rent / 10000)}만원`)
+    priceLines.push(`- 보증금: ${fmtWon(ctx.deposit)}`)
+    priceLines.push(`- 월세: ${fmtWon(ctx.monthly_rent)}`)
   }
-  if (ctx.key_money) priceLines.push(`- 권리금: ${Math.floor(ctx.key_money / 10000)}만원`)
+  // 권리금은 미입력과 '무권리'(실제 0원)를 반드시 구분해 넘긴다.
+  priceLines.push(`- 권리금: ${formatKeyMoney(ctx.key_money)}`)
+  priceLines.push(PRICE_UNKNOWN_PROMPT_RULE)
+  // 가격 옆에 반드시 붙일 출처 한 줄 (값유형 · 출처명 · 기준일)
+  priceLines.push(`- 가격 출처(본문에서 금액을 쓸 때마다 함께 표기): ${formatPriceSourceLabel(ctx)}`)
 
   const extraInfo: string[] = []
   if (ctx.property_category) extraInfo.push(`- 중개대상물 종류: ${ctx.property_category}`)
@@ -235,7 +259,7 @@ export function buildBlogUserPrompt(ctx: BlogPromptContext): string {
 - 주소: ${ctx.address}
 - 매물 유형: ${ctx.property_type}
 ${priceLines.join('\n')}
-- 전용면적: ${ctx.area ? `${ctx.area}㎡ (약 ${(ctx.area / 3.3058).toFixed(1)}평)` : '정보 없음'}
+- 전용면적: ${ctx.area ? `${ctx.area}㎡ (약 ${(ctx.area / 3.3058).toFixed(1)}평)` : PRICE_UNKNOWN_TEXT}
 - 층수: ${ctx.floor && ctx.total_floors ? `${ctx.floor}층 / 전체 ${ctx.total_floors}층` : '정보 없음'}
 - 방향: ${ctx.direction ?? '정보 없음'}
 - 특징: ${ctx.features?.join(', ') ?? '없음'}
@@ -258,6 +282,8 @@ ${ctx.rental_status?.trim() || '정보 없음 - 임대수익 관련 내용은 �
 [공인중개사 현장 메모 - 직접 방문 관찰 내용, 최우선 반영]
 ${ctx.note?.trim() || '없음'}
 
+${buildPriceSourcePromptBlock(ctx)}
+
 [입지 분석 결과]
 ${ctx.location_advantages?.map((a, i) => `${i + 1}. ${a}`).join('\n') || '입지 분석 결과 없음 - 주소 기반으로 추론 가능한 내용만 기재하고, 불확실한 내용은 "~로 알려져 있습니다" 형태로 표현'}
 
@@ -265,9 +291,9 @@ ${ctx.location_advantages?.map((a, i) => `${i + 1}. ${a}`).join('\n') || '입지
 - 상권 등급: ${ctx.commercial_grade || '정보 없음'}
 - 상권 유형: ${ctx.commercial_type || '정보 없음'}
 - 유동인구 분석: ${ctx.foot_traffic ? JSON.stringify(ctx.foot_traffic) : '추정 데이터 없음'}
-- 실거래 시세 동향: ${ctx.price_trend || '정보 없음'}
 - 주변 토지이용 현황: ${ctx.land_use_summary || '정보 없음'}
 - 전문가 추천 및 주의 업종: ${ctx.recommended_industries ? JSON.stringify(ctx.recommended_industries) : '정보 없음'}
+${buildAiTrendPromptLine(ctx.price_trend) || '- 실거래 시세 동향: 제공된 실거래 데이터 없음 — 금액·평단가·시세 범위를 추정하지 말고 "정확한 시세는 문의 바랍니다"로 처리하세요.'}
 
 [글 스타일]
 ${styleGuide}
@@ -275,6 +301,8 @@ ${customStyleInstructions.length > 0 ? `\n[추가 선택 옵션 적용 지침]\n
 
 [말투]
 ${ctx.tone ? toneGuide[ctx.tone] : '자연스럽고 신뢰감 있는 전문 중개사 말투'}
+
+${REGION_PRICE_CLAIM_BAN_REMINDER}
 
 [지역 분석 지침]
 - 지역명에서 자치구, 행정동, 아파트명/상권명을 파악하여 해당 지역의 고유한 특성을 반영

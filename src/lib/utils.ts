@@ -1,24 +1,29 @@
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import { formatPriceOrUnknown } from './price-source'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatPrice(priceInWon: number): string {
-  if (!priceInWon) return '0원'
-
-  if (priceInWon >= 100000000) {
-    const eok = Math.floor(priceInWon / 100000000)
-    const man = Math.floor((priceInWon % 100000000) / 10000)
-    if (man === 0) return `${eok}억`
-    return `${eok}억 ${man.toLocaleString()}만`
-  }
-  if (priceInWon >= 10000) {
-    return `${Math.floor(priceInWon / 10000).toLocaleString()}만`
-  }
-  return `${priceInWon.toLocaleString()}원`
+/**
+ * 원 단위 금액 표기. 포맷터는 src/lib/price-source.ts 한 곳에만 둔다.
+ *
+ * 이전 구현은 falsy 값을 모두 영(零) 금액 문자열로 돌려줬기 때문에
+ * 미입력(NULL/undefined)이 금액 주장으로 바뀌었다.
+ * 이제 미입력은 PRICE_UNKNOWN_TEXT 로, 실제로 입력된 0 만 영 금액으로 나간다.
+ */
+export function formatPrice(priceInWon: number | null | undefined): string {
+  return formatPriceOrUnknown(priceInWon)
 }
+
+export {
+  PRICE_UNKNOWN_TEXT,
+  formatKeyMoney,
+  formatPriceOrUnknown,
+  formatWon,
+  isPriceEntered,
+} from './price-source'
 
 export function formatArea(area: number): string {
   const pyeong = (area / 3.3058).toFixed(1)

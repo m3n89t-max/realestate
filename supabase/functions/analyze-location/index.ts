@@ -221,6 +221,11 @@ Deno.serve(async (req) => {
     const realPriceText   = isCommercial
       ? formatCommercial(project.commercial_data)
       : formatRealPrice(project.real_price_data)
+    // 실거래 근거가 실제로 있는지 — price_trend 생성 여부를 결정한다.
+    // 근거가 없으면 모델에게 price_trend 를 아예 요구하지 않는다(출처 세탁 차단).
+    const hasRealPriceEvidence = isCommercial
+      ? !!project.commercial_data
+      : Array.isArray(project.real_price_data) && project.real_price_data.length > 0
     const kakaoDensityText = formatKakaoDensity(project.kakao_density)
 
     // ── 매물 유형별 분석 관점 설정 ──────────────────────────
@@ -256,7 +261,9 @@ ${propertyType === 'knowledge_industry' ? '- 입주 기업 업종 적합성(IT·
 - 주거 쾌적성: 공원·조용함·방향·채광 등
 ${propertyType === 'multi_unit' ? '- 다가구주택 특성: 임대 수익성, 호실 구성, 공실률, 수익형 투자 관점 포함' : ''}
 ${propertyType === 'oneroom' ? '- 원룸 특성: 1~2인 가구 수요, 인근 대학·직장·역세권 여부, 임대 수요 안정성' : ''}
-- 실거래가 동향을 기반으로 시세 수준과 투자 매력도 평가
+${hasRealPriceEvidence
+  ? '- 아래 [실거래가 데이터]에 실제로 적힌 거래 건만 근거로 시세 수준을 서술하고, 몇 건 기준인지 문장에 밝힐 것'
+  : '- 실거래 데이터가 제공되지 않았다. 시세 수준·투자 매력도·평단가를 추정해 쓰지 말 것. 금액 관련 서술은 모두 생략한다'}
 - recommended_industries 필드는 "해당없음(주거용)" 으로 채울 것`
       : isLand
       ? `[${ptLabel} 분석 중점 사항]
@@ -276,7 +283,9 @@ ${propertyType === 'forest' ? '- 임야 특성: 산지전용 가능 여부, 보�
 - recommended_industries 필드는 "해당없음(공장/창고)" 으로 채울 것`
       : `[일반 부동산 분석 중점 사항]
 - 교통·생활편의·교육·상권을 균형 있게 평가
-- 실거래가 동향 분석 포함`
+${hasRealPriceEvidence
+  ? '- 아래 [실거래가 데이터]에 실제로 적힌 거래 건만 근거로 시세를 서술하고, 몇 건 기준인지 밝힐 것'
+  : '- 실거래 데이터가 없으므로 시세·평단가·가격 수준을 추정해 쓰지 말 것'}`
 
     const systemPrompt = `당신은 대한민국 부동산 입지 분석 전문가입니다. 제공된 데이터에서 직접 확인되는 사실만 짧고 쉽게 요약하세요.
 
@@ -285,8 +294,9 @@ ${propertyType === 'forest' ? '- 임야 특성: 산지전용 가능 여부, 보�
 - 장소 검색 결과는 전수조사가 아니며 유동인구 측정값으로 해석하지 마세요.
 - 확인할 수 없는 항목은 null 또는 빈 배열로 반환하세요.
 - 상권등급, 상권유형, 업종추천은 이번 출력에서 생성하지 마세요.
+- 아래 [실거래가 데이터]에 실제 거래 건이 적혀 있지 않으면 금액·평단가·시세 범위를 추정해 쓰지 마세요.
 
-[출력 형식: JSON]
+[출력 형식: JSON - 아래 필드는 모두 필수. 단 주석으로 '출력하지 마세요'라고 적힌 필드는 제외한다]
 {
   "advantages": ["장점1", "장점2", ..., "장점7"],
   "recommended_targets": [
@@ -302,7 +312,9 @@ ${propertyType === 'forest' ? '- 임야 특성: 산지전용 가능 여부, 보�
     "park":      [{"name": "공원명", "distance_m": 400, "walk_min": 5}]
   },
   "land_use_summary": "용도지역/지구 요약 (1-2문장)",
-  "price_trend": "실거래가 동향 분석 (1-2문장)",
+${hasRealPriceEvidence
+  ? '  "price_trend": "아래 [실거래가/상권 데이터]에 실제로 적힌 거래 건만 근거로 요약 (1-2문장). 데이터에 없는 금액·평단가·시세 범위는 절대 쓰지 말 것",'
+  : '  // price_trend 필드는 이번 요청에서 출력하지 마세요 (실거래 근거 데이터가 없습니다)'}
   "commercial_grade": null,
   "commercial_type": null,
   "recommended_industries": null,
@@ -322,7 +334,9 @@ ${typeGuide}`
 - 조회 제한이 있는 참고자료이며 상권 전체 점포 수로 단정하지 않음`
       : isResidential
       ? `- 실제 수집된 학교·병원·마트 등 생활 인프라 거리만 언급
-- 실거래가 동향을 기반으로 시세 수준과 투자 매력도 평가
+${hasRealPriceEvidence
+  ? '- 아래 [실거래가 데이터]에 실제로 적힌 거래 건만 근거로 시세 수준을 서술하고, 몇 건 기준인지 밝힐 것'
+  : '- 실거래 데이터가 제공되지 않았다. 시세 수준·투자 매력도·평단가를 추정해 쓰지 말 것'}
 - 실제 수집된 교통시설만 언급
 - 소음·채광은 입력에 없으면 언급하지 않음`
       : isLand
@@ -384,7 +398,11 @@ ${analysisInstructions}
         nearby_facilities:        analysis.nearby_facilities,
         analysis_text:            analysis.analysis_text,
         land_use_summary:         analysis.land_use_summary ?? null,
-        price_trend:              analysis.price_trend ?? null,
+        // 실거래 근거가 없으면 모델이 문장을 만들어 보냈더라도 저장하지 않는다.
+        // 저장하면 화면에 노출되고 다시 블로그 프롬프트로 재주입되어
+        // AI 생성문이 다음 모델의 '데이터'로 승격된다(출처 세탁).
+        price_trend:              hasRealPriceEvidence ? (analysis.price_trend ?? null) : null,
+        // 상권등급·상권유형·유동인구·업종추천은 근거 데이터가 없어 저장하지 않는다.
         commercial_grade:         null,
         commercial_type:          null,
         foot_traffic:             null,

@@ -123,6 +123,9 @@ export interface CommercialData {
 
 export type TransactionType = 'sale' | 'lease' | 'rent'
 
+/** 가격 값의 근거 강도 — projects.value_type (DB CHECK 제약과 일치) */
+export type PriceValueType = '중개사 제공' | '실거래' | '호가'
+
 export interface Project {
   id: string
   org_id: string
@@ -144,6 +147,11 @@ export interface Project {
   monthly_rent?: number
   deposit?: number
   key_money?: number
+  // ── 값 출처 메타 4필드 (20260930120000_add_price_source_metadata.sql) ──
+  source_name?: string | null      // 출처명
+  source_date?: string | null      // 기준일 (YYYY-MM-DD)
+  source_channel?: string | null   // 수집경로
+  value_type?: PriceValueType | null // 값유형: 중개사 제공 / 실거래 / 호가
   area?: number                   // 전용면적
   land_area?: number              // 대지면적
   total_area?: number             // 연면적

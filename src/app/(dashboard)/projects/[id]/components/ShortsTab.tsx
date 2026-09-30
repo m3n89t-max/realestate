@@ -5,7 +5,8 @@ import { Video, Copy, Check, Loader2, Download, ChevronLeft, ChevronRight, Play,
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
 import { cn } from '@/lib/utils'
-import type { GeneratedContent } from '@/lib/types'
+import type { GeneratedContent, Project } from '@/lib/types'
+import { checkPriceSource } from '@/lib/price-source'
 
 /* ── Canvas 텍스트 줄바꿈 유틸 ── */
 function wrapText(
@@ -216,6 +217,7 @@ interface ShortsScript {
 
 interface ShortsTabProps {
   projectId: string
+  project?: Project | null
   assets?: { file_url: string; type: string; file_name?: string; is_cover?: boolean }[]
   contents?: GeneratedContent[]
 }
@@ -388,7 +390,7 @@ function PhonePreview({ script, activeScene, onScene, photos = [] }: {
 }
 
 /* ── 메인 컴포넌트 ── */
-export default function ShortsTab({ projectId, assets = [], contents = [] }: ShortsTabProps) {
+export default function ShortsTab({ projectId, project, assets = [], contents = [] }: ShortsTabProps) {
   const supabase = createClient()
   const [generating, setGenerating] = useState(false)
   const [script, setScript] = useState<ShortsScript | null>(() => parseSavedScript(contents))
@@ -423,6 +425,9 @@ export default function ShortsTab({ projectId, assets = [], contents = [] }: Sho
   }
 
   const handleGenerate = async () => {
+    // 렌더 실패 규칙: 값유형이 '실거래'/'호가'인데 출처명·기준일이 비면 한국어 오류로 막는다.
+    const priceSourceCheck = checkPriceSource(project ?? {}, 'shorts')
+    if (!priceSourceCheck.ok) { toast.error(priceSourceCheck.message, { duration: 10000 }); return }
     setGenerating(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()

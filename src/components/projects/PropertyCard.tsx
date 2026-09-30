@@ -4,14 +4,21 @@ import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { ChevronLeft, ChevronRight, MapPin } from 'lucide-react'
-import { formatPrice, formatArea, getPropertyTypeLabel } from '@/lib/utils'
+import { formatPrice, formatArea, getPropertyTypeLabel, isPriceEntered } from '@/lib/utils'
+import { formatPriceSourceLabel } from '@/lib/price-source'
 import { cn } from '@/lib/utils'
+import type { PriceValueType } from '@/lib/types'
 
 interface PropertyCardProps {
   id: string
   address: string
   price?: number
   monthly_rent?: number
+  // 값 출처 메타 4필드 — 가격 아래에 출처명·기준일을 함께 노출한다
+  value_type?: PriceValueType | null
+  source_name?: string | null
+  source_date?: string | null
+  source_channel?: string | null
   area?: number
   floor?: number
   total_floors?: number
@@ -30,6 +37,10 @@ export default function PropertyCard({
   address,
   price,
   monthly_rent,
+  value_type,
+  source_name,
+  source_date,
+  source_channel,
   area,
   floor,
   total_floors,
@@ -134,13 +145,20 @@ export default function PropertyCard({
       <div className="p-4">
         <Link href={href} className="block rounded-sm focus-visible:outline-none">
           <h3 className="text-lg font-bold tracking-[-0.03em] text-slate-950">
-            {price ? formatPrice(price) : '가격 미정'}
-            {monthly_rent ? (
+            {/* 빈 값 표기는 formatPrice 가 PRICE_UNKNOWN_TEXT 한 종으로 통일해 돌려준다 */}
+            {formatPrice(price)}
+            {isPriceEntered(monthly_rent) ? (
               <span className="ml-1.5 text-sm font-medium text-slate-600">
-                / 월 {monthly_rent.toLocaleString()}만
+                {/* monthly_rent 는 원 단위다. 이전에는 원 값에 만원 접미를 그대로 붙여
+                    1,500,000원이 백오십만배로 표시되는 단위 버그가 있었다. */}
+                / 월 {formatPrice(monthly_rent)}
               </span>
             ) : null}
           </h3>
+          {/* 가격 옆에 출처명·기준일을 함께 노출 (값 출처 메타 4필드) */}
+          <span className="mt-1 block text-xs font-medium text-slate-700">
+            {formatPriceSourceLabel({ value_type, source_name, source_date, source_channel })}
+          </span>
           <span className="mt-1.5 flex items-center gap-1 text-sm text-slate-600">
             <MapPin size={13} aria-hidden="true" className="shrink-0 text-slate-500" />
             <span className="truncate">{address}</span>

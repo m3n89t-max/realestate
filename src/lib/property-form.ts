@@ -75,6 +75,45 @@ export function parsePositivePrice(value: string): number | null {
   return Number.isSafeInteger(amount) && amount > 0 && amount <= MAX_SAFE_PRICE_IN_MAN ? amount : null
 }
 
+// ── 수정 폼의 만원 단위 금액 입력 ───────────────────────────────────────────
+// 신규 등록은 parsePositivePrice(0 초과만 허용)를 쓰지만, 수정 폼은
+// '실제 0원'(예: 권리금 없음)을 입력할 수 있어야 하므로 0 을 허용한다.
+// 대신 '미입력(빈칸)'과 '0'을 절대 섞지 않는다 — 빈칸은 NULL 로 저장한다.
+
+/**
+ * 만원 단위 입력 문자열을 원 단위 정수로 바꾼다.
+ * 빈칸·공백 → null (DB에 NULL 로 저장되어 화면에 '미입력'으로 나간다)
+ * '0' → 0 (실제 0원)
+ * 숫자가 아니거나 범위를 벗어나면 null (저장 전에 validateManInput 이 먼저 막는다)
+ */
+export function parseManInputToWon(value: string | null | undefined): number | null {
+  if (typeof value !== 'string') return null
+  const normalized = value.replace(/,/g, '').trim()
+  if (!normalized) return null
+  if (!/^\d+$/.test(normalized)) return null
+  const amount = Number(normalized)
+  if (!Number.isSafeInteger(amount) || amount < 0 || amount > MAX_SAFE_PRICE_IN_MAN) return null
+  return amount * 10000
+}
+
+/**
+ * 만원 단위 금액 입력 검증. 통과하면 undefined, 실패하면 한국어 안내 문구.
+ * 빈칸은 '미입력'으로 허용한다 (모르는 값을 0으로 저장하지 않기 위함).
+ */
+export function validateManInput(value: string | null | undefined, label: string): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const normalized = value.replace(/,/g, '').trim()
+  if (!normalized) return undefined
+  if (!/^\d+$/.test(normalized)) {
+    return `${label}은 숫자만 입력해 주세요. 모르는 금액이면 비워 두세요(‘미입력’으로 표시됩니다).`
+  }
+  const amount = Number(normalized)
+  if (!Number.isSafeInteger(amount) || amount > MAX_SAFE_PRICE_IN_MAN) {
+    return `${label}이 너무 큽니다. ${MAX_SAFE_PRICE_IN_MAN.toLocaleString('ko-KR')}만원 이하로 입력해 주세요.`
+  }
+  return undefined
+}
+
 export function validatePropertyBasics(values: PropertyBasics): Record<string, string> {
   const errors: Record<string, string> = {}
   if (!values.address.trim()) errors.address = '주소를 입력해 주세요.'
