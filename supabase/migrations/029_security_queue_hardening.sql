@@ -2,13 +2,41 @@
 -- Migration: 029_security_queue_hardening.sql
 -- 테넌트 권한 상승 차단, RPC 권한 고정, 작업 상태 표준화
 -- ============================================================
+--
+-- ★ 2026-09-30 안전성 정리 (운영 사고 예방)
+-- 이 파일은 운영 DB에 적용되지 않은 상태로 오래 남아 있었고, 그동안 운영에는
+-- 더 나중의 결정들이 들어갔다. 그래서 원본 그대로 `supabase db push` 하면
+-- 운영 회원가입이 깨지고 중간 실패 상태가 남았다. 아래 3가지를 수정했다.
+--
+--  1) auth_autoconfirm_email 트리거/함수 DROP 2줄 제거
+--     → 후속 마이그레이션 20260823222430(auth_autoconfirm_email_on_signup) 과
+--       20260823223029(fix_signup_trigger_search_path) 가 이 트리거를 "의도적으로"
+--       재도입했다. 029가 되돌리면 신규 회원가입 이메일 자동확인이 사라져
+--       가입 직후 로그인이 막힌다. 029는 그 결정보다 앞선 시점의 의도이므로 폐기한다.
+--
+--  2) tasks status 를 pending → queued 로 바꾸는 4줄 제거
+--     → 이미 007_schema_fixes.sql 이 같은 변경을 담당한다(007:23-32). 007은 운영에
+--       기록돼 있으나 실제로는 반영되지 않아 운영 DB가 여전히 'pending' 이다.
+--       즉 이것은 029가 아니라 007의 미반영 문제이며, 앱 코드는 이미 전부 'queued'를
+--       쓰고 있어 별도 수정 마이그레이션으로 다뤄야 한다(README.md 참고).
+--       029에 섞어두면 "보안 강화"와 "큐 상태 정정"이 한 파일에서 동시에 터진다.
+--
+--  3) generate_agent_key 의 `BEGIN;` → `BEGIN` 문법 오류 수정
+--     → plpgsql 블록의 BEGIN 에 세미콜론을 붙이면 함수 생성이 실패하고,
+--       그 앞까지만 적용된 중간 상태가 남는다.
+-- ============================================================
 
 CREATE SCHEMA IF NOT EXISTS extensions;
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
 
--- 운영에서 이메일 소유권 확인을 우회하던 트리거를 제거합니다.
-DROP TRIGGER IF EXISTS auth_autoconfirm_email_trigger ON auth.users;
-DROP FUNCTION IF EXISTS public.auth_autoconfirm_email();
+-- [제거됨] 이메일 자동확인 트리거 DROP
+--   원본 029는 아래 2줄을 실행했다.
+--     DROP TRIGGER IF EXISTS auth_autoconfirm_email_trigger ON auth.users;
+--     DROP FUNCTION IF EXISTS public.auth_autoconfirm_email();
+--   후속 20260823222430 / 20260823223029 가 이 트리거를 다시 만든 것이 현재 운영의
+--   정식 동작이다. 되돌리면 회원가입이 깨지므로 실행하지 않는다.
+--   이메일 소유권 확인을 다시 켜야 한다면 별도 마이그레이션 + 앱 가입 플로우 수정으로
+--   진행해야 한다.
 
 -- 일반 사용자가 자신의 membership role을 바꾸지 못하도록 관리자만 수정 허용
 DROP POLICY IF EXISTS "memberships_update" ON public.memberships;
@@ -23,13 +51,16 @@ CREATE POLICY "memberships_delete" ON public.memberships
 FOR DELETE
 USING (public.is_org_admin(org_id) OR user_id = auth.uid());
 
--- 큐 상태는 queued를 단일 대기 상태로 사용
-UPDATE public.tasks SET status = 'queued' WHERE status = 'pending';
-ALTER TABLE public.tasks ALTER COLUMN status SET DEFAULT 'queued';
-ALTER TABLE public.tasks DROP CONSTRAINT IF EXISTS tasks_status_check;
-ALTER TABLE public.tasks ADD CONSTRAINT tasks_status_check CHECK (
-  status IN ('queued', 'running', 'success', 'failed', 'retrying', 'cancelled')
-);
+-- [제거됨] tasks status pending → queued 전환
+--   원본 029는 아래를 실행했다.
+--     UPDATE public.tasks SET status = 'queued' WHERE status = 'pending';
+--     ALTER TABLE public.tasks ALTER COLUMN status SET DEFAULT 'queued';
+--     ALTER TABLE public.tasks DROP CONSTRAINT IF EXISTS tasks_status_check;
+--     ALTER TABLE public.tasks ADD CONSTRAINT tasks_status_check CHECK (...);
+--   이 변경 자체는 앱 코드와 맞는 방향이다(코드는 전부 'queued' 사용).
+--   그러나 원래 담당은 007_schema_fixes.sql 이고, 이 파일은 보안 강화 마이그레이션이다.
+--   한 파일에서 데이터 UPDATE 와 보안 정책 변경을 같이 하면 실패 시 원인 추적이 어렵다.
+--   007 미반영 문제는 전용 마이그레이션으로 분리한다(README.md 참고).
 
 -- 기존 불일치 작업은 실행되지 않도록 실패 상태로 격리합니다.
 UPDATE public.tasks t
@@ -135,7 +166,7 @@ SET search_path = pg_catalog, public
 AS $$
 DECLARE
   new_key text;
-BEGIN;
+BEGIN
   IF auth.uid() IS NULL OR NOT public.is_org_admin(p_org_id) THEN
     RAISE EXCEPTION '조직 관리자만 에이전트 키를 발급할 수 있습니다';
   END IF;
