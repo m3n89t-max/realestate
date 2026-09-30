@@ -5,7 +5,7 @@ import { Wand2, Copy, Check, ChevronDown, ChevronUp, AlertCircle, Upload, Loader
 import { createClient } from '@/lib/supabase/client'
 import type { GeneratedContent, SeoScore } from '@/lib/types'
 import toast from 'react-hot-toast'
-import { cn, formatPrice, getPropertyTypeLabel } from '@/lib/utils'
+import { cn, formatPrice, getPropertyTypeLabel, isPriceEntered } from '@/lib/utils'
 import { checkPriceSource, formatPriceSourceLabel } from '@/lib/price-source'
 
 interface BlogTabProps {
@@ -331,10 +331,12 @@ export default function BlogTab({ projectId, orgId, project, contents, assets }:
       const txLabel = tx === 'rent' ? '월세' : tx === 'lease' ? '전세' : '매매'
       const type_label = [typeLabel, txLabel].filter(Boolean).join(' ')
 
+      // 썸네일은 이미지로 구워져 사후 정정이 불가하므로, 금액이 미입력이면
+      // '협의'라고 추측해 굽지 않고 배지 자체를 생략한다(빈 문자열 → 배지 미생성).
       let price_badge = ''
-      if (tx === 'rent') price_badge = `월세 ${project?.monthly_rent ? formatPrice(project.monthly_rent) : '협의'}`
-      else if (tx === 'lease') price_badge = `전세 ${project?.deposit ? formatPrice(project.deposit) : '협의'}`
-      else price_badge = `매매 ${project?.price ? formatPrice(project.price) : '협의'}`
+      if (tx === 'rent') price_badge = isPriceEntered(project?.monthly_rent) ? `월세 ${formatPrice(project!.monthly_rent)}` : ''
+      else if (tx === 'lease') price_badge = isPriceEntered(project?.deposit) ? `전세 ${formatPrice(project!.deposit)}` : ''
+      else price_badge = isPriceEntered(project?.price) ? `매매 ${formatPrice(project!.price)}` : ''
 
       const features: string[] = Array.isArray(project?.features) ? project.features : []
       const badges = [formatPriceSourceLabel(project ?? {}), ...features.slice(0, 3)].filter(Boolean).join(' · ')

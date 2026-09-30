@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
 import type { Project, PropertyType, PriceValueType } from '@/lib/types'
 import { PRICE_VALUE_TYPES, checkPriceSource } from '@/lib/price-source'
+import { parseManInputToWon, validateManInput } from '@/lib/property-form'
 
 const PROPERTY_TYPES: { value: PropertyType; label: string }[] = [
   { value: 'apartment', label: '아파트' },
@@ -57,9 +58,11 @@ function TInput({ value, onChange, placeholder, type = 'text', className = '', d
   )
 }
 
-// 원 → 만원 문자열 변환
+// 원 → 만원 문자열 변환. 0 은 '0'으로 남겨야 한다 —
+// 이전에는 `if (!won) return ''` 이라 실제 0원이 빈칸(미입력)으로 바뀌어
+// 저장 시 NULL 이 되면서 사용자가 입력한 0이 조용히 사라졌다.
 function wonToMan(won: number | null | undefined): string {
-  if (!won) return ''
+  if (won === null || won === undefined || !Number.isFinite(won)) return ''
   return String(Math.round(won / 10000))
 }
 
@@ -136,7 +139,28 @@ export default function ProjectEditForm({ project }: { project: Project }) {
       return { ...prev, whole_building: next, floor: next ? '' : prev.floor, features }
     })
 
+  // 금액 4칸 검증 — 빈칸은 NULL 로 저장하고, 잘못 입력한 값은 저장 자체를 막는다.
+  // 이전에는 검증이 없어 "0"이 그대로 0원으로 저장되고 문자 입력은 NaN 이 되어
+  // 화면에 '0원'이라는 사실과 다른 금액이 표시됐다.
+  const priceFieldLabels = {
+    price: '매매가',
+    deposit: '보증금',
+    monthly_rent: '월세',
+    key_money: '권리금',
+  } as const
+
+  const priceErrors: Partial<Record<keyof typeof priceFieldLabels, string>> = {}
+  for (const field of Object.keys(priceFieldLabels) as (keyof typeof priceFieldLabels)[]) {
+    const message = validateManInput(form[field], priceFieldLabels[field])
+    if (message) priceErrors[field] = message
+  }
+
   const handleSave = async () => {
+    const firstPriceError = Object.values(priceErrors)[0]
+    if (firstPriceError) {
+      toast.error(firstPriceError)
+      return
+    }
     setSaving(true)
     try {
       const { error } = await supabase.from('projects').update({
@@ -145,10 +169,11 @@ export default function ProjectEditForm({ project }: { project: Project }) {
         property_category: form.property_category || null,
         main_use: form.main_use || null,
         transaction_type: form.transaction_type,
-        price: form.price ? parseInt(form.price) * 10000 : null,
-        monthly_rent: form.monthly_rent ? parseInt(form.monthly_rent) * 10000 : null,
-        deposit: form.deposit ? parseInt(form.deposit) * 10000 : null,
-        key_money: form.key_money ? parseInt(form.key_money) * 10000 : null,
+        // 빈칸은 NULL. '0'을 실제로 입력했으면 0 그대로 저장한다(미입력과 구분).
+        price: parseManInputToWon(form.price),
+        monthly_rent: parseManInputToWon(form.monthly_rent),
+        deposit: parseManInputToWon(form.deposit),
+        key_money: parseManInputToWon(form.key_money),
         // 값 출처 메타 4필드
         value_type: form.value_type,
         source_name: form.source_name.trim() || null,
@@ -356,7 +381,7 @@ export default function ProjectEditForm({ project }: { project: Project }) {
                   <tr>
                     <TLabel>권 리 금<br />(만원)</TLabel>
                     <TCell colSpan={2}>
-                      <TInput value={form.key_money} onChange={v => set('key_money', v)} placeholder="무권리" />
+                      <TInput value={form.key_money} onChange={v => set('key_money', v)} placeholder="비워두면 '미입력'으로 표시됩니다" type="number" />
                     </TCell>
                     <TLabel>관 리 비</TLabel>
                     <TCell colSpan={2}>

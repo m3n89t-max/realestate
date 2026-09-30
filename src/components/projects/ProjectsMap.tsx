@@ -121,7 +121,8 @@ export default function ProjectsMap({
             const position = new kakaoMaps.LatLng(project.lat!, project.lng!)
             bounds.extend(position)
 
-            const priceLabel = project.price ? formatPrice(project.price) : '—'
+            // 빈 값 표기는 '—' 가 아니라 '미입력' 한 종으로 통일 (formatPrice 가 처리)
+            const priceLabel = formatPrice(project.price)
             const isActive = project.id === highlightedId
 
             const content = document.createElement('div')

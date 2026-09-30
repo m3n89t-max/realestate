@@ -3,8 +3,12 @@ import { corsHeaders, handleCors } from '../_shared/cors.ts'
 import { getAuthenticatedUser, getOrgId, checkQuota } from '../_shared/auth.ts'
 import { callGemini, callGeminiVision } from '../_shared/gemini.ts'
 import {
+  PRICE_UNKNOWN_PROMPT_RULE,
+  PRICE_UNKNOWN_TEXT,
   assertRenderablePriceSource,
   buildPriceSourcePromptBlock,
+  formatKeyMoney,
+  formatPriceOrUnknown,
   formatPriceSourceLabel,
   REGION_PRICE_CLAIM_BAN_RULES,
 } from '../_shared/price-source.ts'
@@ -54,7 +58,7 @@ ${REGION_PRICE_CLAIM_BAN_RULES}
     "card_number":1,"layout":"cover",
     "title":"후킹 2줄 제목\\n(줄당 8자 이내)",
     "subtitle":"핵심 특장점 요약 (20자 이내)",
-    "price_badge":"매매가 OO억 OO만원",
+    "price_badge":"아래 [매물 정보]의 금액을 그대로 옮겨 적는다. 금액이 '미입력'이면 이 필드를 빈 문자열로 둔다 — 절대 금액을 지어내지 말 것",
     "checkpoints":["구체적 강점1","구체적 강점2","구체적 강점3"],
     "image_prompt":"[지역영문] [건물유형], [외관특징], [층수], [주변환경], warm light, photorealistic, no text"
   },
@@ -91,9 +95,9 @@ ${REGION_PRICE_CLAIM_BAN_RULES}
   },
   {
     "card_number":6,"layout":"cta",
-    "title":"지금이 기회\\n놓치지 마세요",
-    "price_badge":"매매가 OO억 OO만원",
-    "cta":"지금 바로 문의하세요 →",
+    "title":"자세한 정보\\n문의해 주세요",
+    "price_badge":"1장과 동일. 금액이 '미입력'이면 빈 문자열",
+    "cta":"자세한 내용 문의하세요 →",
     "hashtags":["#지역태그","#매물유형태그","#투자태그","#부동산태그","#지역특성태그","#추가태그1","#추가태그2","#추가태그3"],
     "image_prompt":"[건물유형] exterior in [지역영문], golden hour, warm glow, photorealistic, no text"
   }
@@ -177,11 +181,9 @@ Deno.serve(async (req) => {
 
     const nextVersion = (existing?.version ?? 0) + 1
 
-    const billions = project.price ? Math.floor(project.price / 100000000) : 0
-    const tenThousands = project.price ? Math.floor((project.price % 100000000) / 10000) : 0
-    const priceText = project.price
-      ? [billions > 0 ? `${billions}억` : '', tenThousands > 0 ? `${tenThousands}만원` : ''].filter(Boolean).join(' ') || `${project.price.toLocaleString()}원`
-      : '가격 협의'
+    // 금액 표기는 _shared/price-source.ts 한 곳만 쓴다.
+    // 미입력은 '미입력'으로 넘겨 모델이 '가격 협의'라고 추측하거나 금액을 지어내지 못하게 한다.
+    const priceText = formatPriceOrUnknown(project.price)
 
     const advantages = (location?.advantages ?? []).slice(0, 5)
       .map((a: string, i: number) => `${i + 1}. ${a}`).join('\n')
@@ -221,11 +223,15 @@ Deno.serve(async (req) => {
 
 주소: ${address}
 유형: ${propertyType}
-가격: ${priceText}${project.deposit ? ` / 보증금 ${Math.floor(project.deposit / 10000)}만원` : ''}${project.monthly_rent ? ` / 월세 ${Math.floor(project.monthly_rent / 10000)}만원` : ''}${project.key_money ? ` / 권리금 ${Math.floor(project.key_money / 10000)}만원` : ''}
+매매가: ${priceText}
+보증금: ${formatPriceOrUnknown(project.deposit)}
+월세: ${formatPriceOrUnknown(project.monthly_rent)}
+권리금: ${formatKeyMoney(project.key_money)}
 가격 출처 (가격을 카드에 쓸 때 반드시 함께 표기): ${priceSourceLabel}
-면적: ${project.area ? `${project.area}㎡` : '미정'}
-층수: ${project.floor ? `${project.floor}층` : '미정'}
-방향: ${project.direction ?? '미정'}
+${PRICE_UNKNOWN_PROMPT_RULE}
+면적: ${project.area ? `${project.area}㎡` : PRICE_UNKNOWN_TEXT}
+층수: ${project.floor ? `${project.floor}층` : PRICE_UNKNOWN_TEXT}
+방향: ${project.direction ?? PRICE_UNKNOWN_TEXT}
 건물 상태: ${project.building_condition || '미기재'}
 특징: ${(project.features ?? []).join(', ') || '미기재'}
 

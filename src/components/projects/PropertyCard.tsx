@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { ChevronLeft, ChevronRight, MapPin } from 'lucide-react'
-import { formatPrice, formatArea, getPropertyTypeLabel } from '@/lib/utils'
+import { formatPrice, formatArea, getPropertyTypeLabel, isPriceEntered } from '@/lib/utils'
 import { formatPriceSourceLabel } from '@/lib/price-source'
 import { cn } from '@/lib/utils'
 import type { PriceValueType } from '@/lib/types'
@@ -145,10 +145,13 @@ export default function PropertyCard({
       <div className="p-4">
         <Link href={href} className="block rounded-sm focus-visible:outline-none">
           <h3 className="text-lg font-bold tracking-[-0.03em] text-slate-950">
-            {price ? formatPrice(price) : '가격 미정'}
-            {monthly_rent ? (
+            {/* 빈 값 표기는 formatPrice 가 PRICE_UNKNOWN_TEXT 한 종으로 통일해 돌려준다 */}
+            {formatPrice(price)}
+            {isPriceEntered(monthly_rent) ? (
               <span className="ml-1.5 text-sm font-medium text-slate-600">
-                / 월 {monthly_rent.toLocaleString()}만
+                {/* monthly_rent 는 원 단위다. 이전에는 원 값에 만원 접미를 그대로 붙여
+                    1,500,000원이 백오십만배로 표시되는 단위 버그가 있었다. */}
+                / 월 {formatPrice(monthly_rent)}
               </span>
             ) : null}
           </h3>

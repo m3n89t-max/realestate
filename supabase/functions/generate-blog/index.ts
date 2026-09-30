@@ -5,7 +5,13 @@ import { countTokens } from '../_shared/openai.ts'
 import { callGemini } from '../_shared/gemini.ts'
 import { maskPersonalInfo } from '../_shared/masking.ts'
 import { buildBlogSystemPrompt, buildBlogUserPrompt, type BlogPromptContext } from '../_shared/seo-prompt.ts'
-import { assertRenderablePriceSource, formatPriceSourceLabel } from '../_shared/price-source.ts'
+import {
+  PRICE_UNKNOWN_TEXT,
+  assertRenderablePriceSource,
+  formatKeyMoney,
+  formatPriceOrUnknown,
+  formatPriceSourceLabel,
+} from '../_shared/price-source.ts'
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -132,12 +138,10 @@ Deno.serve(async (req) => {
       .from('organizations').select('name, phone, address, business_number').eq('id', orgId).single()
 
     // 매물 정보표 HTML (블로그 "## 매물 개요" 섹션에 삽입)
-    const fmt = (won?: number) => {
-      if (!won) return '-'
-      const e = Math.floor(won / 100000000), m = Math.floor((won % 100000000) / 10000)
-      return e > 0 && m > 0 ? `${e}억 ${m}만원` : e > 0 ? `${e}억원` : `${m}만원`
-    }
-    const fmtArea = (sqm?: number) => sqm ? `${sqm}㎡(${(sqm * 0.3025).toFixed(0)}평)` : '-'
+    // 금액 포맷터는 _shared/price-source.ts 한 곳만 쓴다.
+    // 미입력은 '미입력', 실제 0 만 '0원'. 권리금 미입력은 '무권리'로 단정하지 않는다.
+    const fmt = formatPriceOrUnknown
+    const fmtArea = (sqm?: number) => sqm ? `${sqm}㎡(${(sqm * 0.3025).toFixed(0)}평)` : PRICE_UNKNOWN_TEXT
     const txMap: Record<string, string> = { sale: '매매', lease: '전세', rent: '임대' }
     const txType = txMap[project.transaction_type ?? 'sale'] ?? '매매'
     const priceLabel = project.transaction_type === 'rent' ? '보증금/임대료' : project.transaction_type === 'lease' ? '전세보증금' : '매매가'
@@ -146,7 +150,7 @@ Deno.serve(async (req) => {
       : project.transaction_type === 'lease' ? fmt(project.deposit) : fmt(project.price)
     const agRow = org ? `<tr><td colspan="6" style="border:1px solid #bbb;padding:8px 12px;background:#f5f5f5;font-size:12px;color:#444;line-height:1.8;">${org.name ? `■ 상호: ${org.name}&nbsp;&nbsp;` : ''}${org.business_number ? `■ 중개등록번호: ${org.business_number}&nbsp;&nbsp;` : ''}${org.address ? `■ 주소: ${org.address}&nbsp;&nbsp;` : ''}${org.phone ? `■ 전화번호: ${org.phone}` : ''}</td></tr>` : ''
     const s = 'border:1px solid #bbb;padding:6px 10px;', h = s + 'background:#dbeafe;font-weight:bold;'
-    const propertyTableHtml = `<table style="width:100%;border-collapse:collapse;font-size:13px;margin:16px 0;"><tbody><tr><td style="${h}">소재지</td><td style="${s}" colspan="3">${maskPersonalInfo(project.address)}</td><td style="${h}">중개대상물 종류</td><td style="${s}">${project.property_category || '-'}</td></tr><tr><td style="${h}">주용도</td><td style="${s}">${project.main_use || '-'}</td><td style="${h}">해당층/총층</td><td style="${s}">${project.floor != null || project.total_floors != null ? `${project.floor ?? '-'}층/${project.total_floors ?? '-'}층` : '-'}</td><td style="${h}">거래형태</td><td style="${s}">${txType}</td></tr><tr><td style="${h}">대지면적</td><td style="${s}">${fmtArea(project.land_area)}</td><td style="${h}">사용승인일</td><td style="${s}">${project.approval_date || '-'}</td><td style="${h}">연면적</td><td style="${s}">${fmtArea(project.total_area)}</td></tr><tr><td style="${h}">전용면적</td><td style="${s}">${fmtArea(project.area)}</td><td style="${h}">방/화장실</td><td style="${s}">${project.rooms_count != null || project.bathrooms_count != null ? `${project.rooms_count ?? '-'}/${project.bathrooms_count ?? '-'}` : '-'}</td><td style="${h}">주차</td><td style="${s}">${project.parking_legal != null || project.parking_actual != null ? `대장:${project.parking_legal ?? '-'}대/실:${project.parking_actual ?? '-'}대` : '-'}</td></tr><tr><td style="${h}">${priceLabel}</td><td style="${s}color:#dc2626;font-weight:bold;">${priceVal}</td><td style="${h}">가격 출처</td><td style="${s}" colspan="3">${priceSourceLabel}</td></tr><tr><td style="${h}">입주가능일</td><td style="${s}">${project.move_in_date || '협의'}</td><td style="${h}">방향</td><td style="${s}">${project.direction || '-'}</td><td style="${h}">권리금</td><td style="${s}">${project.key_money ? fmt(project.key_money) : '무권리'}</td></tr><tr><td style="${h}">관리비</td><td style="${s}" colspan="5">${project.management_fee_detail || '-'}</td></tr>${agRow}</tbody></table>`
+    const propertyTableHtml = `<table style="width:100%;border-collapse:collapse;font-size:13px;margin:16px 0;"><tbody><tr><td style="${h}">소재지</td><td style="${s}" colspan="3">${maskPersonalInfo(project.address)}</td><td style="${h}">중개대상물 종류</td><td style="${s}">${project.property_category || '-'}</td></tr><tr><td style="${h}">주용도</td><td style="${s}">${project.main_use || '-'}</td><td style="${h}">해당층/총층</td><td style="${s}">${project.floor != null || project.total_floors != null ? `${project.floor ?? '-'}층/${project.total_floors ?? '-'}층` : '-'}</td><td style="${h}">거래형태</td><td style="${s}">${txType}</td></tr><tr><td style="${h}">대지면적</td><td style="${s}">${fmtArea(project.land_area)}</td><td style="${h}">사용승인일</td><td style="${s}">${project.approval_date || '-'}</td><td style="${h}">연면적</td><td style="${s}">${fmtArea(project.total_area)}</td></tr><tr><td style="${h}">전용면적</td><td style="${s}">${fmtArea(project.area)}</td><td style="${h}">방/화장실</td><td style="${s}">${project.rooms_count != null || project.bathrooms_count != null ? `${project.rooms_count ?? '-'}/${project.bathrooms_count ?? '-'}` : '-'}</td><td style="${h}">주차</td><td style="${s}">${project.parking_legal != null || project.parking_actual != null ? `대장:${project.parking_legal ?? '-'}대/실:${project.parking_actual ?? '-'}대` : '-'}</td></tr><tr><td style="${h}">${priceLabel}</td><td style="${s}color:#dc2626;font-weight:bold;">${priceVal}</td><td style="${h}">가격 출처</td><td style="${s}" colspan="3">${priceSourceLabel}</td></tr><tr><td style="${h}">입주가능일</td><td style="${s}">${project.move_in_date || '협의'}</td><td style="${h}">방향</td><td style="${s}">${project.direction || '-'}</td><td style="${h}">권리금</td><td style="${s}">${formatKeyMoney(project.key_money)}</td></tr><tr><td style="${h}">관리비</td><td style="${s}" colspan="5">${project.management_fee_detail || '-'}</td></tr>${agRow}</tbody></table>`
 
     // 프롬프트 컨텍스트 구성 (개인정보 마스킹)
     const ctx: BlogPromptContext = {

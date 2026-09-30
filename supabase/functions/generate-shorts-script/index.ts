@@ -6,8 +6,11 @@ import { maskPersonalInfo } from '../_shared/masking.ts'
 import { ok, err } from '../_shared/response.ts'
 import { buildShortsSystemPrompt } from '../_shared/shorts-prompt.ts'
 import {
+  PRICE_UNKNOWN_PROMPT_RULE,
   assertRenderablePriceSource,
   buildPriceSourcePromptBlock,
+  formatKeyMoney,
+  formatPriceOrUnknown,
   formatPriceSourceLabel,
 } from '../_shared/price-source.ts'
 
@@ -51,9 +54,26 @@ Deno.serve(async (req) => {
     ])
 
     const maskedAddress = maskPersonalInfo(project.address ?? '')
-    const priceText = project.price
-      ? `${Math.floor(project.price / 100000000)}억${Math.floor((project.price % 100000000) / 10000) > 0 ? ` ${Math.floor((project.price % 100000000) / 10000)}만원` : '원'}`
-      : '가격 협의'
+    // 이전에는 project.price 만 읽어서 전세·월세 매물의 금액이 프롬프트에
+    // 전혀 들어가지 않았고, 모델이 추측 표기로 채웠다.
+    // 거래유형에 맞는 금액(보증금·월세·권리금)을 모두 넘기고,
+    // 미입력은 PRICE_UNKNOWN_TEXT 로 넘겨 모델이 금액을 지어내지 못하게 한다.
+    const txType: string = project.transaction_type ?? 'sale'
+    const priceLines: string[] = []
+    if (txType === 'rent') {
+      priceLines.push(`거래 유형: 월세`)
+      priceLines.push(`보증금: ${formatPriceOrUnknown(project.deposit)}`)
+      priceLines.push(`월세: ${formatPriceOrUnknown(project.monthly_rent)}`)
+    } else if (txType === 'lease') {
+      priceLines.push(`거래 유형: 전세`)
+      priceLines.push(`전세 보증금: ${formatPriceOrUnknown(project.deposit)}`)
+    } else {
+      priceLines.push(`거래 유형: 매매`)
+      priceLines.push(`매매가: ${formatPriceOrUnknown(project.price)}`)
+    }
+    // 권리금은 미입력과 '무권리'(실제 0원)를 구분해 넘긴다.
+    priceLines.push(`권리금: ${formatKeyMoney(project.key_money)}`)
+    const priceText = priceLines.join('\n')
 
     const locationInfo = location
       ? `\n입지 장점: ${(location.advantages ?? []).join(', ')}\n입지 요약: ${location.analysis_text ?? ''}`
@@ -71,8 +91,9 @@ Deno.serve(async (req) => {
 
 주소: ${maskedAddress}
 매물 유형: ${project.property_type ?? '아파트'}
-가격: ${priceText}
+${priceText}
 가격 출처 (나레이션·자막에서 금액을 말할 때 반드시 함께 표기): ${priceSourceLabel}
+${PRICE_UNKNOWN_PROMPT_RULE}
 면적: ${project.area ? `${project.area}㎡` : ''}
 층수: ${project.floor ? `${project.floor}층` : ''}
 방향: ${project.direction ?? ''}

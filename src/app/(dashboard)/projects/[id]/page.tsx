@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import StatusBadge from '@/components/ui/StatusBadge'
 import { formatPrice, formatArea, getPropertyTypeLabel } from '@/lib/utils'
+import { PRICE_UNKNOWN_TEXT, formatKeyMoney } from '@/lib/price-source'
 import BlogTab from './components/BlogTab'
 import CardNewsTab from './components/CardNewsTab'
 import DocsTab from './components/DocsTab'
@@ -103,15 +104,17 @@ export default async function ProjectDetailPage({
             </div>
             <h1 className="text-xl font-bold text-gray-900 leading-tight">{project.address}</h1>
             <div className="flex items-center gap-3 mt-1.5 text-sm text-gray-500">
-              {project.transaction_type === 'rent' && (project.deposit || project.monthly_rent) && (
+{/* 금액이 비어도 줄이 조용히 사라지지 않게 한다 — 중개사가 미입력 사실을 알아야 한다.
+                  빈 값 표기는 '미입력' 한 종으로 통일(formatPrice 가 처리). */}
+              {project.transaction_type === 'rent' && (
                 <span className="font-medium text-gray-800">
-                  {project.deposit ? formatPrice(project.deposit) : '-'} / {project.monthly_rent ? formatPrice(project.monthly_rent) : '-'}
+                  {formatPrice(project.deposit)} / {formatPrice(project.monthly_rent)}
                 </span>
               )}
-              {project.transaction_type === 'lease' && project.deposit && (
+              {project.transaction_type === 'lease' && (
                 <span className="font-medium text-gray-800">{formatPrice(project.deposit)}</span>
               )}
-              {(!project.transaction_type || project.transaction_type === 'sale') && project.price && (
+              {(!project.transaction_type || project.transaction_type === 'sale') && (
                 <span className="font-medium text-gray-800">{formatPrice(project.price)}</span>
               )}
               {project.area && <span>{formatArea(project.area)}</span>}
@@ -181,17 +184,17 @@ export default async function ProjectDetailPage({
                     {
                       label: project.transaction_type === 'rent' ? '보증금/월세'
                         : project.transaction_type === 'lease' ? '전세보증금' : '매매가',
+                      // 빈 값 표기는 '—' 가 아니라 '미입력' 한 종으로 통일한다.
                       value: project.transaction_type === 'rent'
-                        ? (project.deposit || project.monthly_rent
-                          ? `${project.deposit ? formatPrice(project.deposit) : '-'} / ${project.monthly_rent ? formatPrice(project.monthly_rent) : '-'}`
-                          : '—')
+                        ? `${formatPrice(project.deposit)} / ${formatPrice(project.monthly_rent)}`
                         : project.transaction_type === 'lease'
-                        ? (project.deposit ? formatPrice(project.deposit) : '—')
-                        : (project.price ? formatPrice(project.price) : '—')
+                        ? formatPrice(project.deposit)
+                        : formatPrice(project.price)
                     },
-                    { label: '전용면적', value: project.area ? formatArea(project.area) : '—' },
-                    { label: '층수', value: project.floor ? `${project.floor}층 / ${project.total_floors}층` : '—' },
-                    { label: '방향', value: project.direction ?? '—' },
+                    { label: '권리금', value: formatKeyMoney(project.key_money) },
+                    { label: '전용면적', value: project.area ? formatArea(project.area) : PRICE_UNKNOWN_TEXT },
+                    { label: '층수', value: project.floor ? `${project.floor}층 / ${project.total_floors}층` : PRICE_UNKNOWN_TEXT },
+                    { label: '방향', value: project.direction ?? PRICE_UNKNOWN_TEXT },
                   ].map(item => (
                     <div key={item.label}>
                       <p className="text-gray-400 text-xs mb-0.5">{item.label}</p>

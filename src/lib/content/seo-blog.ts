@@ -1,6 +1,6 @@
 import { Project, GenerateBlogRequest, GenerateBlogResponse, LocationAnalysis, Document } from '../types';
 import { calculateSeoScore } from './seo-scorer';
-import { assertRenderablePriceSource, formatPriceSourceLabel } from '../price-source';
+import { assertRenderablePriceSource, formatKeyMoney, formatPriceOrUnknown, formatPriceSourceLabel } from '../price-source';
 
 export async function generateSeoBlog(
     project: Project,
@@ -26,9 +26,10 @@ export async function generateSeoBlog(
 
 ## 1. 매물 개요
 ${project.address}에 위치한 ${project.property_type}입니다. 
-가격: ${project.price || '상담 환영'} 
+가격: ${formatPriceOrUnknown(project.price)}
+권리금: ${formatKeyMoney(project.key_money)}
 가격 출처: ${priceSource}
-면적: ${project.area || '미정'}
+면적: ${project.area ? `${project.area}㎡` : '미입력'}
 
 ※ 위 금액은 이 매물 1건의 가격입니다. 지역 전체 시세가 아닙니다.
 
