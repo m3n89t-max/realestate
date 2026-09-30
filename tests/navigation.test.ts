@@ -35,3 +35,7 @@ test('상세 경로에서도 초보자가 이해할 수 있는 상단 문맥을 
   assert.deepEqual(getPageMeta('/tasks'), { eyebrow: '처리 알림', title: '처리 상태와 문제 해결' })
   assert.deepEqual(getPageMeta('/help'), { eyebrow: '도움말', title: '처음 사용하는 분을 위한 안내' })
 })
+
+test('알 수 없는 경로에서도 집포터 브랜드 문맥을 유지한다', () => {
+  assert.deepEqual(getPageMeta('/unknown'), { eyebrow: '집포터', title: '업무 공간' })
+})

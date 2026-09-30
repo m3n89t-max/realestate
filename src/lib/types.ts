@@ -180,6 +180,20 @@ export interface Project {
   population_data?: PopulationData | null
   tourism_data?: any | null
   card_data?: any | null
+  /** 무료 공공 데이터 레이어 수집 결과. 레이어별 status와 provenance를 포함한다. */
+  public_data_layers?: {
+    collected_at?: string | null
+    region_address?: string | null
+    seoul_nearest_place?: { area_nm: string; area_cd: string | null; distance_m: number } | null
+    /** 구조는 src/lib/public-data-layers.ts 의 PublicDataLayerResult 와 같다. 순환 import를 피하려고 여기서 구조로 선언한다. */
+    results?: Array<{
+      layerId: string
+      status: string
+      value: unknown
+      collectedAt: string | null
+      sourceAsOf: string | null
+    }> | null
+  } | null
   created_at: string
   updated_at: string
 }
@@ -244,6 +258,14 @@ export interface PopulationData {
   single_households: number
   avg_members: number
   avg_age: number
+  adm_nm?: string
+  adm_cd?: string
+  adm_level?: string
+  source_year?: string
+  radius_500m_estimated?: number | null
+  estimation_method?: string | null
+  barrier_status?: 'available' | 'failed' | 'not_collected'
+  barrier_names?: string[]
   collected_at: string
 }
 

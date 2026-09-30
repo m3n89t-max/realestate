@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowRight, Building2, Eye, EyeOff, Lock, Loader2, Mail } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { BRAND } from '@/lib/brand'
 import { createClient } from '@/lib/supabase/client'
 import { normalizeSignupName } from '@/lib/auth'
 
@@ -31,8 +32,14 @@ export default function LoginPage() {
   const [cooldown, setCooldown] = useState(0)
 
   useEffect(() => {
-    const error = new URLSearchParams(window.location.search).get('error')
-    if (error) { toast.error('인증 링크를 확인할 수 없습니다. 새 인증 메일을 보내 주세요.'); window.history.replaceState({}, '', '/login') }
+    const searchParams = new URLSearchParams(window.location.search)
+    const error = searchParams.get('error')
+    if (error) {
+      toast.error('인증 링크를 확인할 수 없습니다. 새 인증 메일을 보내 주세요.')
+      window.history.replaceState({}, '', '/login')
+      return
+    }
+    if (searchParams.get('mode') === 'signup') setMode('signup')
   }, [])
   useEffect(() => {
     if (!cooldown) return
@@ -78,7 +85,7 @@ export default function LoginPage() {
   if (mode === 'confirmation') return <main className="grid min-h-screen place-items-center bg-[#faf9f5] p-4"><section className="w-full max-w-md rounded-2xl bg-white p-7 shadow-sm"><Building2 className="text-brand-700" /><h1 className="mt-5 text-2xl font-bold text-slate-950">이메일을 확인해 주세요</h1><p className="mt-3 text-sm leading-6 text-slate-600"><strong className="block text-slate-900">{confirmedEmail}</strong>입력한 이메일을 사용할 수 있는 경우 인증 안내를 보냈습니다. 받은편지함에 없으면 스팸함도 확인해 주세요.</p>{confirmationKind === 'signup' ? <><button type="button" disabled={loading || cooldown > 0} onClick={resend} className="btn-primary mt-6 w-full">{loading ? <Loader2 className="animate-spin" size={17} /> : null}{cooldown ? `${cooldown}초 후 다시 보내기` : '인증 메일 다시 보내기'}</button><button type="button" disabled={loading} onClick={() => setMode('signup')} className="mt-3 min-h-11 w-full text-sm font-semibold text-brand-700 disabled:opacity-50">이메일 다시 입력</button></> : null}<div className="mt-4 flex gap-4 text-sm font-semibold text-brand-700"><button type="button" disabled={loading} onClick={() => setMode('login')}>로그인</button><button type="button" disabled={loading} onClick={() => setMode('forgot')}>비밀번호 재설정</button></div></section></main>
 
   const heading = mode === 'signup' ? '계정 만들기' : mode === 'forgot' ? '비밀번호 재설정' : '로그인'
-  return <main className="grid min-h-screen place-items-center bg-[#faf9f5] p-4"><section className="w-full max-w-md rounded-2xl bg-white p-7 shadow-sm"><div className="flex items-center gap-2 text-slate-950"><span className="grid size-9 place-items-center rounded-lg bg-brand-700 text-white"><Building2 size={18} /></span><span className="font-bold">부동산 업무 도우미</span></div><h1 className="mt-8 text-3xl font-bold tracking-[-.04em] text-slate-950">{heading}</h1><p className="mt-2 text-sm text-slate-600">{mode === 'forgot' ? '입력한 이메일로 재설정 안내를 보내 드립니다.' : '매물 정보를 쉽게 관리해 보세요.'}</p>
+  return <main className="grid min-h-screen place-items-center bg-[#faf9f5] p-4"><section className="w-full max-w-md rounded-2xl bg-white p-7 shadow-sm"><div className="flex items-center gap-2 text-slate-950"><span className="grid size-9 place-items-center rounded-lg bg-brand-700 text-white"><Building2 size={18} /></span><span className="font-bold">{BRAND.name}</span></div><h1 className="mt-8 text-3xl font-bold tracking-[-.04em] text-slate-950">{heading}</h1><p className="mt-2 text-sm text-slate-600">{mode === 'forgot' ? '입력한 이메일로 재설정 안내를 보내 드립니다.' : BRAND.tagline}</p>
     <form onSubmit={handleSubmit} className="mt-7 space-y-5">
       {mode === 'signup' && <Field label="이름" htmlFor="fullName"><input id="fullName" value={fullName} onChange={e => setFullName(e.target.value)} autoComplete="name" className="input" placeholder="이름을 입력해 주세요" required /></Field>}
       <Field label="이메일" htmlFor="email"><span className="relative block"><Mail size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" className="input pl-10" placeholder="name@example.com" required /></span></Field>
