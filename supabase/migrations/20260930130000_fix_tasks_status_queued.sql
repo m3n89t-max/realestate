@@ -22,25 +22,31 @@
 -- 보안 마이그레이션과 데이터 UPDATE 를 한 파일에서 처리하면 실패 시 원인
 -- 추적이 어려워 이 전용 파일로 분리했다.
 --
--- 멱등성: 세 구문 모두 반복 실행해도 안전하다.
---   UPDATE 는 대상이 없으면 0행, DROP CONSTRAINT 는 IF EXISTS,
+-- 멱등성: 네 구문 모두 반복 실행해도 안전하다.
+--   DROP CONSTRAINT 는 IF EXISTS, UPDATE 는 대상이 없으면 0행,
 --   ADD CONSTRAINT 는 직전 DROP 으로 항상 새로 만든다.
+--
+-- 실행 순서가 중요하다: 구 제약이 'queued' 를 거부하므로 제약을 먼저
+-- 제거해야 UPDATE 가 통과한다. (제약을 남긴 채 UPDATE 하면 23514 로 실패)
 -- ============================================================
 
--- 1) 남아 있는 대기 작업을 새 상태값으로 옮긴다 (현재 운영 2건)
+-- 1) 구 제약을 먼저 제거한다. 이것이 없으면 아래 UPDATE 가 'queued' 를
+--    쓰는 순간 CHECK 위반(23514)으로 전체가 롤백된다.
+ALTER TABLE public.tasks DROP CONSTRAINT IF EXISTS tasks_status_check;
+
+-- 2) 남아 있는 대기 작업을 새 상태값으로 옮긴다 (현재 운영 2건)
 UPDATE public.tasks SET status = 'queued' WHERE status = 'pending';
 
--- 2) 기본값을 코드와 맞춘다
+-- 3) 기본값을 코드와 맞춘다
 ALTER TABLE public.tasks ALTER COLUMN status SET DEFAULT 'queued';
 
--- 3) 제약을 교체한다. 'pending' 은 더 이상 허용하지 않는다.
---    (1번을 먼저 실행했으므로 기존 행이 제약을 위반하지 않는다)
-ALTER TABLE public.tasks DROP CONSTRAINT IF EXISTS tasks_status_check;
+-- 4) 새 제약을 건다. 'pending' 은 더 이상 허용하지 않는다.
+--    (2번을 먼저 실행했으므로 기존 행이 제약을 위반하지 않는다)
 ALTER TABLE public.tasks ADD CONSTRAINT tasks_status_check CHECK (
   status IN ('queued', 'running', 'success', 'failed', 'retrying', 'cancelled')
 );
 
--- 4) 007 이 만들려 했던 대기 작업 조회용 부분 인덱스도 함께 복구한다.
+-- 5) 007 이 만들려 했던 대기 작업 조회용 부분 인덱스도 함께 복구한다.
 --    운영 tasks 에는 현재 tasks_pkey 외 인덱스가 없다.
 DROP INDEX IF EXISTS public.idx_tasks_pending_scheduled;
 CREATE INDEX IF NOT EXISTS idx_tasks_queued_scheduled

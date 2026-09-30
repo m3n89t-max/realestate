@@ -1,34 +1,39 @@
--- 입지 분석 자동화를 위한 DB Webhook 설정
--- tasks 테이블에 location_analyze 타입의 작업이 삽입되면 analyze-location 에지 함수를 호출합니다.
+-- ============================================================
+-- 010_location_analyze_webhook.sql — 적용 보류 (2026-09-30)
+-- ============================================================
+--
+-- 이 마이그레이션은 히스토리상 applied 로 기록돼 있으나 운영 DB에는
+-- 반영되지 않았다. 2026-09-30 검토 결과 "반영하지 않는 것이 옳다"고 판단해
+-- 본문 전체를 비활성화했다. 근거는 다음 세 가지다.
+--
+-- 1) 앱이 이미 에지 함수를 직접 호출한다.
+--      src/app/(dashboard)/projects/new/page.tsx:201
+--        supabase.functions.invoke('analyze-location', { body: { project_id } })
+--      src/app/(dashboard)/projects/[id]/components/AnalysisTab.tsx:110, :618
+--    즉 DB 트리거를 통한 자동 호출 경로는 현재 설계에 필요하지 않다.
+--
+-- 2) 적용하면 큐가 다시 죽는다.
+--    트리거 본문이 current_setting('app.settings.supabase_url') 과
+--    current_setting('app.settings.service_role_key') 를 읽는데, 운영 DB에는
+--    두 설정값이 존재하지 않는다(2026-09-30 실측: 둘 다 NULL).
+--    세 번째 인자 없는 current_setting 은 미설정 시 예외를 던지므로,
+--    location_analyze 작업을 INSERT 하는 순간 트리거가 실패하고
+--    INSERT 자체가 롤백된다. 방금 복구한 작업 큐가 다시 막힌다.
+--
+-- 3) http 확장도 미설치다(installed_version = null). extensions.http_post 를
+--    쓰려면 확장 설치까지 필요하며, 이는 1)에 따라 불필요한 의존성이다.
+--
+-- 다시 켜야 한다면 순서가 있다:
+--   (a) http 또는 pg_net 확장 설치
+--   (b) ALTER DATABASE ... SET app.settings.supabase_url / service_role_key 설정
+--       — service_role_key 를 DB 설정에 넣는 것은 비밀정보 노출 경로가 되므로
+--         보안 검토가 먼저 필요하다. Supabase Vault 사용을 검토할 것.
+--   (c) current_setting(..., true) + NULL 가드로 바꿔 미설정 시에도
+--       INSERT 가 실패하지 않게 할 것
+--   (d) 앱의 직접 호출과 중복 실행되지 않도록 조정
+--
+-- 원본 내용은 git 이력에 남아 있다.
+-- ============================================================
 
--- 1. WebHook 호출을 위한 HTTP 확장이 활성화되어 있는지 확인 (일반적으로 Supabase 기본 활성)
-CREATE EXTENSION IF NOT EXISTS http WITH SCHEMA extensions;
-
--- 2. 트리거 함수 생성
-CREATE OR REPLACE FUNCTION public.trg_on_location_analyze_task()
-RETURNS TRIGGER AS $$
-BEGIN
-  -- location_analyze 유형의 작업이 'pending' 상태로 들어올 때만 실행
-  IF NEW.type = 'location_analyze' AND NEW.status = 'queued' THEN
-    PERFORM
-      extensions.http_post(
-        url := current_setting('app.settings.supabase_url') || '/functions/v1/analyze-location',
-        headers := jsonb_build_object(
-          'Content-Type', 'application/json',
-          'Authorization', 'Bearer ' || current_setting('app.settings.service_role_key')
-        ),
-        body := jsonb_build_object(
-          'record', row_to_json(NEW)
-        )::text
-      );
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- 3. 트리거 적용
-DROP TRIGGER IF EXISTS trg_location_analyze_webhook ON public.tasks;
-CREATE TRIGGER trg_location_analyze_webhook
-AFTER INSERT ON public.tasks
-FOR EACH ROW
-EXECUTE FUNCTION public.trg_on_location_analyze_task();
+-- 의도적으로 실행 구문 없음.
+SELECT 1 WHERE false;

@@ -128,10 +128,12 @@ WITH CHECK (
 );
 
 -- 004 시드가 이미 적용된 환경에서도 공개된 개발 키만 즉시 폐기합니다.
+-- (2026-09-30 수정: 원본은 updated_at = now() 도 설정했으나 agent_connections 에는
+--  updated_at 컬럼이 존재한 적이 없다 — 001_initial_schema.sql:290-300 은 last_seen_at /
+--  created_at 만 정의한다. 운영 실측에서도 없어 42703 으로 실패했다. 해당 대입을 제거한다.)
 UPDATE public.agent_connections
 SET agent_key = 'revoked_' || encode(extensions.gen_random_bytes(32), 'hex'),
-    status = 'offline',
-    updated_at = now()
+    status = 'offline'
 WHERE id = 'c0000000-0000-0000-0000-000000000001'
   AND encode(extensions.digest(agent_key, 'sha256'), 'hex') = 'f85a8a02f6768e2211c9b7c1b9944b115b6fc05901be6f0b660ebfc65c29a7b6';
 
@@ -173,8 +175,9 @@ BEGIN
 
   new_key := 'rak_' || encode(extensions.gen_random_bytes(32), 'hex');
 
+  -- (2026-09-30 수정: agent_connections 에 updated_at 컬럼이 없다. 위 주석 참고.)
   UPDATE public.agent_connections
-  SET agent_key = new_key, updated_at = now()
+  SET agent_key = new_key
   WHERE org_id = p_org_id;
 
   IF NOT FOUND THEN
