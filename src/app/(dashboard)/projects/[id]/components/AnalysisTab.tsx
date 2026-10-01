@@ -15,8 +15,9 @@ import KakaoMap from '@/components/KakaoMap'
 import { AI_TREND_NOTICE, AI_TREND_TITLE } from '@/lib/price-source'
 import PublicDataLayerPanel from '@/components/PublicDataLayerPanel'
 import {
+  canRenderPopulationStats,
   describeBarrierStatus,
-  getPopulationEstimate,
+  evaluatePopulationDisplay,
   hasDisplayableMetric,
 } from '@/lib/location-data-truthfulness'
 
@@ -709,35 +710,57 @@ function MapSection({
       {/* 지도 분석 가이드 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 text-[11px]">
 
-        {/* ① 거주인구 참고값 */}
+        {/* ① 거주인구 참고값 — 표시 여부는 게이트가 정한다 */}
         <div className="bg-white border border-blue-100 rounded-xl p-3 shadow-sm">
           <p className="font-bold text-blue-700 mb-2 flex items-center gap-1">
             <span className="w-3 h-3 rounded-full border-2 border-dashed inline-block flex-shrink-0" style={{borderColor:'#ef4444'}} />
             주변 거주인구 참고값
           </p>
-          <div className="bg-blue-50 rounded-lg px-2.5 py-2 text-[10px] leading-relaxed text-blue-800 mb-2">
-            행정구역의 평균 인구밀도를 매물 주변 500m 원에 단순 환산한 추정값이에요. 실제 보행권 인구와는 다를 수 있어요.
-          </div>
-          {/* 실제 값 표시 */}
-          {population_data?.radius_500m_estimated != null && (() => {
-            const estimate = getPopulationEstimate(population_data)
-            if (!estimate) return null
+          {(() => {
+            const popState = evaluatePopulationDisplay(population_data)
             return (
-              <div className="text-[10px] text-gray-600 space-y-0.5">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">거주인구 추정</span>
-                  <span className="font-bold text-blue-700">약 {estimate.value.toLocaleString()}명</span>
+              <>
+                {/* 신뢰도 등급 + 평문 한 문장 먼저 */}
+                <div
+                  className={`rounded-lg px-2.5 py-2 text-[10px] leading-relaxed mb-2 ${
+                    popState.status === 'available'
+                      ? 'bg-blue-50 text-blue-800'
+                      : popState.status === 'failed'
+                        ? 'bg-red-50 border border-red-200 text-red-600'
+                        : 'bg-gray-50 text-gray-600'
+                  }`}
+                >
+                  <p className="font-semibold mb-0.5">
+                    {popState.status === 'available' ? '참고값 (추정)' : '값 없음'}
+                  </p>
+                  <p>{popState.message}</p>
                 </div>
-                <div className="text-[9px] text-gray-400">{estimate.sourceLabel}</div>
-              </div>
+
+                {/* 값은 게이트를 통과했을 때만 */}
+                {popState.estimate && (
+                  <div className="text-[10px] text-gray-600 space-y-0.5">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">거주인구 추정</span>
+                      <span className="font-bold text-blue-700">약 {popState.estimate.value.toLocaleString()}명</span>
+                    </div>
+                    <div className="text-[9px] text-gray-400">{popState.estimate.sourceLabel}</div>
+                    <details className="mt-1">
+                      <summary className="text-[9px] text-gray-400 cursor-pointer">산정 기준 보기</summary>
+                      <p className="text-[9px] text-gray-500 mt-1 leading-relaxed">
+                        {popState.estimate.methodLabel}
+                        <br />
+                        출처: 통계청 SGIS 행정구역 통계. 보행 장벽은 참고정보로만 쓰고 인구 숫자에서 차감하지 않습니다.
+                      </p>
+                    </details>
+                  </div>
+                )}
+
+                {popState.needsRecollection && (
+                  <p className="text-[9px] text-gray-500 mt-1.5">위의 분석 버튼으로 다시 수집할 수 있어요.</p>
+                )}
+              </>
             )
           })()}
-          <div className="flex gap-1.5 mt-2 pt-1.5 border-t border-gray-100">
-            <span className="flex items-center gap-0.5 text-[9px] text-gray-400"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#ef4444'}} />고밀</span>
-            <span className="flex items-center gap-0.5 text-[9px] text-gray-400"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#f97316'}} />중밀</span>
-            <span className="flex items-center gap-0.5 text-[9px] text-gray-400"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#22c55e'}} />저밀</span>
-            <span className="text-[9px] text-gray-500 ml-auto">SGIS 행정구역 통계</span>
-          </div>
         </div>
 
         {/* ② 보행 장벽 참고정보 */}
@@ -749,11 +772,15 @@ function MapSection({
             도로나 하천은 이동에 영향을 줄 수 있어요. 현재는 인구 숫자에서 임의로 차감하지 않고, 확인된 항목만 참고정보로 보여드려요.
           </div>
           {/* 실제 감지된 장벽 표시 */}
-          {describeBarrierStatus(population_data) && (
-            <div className="text-[9px] bg-orange-50 rounded px-2 py-1 text-orange-700">
-              {describeBarrierStatus(population_data)}
-            </div>
-          )}
+          {(() => {
+            const barrierMessage = describeBarrierStatus(population_data)
+            if (!barrierMessage) return null
+            return (
+              <div className="text-[9px] bg-orange-50 rounded px-2 py-1 text-orange-700">
+                {barrierMessage}
+              </div>
+            )
+          })()}
           <p className="text-[9px] text-gray-500 mt-1.5 text-right">OpenStreetMap 기반</p>
         </div>
 
@@ -786,12 +813,12 @@ function MapSection({
         </div>
       </div>
 
-      {/* 인구·주택·사업체 통계 요약 (SGIS) */}
-      {population_data && (
+      {/* 인구·주택·사업체 통계 요약 (SGIS) — 기준연도 없는 숫자는 렌더하지 않는다 */}
+      {canRenderPopulationStats(population_data) && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mt-3">
           {/* 인구 통계 */}
           <div className="bg-white border border-blue-100 rounded-xl p-3 shadow-sm text-[11px]">
-            <p className="font-bold text-blue-700 mb-2">인구 통계 <span className="text-[9px] font-normal text-gray-400">({population_data.adm_nm ?? ''} · {population_data.adm_level ?? 'SGIS'})</span></p>
+            <p className="font-bold text-blue-700 mb-2">인구 통계 <span className="text-[9px] font-normal text-gray-400">({population_data.adm_nm ?? ''} · {population_data.adm_level ?? ''} · {population_data.source_year}년)</span></p>
             <div className="space-y-1">
               {population_data.total_population > 0 && (
                 <div className="flex justify-between">

@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from 'react'
 import type { POIItem, KakaoDensity } from '@/lib/types'
 import {
   buildFacilityHeatPoints,
+  canRenderPopulationStats,
   describeBarrierStatus,
-  getPopulationEstimate,
+  evaluatePopulationDisplay,
   hasDisplayableMetric,
 } from '@/lib/location-data-truthfulness'
 import type { PublicDataLayerResult } from '@/lib/public-data-layers'
@@ -172,13 +173,17 @@ export default function KakaoMap({
     if (popCircleRef.current) { popCircleRef.current.setMap(null); popCircleRef.current = null }
     if (popLabelRef.current)  { popLabelRef.current.setMap(null);  popLabelRef.current  = null }
 
-    if (!populationData?.total_population || !populationData?.density || populationData.density <= 0) return
+    // 표시 가능 여부는 게이트 한 곳에서만 판단한다.
+    // 여기서 density/total_population 조건을 다시 쓰면 레거시 행이 지도로 흘러든다.
+    const popState = evaluatePopulationDisplay(populationData)
+    if (popState.status !== 'available' || !popState.estimate) return
+    if (!canRenderPopulationStats(populationData)) return
 
     const center = new window.kakao.maps.LatLng(lat, lng)
-    // 배후인구 반경: 500m 고정 (업종밀집도와 같은 분석범위)
+    // 거주인구 참고값 반경: 500m 고정 (업종밀집도와 같은 분석범위)
     const popRadius = 500
 
-    const density = populationData.density
+    const density = populationData.density as number
     const color = density > 5000 ? '#ef4444' : density > 1000 ? '#f97316' : '#22c55e'
 
     const circle = new window.kakao.maps.Circle({
@@ -195,11 +200,9 @@ export default function KakaoMap({
     circle.setMap(map)
     popCircleRef.current = circle
 
-    // 행정구역 평균 인구밀도로 단순 환산한 거주인구 추정값만 표시한다.
-    const estimate = getPopulationEstimate(populationData)
-    const labelText = estimate
-      ? `약 ${estimate.value.toLocaleString()}명(추정)`
-      : `${(populationData.total_population / 10000).toFixed(1)}만명`
+    // 게이트를 통과한 추정값만 표시한다. 폴백으로 총인구를 대신 찍지 않는다
+    // (총인구는 읍면동 전체 숫자라 500m 참고값 자리에 오면 수십 배 과대표시된다).
+    const labelText = `약 ${popState.estimate.value.toLocaleString()}명(추정)`
     const labelPos = new window.kakao.maps.LatLng(
       lat + (popRadius / 111_000) * 0.9,
       lng
@@ -207,7 +210,7 @@ export default function KakaoMap({
     const label = new window.kakao.maps.CustomOverlay({
       map,
       position: labelPos,
-      content: `<div style="background:${color};color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:99px;white-space:nowrap;opacity:0.9;">👥 ${labelText}</div>`,
+      content: `<div style="background:${color};color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:99px;white-space:nowrap;opacity:0.9;">${labelText}</div>`,
       yAnchor: 1,
     })
     label.setMap(map)
@@ -613,78 +616,89 @@ export default function KakaoMap({
         )}
       </div>
 
-      {/* 배후 인구 분석 팝업 */}
-      {populationData && (
-        <div className="absolute top-4 right-4 z-10 bg-white/95 backdrop-blur-sm p-3.5 rounded-xl shadow-md border border-brand-100 min-w-[190px]">
-          <h4 className="text-xs font-bold text-gray-800 mb-2 flex items-center gap-1">
-            <span>👥</span> 배후 인구 분석
-          </h4>
+      {/* 거주인구 참고값 패널 — 표시 여부는 게이트가 정한다 */}
+      {(() => {
+        const popState = evaluatePopulationDisplay(populationData)
+        // 수집 자체를 안 한 매물은 패널을 띄우지 않는다.
+        if (popState.status === 'not_collected') return null
 
-          {/* SGIS 수집 실패 시 에러 안내 */}
-          {(populationData as any).error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg px-2.5 py-2 text-[10px] text-red-600 mb-2">
-              <p className="font-semibold mb-0.5">데이터 수집 실패</p>
-              <p className="text-red-500">SGIS가 이 좌표를 찾지 못했습니다. &apos;배후 인구 분석&apos; 버튼으로 재시도하세요.</p>
+        const barrierMessage = describeBarrierStatus(populationData)
+        const showStats = canRenderPopulationStats(populationData)
+
+        return (
+          <div className="absolute top-4 right-4 z-10 bg-white/95 backdrop-blur-sm p-3.5 rounded-xl shadow-md border border-brand-100 min-w-[190px]">
+            <h4 className="text-xs font-bold text-gray-800 mb-2">주변 거주인구 참고값</h4>
+
+            {/* 신뢰도 등급 + 평문 한 문장을 맨 앞에 둔다 */}
+            <div
+              className={`rounded-lg px-2.5 py-2 text-[10px] leading-relaxed mb-2 ${
+                popState.status === 'available'
+                  ? 'bg-blue-50 text-blue-700'
+                  : popState.status === 'failed'
+                    ? 'bg-red-50 border border-red-200 text-red-600'
+                    : 'bg-gray-50 text-gray-600'
+              }`}
+            >
+              <p className="font-semibold mb-0.5">
+                {popState.status === 'available' ? '참고값 (추정)' : '값 없음'}
+              </p>
+              <p>{popState.message}</p>
             </div>
-          )}
 
-          {/* 섹션 1: 행정구역 평균밀도 기반 500m 거주인구 단순 환산 */}
-          {!(populationData as any).error && populationData.radius_500m_estimated != null && (() => {
-            const estimate = getPopulationEstimate(populationData)
-            if (!estimate) return null
-            const barrierMessage = describeBarrierStatus(populationData)
-            return (
+            {/* 값은 게이트를 통과했을 때만 렌더한다 */}
+            {popState.estimate && (
               <div className="mb-2.5">
-                <p className="text-[9px] font-semibold text-blue-600 mb-1">매물 주변 500m · 거주인구 참고값</p>
                 <div className="bg-blue-50 rounded-lg px-2.5 py-1.5 flex justify-between items-center">
                   <span className="text-[11px] text-blue-700">거주인구 추정</span>
-                  <span className="text-[13px] font-bold text-blue-800">약 {estimate.value.toLocaleString()}명</span>
-                </div>
-                <p className="text-[9px] text-gray-500 mt-1">{estimate.description}</p>
-                <p className="text-[8px] text-gray-400 mt-0.5">{estimate.sourceLabel}</p>
-                {barrierMessage && <p className="text-[8px] text-orange-500 mt-0.5">{barrierMessage}</p>}
-              </div>
-            )
-          })()}
-
-          {/* 구분선 — 에러 시 숨김 */}
-          {!(populationData as any).error && <div className="border-t border-gray-200 my-2" />}
-
-          {/* 섹션 2: 읍면동 행정구역 통계 — 에러 시 숨김 */}
-          {!(populationData as any).error && (
-            <div>
-              <p className="text-[9px] font-semibold text-gray-500 mb-1.5">
-                🏘 {populationData.adm_nm || '행정구역'} ({populationData.adm_level || '시군구'}) 전체 통계
-              </p>
-              <div className="space-y-1.5">
-                <div className="flex justify-between items-center text-[11px]">
-                  <span className="text-gray-500">인구 밀도</span>
-                  <span className="font-semibold text-brand-600">{populationData.density?.toLocaleString()}명/㎢</span>
-                </div>
-                <div className="flex justify-between items-center text-[11px]">
-                  <span className="text-gray-500">총 인구</span>
-                  <span className="font-semibold text-gray-700">{populationData.total_population?.toLocaleString()}명</span>
-                </div>
-                <div className="flex justify-between items-center text-[11px]">
-                  <span className="text-gray-500">총 가구 수</span>
-                  <span className="font-semibold text-gray-700">{populationData.total_households?.toLocaleString()}가구</span>
-                </div>
-                <div className="flex justify-between items-center text-[11px]">
-                  <span className="text-gray-500">1인가구 비율</span>
-                  <span className="font-semibold text-orange-600">
-                    {populationData.total_households > 0
-                      ? ((populationData.single_households / populationData.total_households) * 100).toFixed(1)
-                      : 0}%
+                  <span className="text-[13px] font-bold text-blue-800">
+                    약 {popState.estimate.value.toLocaleString()}명
                   </span>
                 </div>
+                <p className="text-[8px] text-gray-400 mt-0.5">{popState.estimate.sourceLabel}</p>
+                {barrierMessage && <p className="text-[8px] text-orange-500 mt-0.5">{barrierMessage}</p>}
+                {/* 산식·출처는 접어둔다 */}
+                <details className="mt-1">
+                  <summary className="text-[8px] text-gray-400 cursor-pointer">산정 기준 보기</summary>
+                  <p className="text-[8px] text-gray-500 mt-1 leading-relaxed">
+                    {popState.estimate.methodLabel}
+                    <br />
+                    출처: 통계청 SGIS. 장벽은 참고정보로만 쓰고 인구 숫자에서 차감하지 않습니다.
+                  </p>
+                </details>
               </div>
-              {populationData.collected_at && (
-                <p className="mt-2.5 text-[9px] text-gray-400 text-right">SGIS 통계청 기준</p>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+            )}
+
+            {/* 행정구역 통계는 별도 게이트로 판단한다 */}
+            {showStats && (
+              <>
+                <div className="border-t border-gray-200 my-2" />
+                <div>
+                  <p className="text-[9px] font-semibold text-gray-500 mb-1.5">
+                    {populationData.adm_nm || '행정구역'} ({populationData.adm_level || '시군구'}) 전체 통계
+                  </p>
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center text-[11px]">
+                      <span className="text-gray-500">인구 밀도</span>
+                      <span className="font-semibold text-brand-600">{populationData.density?.toLocaleString()}명/㎢</span>
+                    </div>
+                    <div className="flex justify-between items-center text-[11px]">
+                      <span className="text-gray-500">총 인구</span>
+                      <span className="font-semibold text-gray-700">{populationData.total_population?.toLocaleString()}명</span>
+                    </div>
+                    <div className="flex justify-between items-center text-[11px]">
+                      <span className="text-gray-500">총 가구 수</span>
+                      <span className="font-semibold text-gray-700">{populationData.total_households?.toLocaleString()}가구</span>
+                    </div>
+                  </div>
+                  <p className="mt-2.5 text-[9px] text-gray-400 text-right">
+                    {populationData.source_year}년 통계청 SGIS
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+        )
+      })()}
     </div>
   )
 }
