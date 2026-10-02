@@ -174,9 +174,94 @@ test('[결함 3] 면적대를 벗어난 거래는 평균에서 제외한다', ()
   assert.equal(view.stats?.max, 200_000)
   assert.equal(view.stats?.average, 190_000)
   assert.ok((view.stats?.max ?? 0) < 540_000, '면적대 밖 거래가 최고가로 올라오면 안 된다')
-  // 목록은 같은 종류 전체를 보여주되, 금액 통계는 면적대만 쓴다.
   assert.equal(view.matchedItems.length, 4)
   assert.equal(view.bandCount, 3)
+})
+
+// ── [결함 5] 평균 산출 범위와 화면 목록이 어긋난다 ─────────────────────────
+// 실측(운영 배포 후): 잠실 84.97㎡ 매물 화면이 '비슷한 면적(±20%) 거래 44건만으로
+// 계산'이라고 쓰면서, 목록 맨 위에 평균에서 제외된 151.008㎡ 54억을 그대로 보여줬다.
+// 중개사는 '평균 34억인데 맨 위가 54억'을 읽고 숫자를 신뢰할 수 없게 된다.
+
+test('[결함 5] 평균에 쓴 거래와 쓰지 않은 거래를 목록에서 구분한다', () => {
+  const items = [
+    item({ name: '아시아선수촌', amount: 540_000, area: 151.008 }),
+    item({ amount: 180_000, area: 84.97 }),
+    item({ amount: 190_000, area: 82.5 }),
+    item({ amount: 200_000, area: 88.0 }),
+  ]
+  const view = buildComparableSalesView({ propertyType: 'apartment', legalDong: '잠실동', area: 84.97, items })
+
+  // 목록은 '평균에 쓴 것'만 담는다. 제외된 건은 별도 배열로 분리해 섞이지 않게 한다.
+  assert.equal(view.statsItems.length, 3, '평균에 쓴 거래만 담는 배열이 있어야 한다')
+  assert.equal(view.excludedItems.length, 1, '면적대 밖 거래는 별도로 분리해야 한다')
+  assert.equal(view.excludedItems[0]?.name, '아시아선수촌')
+  assert.ok(
+    view.statsItems.every(it => (it.area ?? 0) <= 102 && (it.area ?? 0) >= 68),
+    '평균에 쓴 목록에 면적대 밖 거래가 섞이면 안 된다',
+  )
+  // 평균 건수와 목록 건수가 같아야 '44건으로 계산'이라는 문장이 사실이 된다.
+  assert.equal(view.statsItems.length, view.bandCount)
+})
+
+test('[결함 5] 화면 목록은 평균 산출 범위와 같은 배열을 쓴다', () => {
+  // 화면이 matchedItems(전체)를 직접 렌더하면 통계 범위와 목록이 다시 어긋난다.
+  for (const file of [
+    'src/app/(dashboard)/projects/[id]/components/AnalysisTab.tsx',
+    'src/app/(dashboard)/projects/[id]/components/LocationDataCards.tsx',
+  ]) {
+    const source = read(file)
+    assert.doesNotMatch(source, /view\.matchedItems\.slice/, `${file}이 전체 목록을 그대로 렌더한다`)
+    assert.match(source, /view\.statsItems/, `${file}이 평균 산출 범위를 쓰지 않는다`)
+  }
+})
+
+test('[결함 5] 면적을 몰라 평균을 못 내면 목록도 평균 범위를 주장하지 않는다', () => {
+  const items = [
+    item({ amount: 180_000, area: 84.97 }),
+    item({ amount: 540_000, area: 151.008 }),
+    item({ amount: 200_000, area: 88.0 }),
+  ]
+  const view = buildComparableSalesView({ propertyType: 'apartment', legalDong: '잠실동', area: null, items })
+
+  assert.equal(view.canShowStats, false)
+  // 평균을 못 내는 상태에서는 걸러낼 기준도 없다. 전체를 보여주고 제외 목록은 비운다.
+  assert.equal(view.statsItems.length, 3)
+  assert.equal(view.excludedItems.length, 0)
+})
+
+test('[결함 5] 표본이 모자라 평균을 못 내면 전체를 보여주고 제외 주장도 하지 않는다', () => {
+  const items = [
+    item({ amount: 180_000, area: 84.97 }),
+    item({ amount: 540_000, area: 151.008 }),
+  ]
+  const view = buildComparableSalesView({ propertyType: 'apartment', legalDong: '잠실동', area: 84.97, items })
+
+  assert.equal(view.statsBasis, 'band_too_small')
+  assert.equal(view.canShowStats, false)
+  assert.equal(view.statsItems.length, 2, '평균을 못 내면 목록을 임의로 줄이지 않는다')
+  assert.equal(view.excludedItems.length, 0)
+})
+
+test('[결함 5] 제외된 거래가 있으면 그 사실을 알리는 문장을 낸다', () => {
+  const items = [
+    item({ name: '아시아선수촌', amount: 540_000, area: 151.008 }),
+    item({ amount: 180_000, area: 84.97 }),
+    item({ amount: 190_000, area: 82.5 }),
+    item({ amount: 200_000, area: 88.0 }),
+  ]
+  const view = buildComparableSalesView({ propertyType: 'apartment', legalDong: '잠실동', area: 84.97, items })
+
+  assert.ok(view.excludedNote, '제외된 거래가 있으면 설명 문장이 있어야 한다')
+  assert.match(view.excludedNote ?? '', /1건/)
+  // 제외가 없으면 문장도 없다.
+  const clean = buildComparableSalesView({
+    propertyType: 'apartment',
+    legalDong: '잠실동',
+    area: 84.97,
+    items: items.slice(1),
+  })
+  assert.equal(clean.excludedNote, null)
 })
 
 test('[결함 3] 매물 전용면적이 없으면 평균을 단정하지 않는다', () => {

@@ -968,7 +968,7 @@ function RealPriceSection({ real_price_data, projectId, legalDong, propertyType,
     )
   }
 
-  const list = showAll ? view.matchedItems.slice(0, 50) : view.matchedItems.slice(0, 10)
+  const list = showAll ? view.statsItems.slice(0, 50) : view.statsItems.slice(0, 10)
 
   return (
     <div>
@@ -1005,6 +1005,7 @@ function RealPriceSection({ real_price_data, projectId, legalDong, propertyType,
         <summary className="text-xs text-gray-400 cursor-pointer">비교군 구성과 계산 기준 보기</summary>
         <div className="mt-2 space-y-1 text-xs text-gray-500">
           {view.canShowStats && <p>{view.statsNote}</p>}
+          {view.excludedNote && <p>{view.excludedNote}</p>}
           <p>
             국토교통부 실거래가 자료는 시·군·구 단위로만 조회됩니다. 동 단위 조회가 제공되지 않아
             같은 동 거래만 모을 수 없습니다.
@@ -1030,12 +1031,12 @@ function RealPriceSection({ real_price_data, projectId, legalDong, propertyType,
           </div>
         ))}
       </div>
-      {view.matchedItems.length > 10 && (
+      {view.statsItems.length > 10 && (
         <button
           onClick={() => setShowAll(!showAll)}
           className="w-full mt-3 text-xs text-gray-400 hover:text-gray-600 flex items-center justify-center gap-1"
         >
-          {showAll ? <><ChevronUp size={12} /> 접기</> : <><ChevronDown size={12} /> 전체 {view.matchedItems.length}건 보기</>}
+          {showAll ? <><ChevronUp size={12} /> 접기</> : <><ChevronDown size={12} /> 전체 {view.statsItems.length}건 보기</>}
         </button>
       )}
       <button

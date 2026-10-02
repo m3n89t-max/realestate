@@ -121,6 +121,15 @@ export interface ComparableSalesView {
   bandCount: number
   /** 다시 수집해야 하는 상태인지. */
   needsRecollect: boolean
+  /**
+   * 화면에 보여줄 목록. 평균을 계산한 범위와 **같은** 배열이다.
+   * 평균을 계산하지 못한 상태에서는 걸러낼 기준이 없으므로 matchedItems 전체가 들어온다.
+   */
+  statsItems: RealPriceItem[]
+  /** 면적대를 벗어나 평균에서 제외된 거래. 평균을 못 낸 상태에서는 빈 배열이다. */
+  excludedItems: RealPriceItem[]
+  /** 제외된 거래가 있을 때만 그 사실을 알리는 문장. 없으면 null. */
+  excludedNote: string | null
 }
 
 /** 매물 종류에 대응하는 실거래 서비스명. 매핑에 없으면 null(아파트로 대체하지 않는다). */
@@ -211,6 +220,9 @@ function emptyView(status: ComparableSalesStatus, basis: ComparableStatsBasis): 
     mismatchedCount: 0,
     bandCount: 0,
     needsRecollect: status === 'failed' || status === 'asset_type_mismatch',
+    statsItems: [],
+    excludedItems: [],
+    excludedNote: null,
   }
 }
 
@@ -235,19 +247,6 @@ export function buildComparableSalesView(input: ComparableSalesInput): Comparabl
     const view = emptyView(status, 'no_comparables')
     return { ...view, mismatchedCount }
   }
-
-  const composition = buildComposition(matchedItems)
-  const normTarget = normalizeDongName(input.legalDong)
-  const namedCount = normTarget
-    ? matchedItems.filter(it => normalizeDongName(it.dong) === normTarget).length
-    : 0
-  const namedRatio = namedCount / matchedItems.length
-  const isNamedMajority = Boolean(normTarget) && namedRatio > REGION_LABEL_MAJORITY_RATIO
-
-  const regionScope: ComparableSalesView['regionScope'] = isNamedMajority ? 'named_dong' : 'sigungu'
-  const regionLabel = isNamedMajority
-    ? `${input.legalDong} 거래 ${matchedItems.length}건`
-    : `매물이 속한 시·군·구 전체 거래 ${matchedItems.length}건`
 
   const area = typeof input.area === 'number' && Number.isFinite(input.area) && input.area > 0 ? input.area : null
   const areaBand = area
@@ -278,6 +277,32 @@ export function buildComparableSalesView(input: ComparableSalesInput): Comparabl
     }
   }
 
+  // 화면 목록은 평균을 계산한 범위와 같아야 한다. 평균을 면적대로 냈다면 목록도 면적대만,
+  // 평균을 내지 못했다면 걸러낼 기준이 없으므로 전체를 보여주고 제외를 주장하지 않는다.
+  const usedBand = stats !== null && statsBasis === 'area_band'
+  const statsItems = usedBand ? bandItems : matchedItems
+  const excludedItems = usedBand
+    ? matchedItems.filter(it => !bandItems.includes(it))
+    : []
+  const excludedNote = excludedItems.length > 0
+    ? `면적대(±${Math.round(AREA_BAND_RATIO * 100)}%)를 벗어난 거래 ${excludedItems.length}건은 평균에서 빼고 목록에도 올리지 않았습니다.`
+    : null
+
+  // 라벨과 구성비는 화면에 실제로 올라가는 목록(statsItems)을 설명해야 한다.
+  // matchedItems로 세면 '평균 44건'과 '거래 60건'이 같은 화면에서 어긋난다.
+  const composition = buildComposition(statsItems)
+  const normTarget = normalizeDongName(input.legalDong)
+  const namedCount = normTarget
+    ? statsItems.filter(it => normalizeDongName(it.dong) === normTarget).length
+    : 0
+  const namedRatio = namedCount / statsItems.length
+  const isNamedMajority = Boolean(normTarget) && namedRatio > REGION_LABEL_MAJORITY_RATIO
+
+  const regionScope: ComparableSalesView['regionScope'] = isNamedMajority ? 'named_dong' : 'sigungu'
+  const regionLabel = isNamedMajority
+    ? `${input.legalDong} 거래 ${statsItems.length}건`
+    : `매물이 속한 시·군·구 전체 거래 ${statsItems.length}건`
+
   return {
     status: 'available',
     headline: describeComparableSalesStatus('available'),
@@ -289,10 +314,13 @@ export function buildComparableSalesView(input: ComparableSalesInput): Comparabl
     regionScope,
     regionLabel,
     composition,
-    periodLabel: buildPeriodLabel(matchedItems),
+    periodLabel: buildPeriodLabel(statsItems),
     matchedItems,
     mismatchedCount,
     bandCount: bandItems.length,
     needsRecollect: mismatchedCount > 0,
+    statsItems,
+    excludedItems,
+    excludedNote,
   }
 }

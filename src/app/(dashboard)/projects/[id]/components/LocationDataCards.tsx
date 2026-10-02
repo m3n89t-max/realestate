@@ -138,7 +138,7 @@ export function RealPriceCard({ real_price_data, propertyType, legalDong, area }
 
   if (view.status === 'not_collected') return null
 
-  const recent = view.matchedItems.slice(0, 20)
+  const recent = view.statsItems.slice(0, 20)
 
   return (
     <div className="card p-5">
@@ -178,6 +178,7 @@ export function RealPriceCard({ real_price_data, propertyType, legalDong, area }
           <summary className="text-xs text-gray-400 cursor-pointer">비교군 구성과 계산 기준 보기</summary>
           <div className="mt-2 space-y-1 text-xs text-gray-500">
             {view.canShowStats && <p>{view.statsNote}</p>}
+            {view.excludedNote && <p>{view.excludedNote}</p>}
             <p>
               국토교통부 실거래가 자료는 시·군·구 단위로만 조회됩니다. 동 단위 조회는 제공되지 않아
               같은 동 거래만 모을 수 없습니다.
