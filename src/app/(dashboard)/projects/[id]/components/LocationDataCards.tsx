@@ -2,6 +2,7 @@
 
 import { Train, ShoppingCart, Hospital, GraduationCap, Coffee, MapPin, TrendingUp, Building2 } from 'lucide-react'
 import type { POIItem, LandUseItem, RealPriceItem } from '@/lib/types'
+import { buildComparableSalesView } from '@/lib/comparable-sales'
 
 const POI_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
   subway:      { label: '지하철',  icon: <Train size={14} />,         color: 'text-blue-600 bg-blue-50' },
@@ -110,7 +111,12 @@ export function LandUseCard({ land_use_data }: LandUseCardProps) {
 
 // ── 실거래가 카드 ─────────────────────────────────────────────
 interface RealPriceCardProps {
-  real_price_data: RealPriceItem[]
+  real_price_data: RealPriceItem[] | null
+  /** 비교군 자산 종류는 이 값에서만 유도한다. */
+  propertyType?: string | null
+  legalDong?: string | null
+  /** 매물 전용면적(㎡). 없으면 평균 금액을 표시하지 않는다. */
+  area?: number | null
 }
 
 function formatAmount(amount: number | null): string {
@@ -122,57 +128,85 @@ function formatAmount(amount: number | null): string {
   return `${man.toLocaleString()}만`
 }
 
-export function RealPriceCard({ real_price_data }: RealPriceCardProps) {
-  if (!real_price_data.length) return null
+export function RealPriceCard({ real_price_data, propertyType, legalDong, area }: RealPriceCardProps) {
+  const view = buildComparableSalesView({
+    propertyType,
+    legalDong,
+    area,
+    items: real_price_data,
+  })
 
-  // 최근 거래 20건만 표시
-  const recent = real_price_data.slice(0, 20)
+  if (view.status === 'not_collected') return null
 
-  // 가격대 통계
-  const amounts = recent.map(t => t.amount).filter((a): a is number => a !== null && a > 0)
-  const avgAmount = amounts.length ? Math.round(amounts.reduce((s, a) => s + a, 0) / amounts.length) : null
-  const maxAmount = amounts.length ? Math.max(...amounts) : null
-  const minAmount = amounts.length ? Math.min(...amounts) : null
+  const recent = view.matchedItems.slice(0, 20)
 
   return (
     <div className="card p-5">
       <h3 className="section-title mb-4 flex items-center gap-2">
         <TrendingUp size={16} className="text-brand-500" />
-        최근 실거래가 (3개월)
+        주변 실거래 비교군
+        {view.periodLabel && <span className="text-xs font-normal text-gray-400">{view.periodLabel}</span>}
       </h3>
 
-      {/* 통계 요약 */}
-      {avgAmount && (
-        <div className="grid grid-cols-3 gap-3 mb-4 p-3 bg-gray-50 rounded-lg">
+      {/* 첫 화면에 둘 평문 한 문장 */}
+      <p className="text-sm text-gray-700">{view.headline}</p>
+      <p className="text-xs text-gray-500 mt-1">{view.regionLabel}</p>
+
+      {/* 금액은 같은 면적대 거래가 충분할 때만 렌더한다 */}
+      {view.canShowStats && view.stats ? (
+        <div className="grid grid-cols-3 gap-3 my-4 p-3 bg-gray-50 rounded-lg">
           <div className="text-center">
             <p className="text-xs text-gray-400 mb-0.5">평균</p>
-            <p className="text-sm font-bold text-brand-700 tabular-nums">{formatAmount(avgAmount)}</p>
+            <p className="text-sm font-bold text-brand-700 tabular-nums">{formatAmount(view.stats.average)}</p>
           </div>
           <div className="text-center border-x border-gray-200">
             <p className="text-xs text-gray-400 mb-0.5">최고</p>
-            <p className="text-sm font-bold text-red-600 tabular-nums">{formatAmount(maxAmount)}</p>
+            <p className="text-sm font-bold text-red-600 tabular-nums">{formatAmount(view.stats.max)}</p>
           </div>
           <div className="text-center">
             <p className="text-xs text-gray-400 mb-0.5">최저</p>
-            <p className="text-sm font-bold text-blue-600 tabular-nums">{formatAmount(minAmount)}</p>
+            <p className="text-sm font-bold text-blue-600 tabular-nums">{formatAmount(view.stats.min)}</p>
           </div>
         </div>
+      ) : (
+        <p className="text-xs text-gray-500 mt-2">{view.statsNote}</p>
+      )}
+
+      {/* 산식·구성비는 접힌 영역에 */}
+      {(view.composition.length > 0 || view.canShowStats) && (
+        <details className="mt-2">
+          <summary className="text-xs text-gray-400 cursor-pointer">비교군 구성과 계산 기준 보기</summary>
+          <div className="mt-2 space-y-1 text-xs text-gray-500">
+            {view.canShowStats && <p>{view.statsNote}</p>}
+            <p>
+              국토교통부 실거래가 자료는 시·군·구 단위로만 조회됩니다. 동 단위 조회는 제공되지 않아
+              같은 동 거래만 모을 수 없습니다.
+            </p>
+            {view.composition.slice(0, 5).map(c => (
+              <p key={c.dong}>
+                {c.dong} {c.count}건 ({Math.round(c.ratio * 100)}%)
+              </p>
+            ))}
+          </div>
+        </details>
       )}
 
       {/* 거래 목록 */}
-      <div className="space-y-1.5 max-h-48 overflow-y-auto">
-        {recent.map((t, i) => (
-          <div key={i} className="flex items-center justify-between text-xs py-1.5 border-b border-gray-50 last:border-0">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-gray-400 flex-shrink-0">{t.deal_ym?.slice(0, 4)}.{t.deal_ym?.slice(4, 6)}</span>
-              <span className="font-medium text-gray-700 truncate">{t.name ?? t.dong ?? '-'}</span>
-              {t.area && <span className="text-gray-400 flex-shrink-0">{t.area}㎡</span>}
-              {t.floor && <span className="text-gray-400 flex-shrink-0">{t.floor}층</span>}
+      {recent.length > 0 && (
+        <div className="space-y-1.5 max-h-48 overflow-y-auto mt-3">
+          {recent.map((t, i) => (
+            <div key={i} className="flex items-center justify-between text-xs py-1.5 border-b border-gray-50 last:border-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-gray-400 flex-shrink-0">{t.deal_ym?.slice(0, 4)}.{t.deal_ym?.slice(4, 6)}</span>
+                <span className="font-medium text-gray-700 truncate">{t.name ?? t.dong ?? '-'}</span>
+                {t.area && <span className="text-gray-400 flex-shrink-0">{t.area}㎡</span>}
+                {t.floor && <span className="text-gray-400 flex-shrink-0">{t.floor}층</span>}
+              </div>
+              <span className="font-semibold text-gray-800 flex-shrink-0 ml-2 tabular-nums">{formatAmount(t.amount)}</span>
             </div>
-            <span className="font-semibold text-gray-800 flex-shrink-0 ml-2 tabular-nums">{formatAmount(t.amount)}</span>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
       <p className="text-xs text-gray-400 mt-2">출처: 국토교통부 실거래가 공개시스템</p>
     </div>
   )

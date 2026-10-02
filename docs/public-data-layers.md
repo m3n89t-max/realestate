@@ -189,5 +189,6 @@ API 키 부재는 `failed`가 아니라 `unconfigured`다. 예외를 던지지 �
 - `tests/public-data-collectors.test.ts` — 구간 보존, provenance, 키 부재, 형제 격리
 - `tests/seoul-hotspots.test.ts` — 좌표 범위, 코드 중복, 근접 탐색, 반경 초과
 - `tests/forbidden-phrases.test.ts` — 소스 전체 금지 문구 + 등급 배수 테이블 잔존
+- `tests/comparable-sales.test.ts` — 실거래 비교군 자산종류 일치, 지역 구성비 라벨, 면적대 정규화, 상태 문장 구분
 
 금지 문구를 추가할 때는 `FORBIDDEN_LAYER_PHRASES`와 이 문서를 함께 고친다.
