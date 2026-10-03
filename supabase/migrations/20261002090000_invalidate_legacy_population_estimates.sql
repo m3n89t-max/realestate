@@ -38,6 +38,7 @@ SET population_data = jsonb_build_object(
       'failure_reason', COALESCE(population_data->>'error', '수집 실패(레거시 행, 사유 미기록)'),
       'superseded_at', now(),
       'superseded_reason', 'legacy_row_without_method_stamp',
+      'needs_recollection', true,
       'collected_at', population_data->>'collected_at'
     )
 WHERE population_data IS NOT NULL
@@ -76,7 +77,9 @@ SET population_data = (population_data - 'radius_500m_estimated')
            'needs_recollection', true
          )
 WHERE population_data IS NOT NULL
-  AND population_data->>'estimation_method' IS NULL;
+  AND population_data->>'estimation_method' IS NULL
+  -- 1·2단계에서 이미 분류한 행은 다시 일반 레거시로 덮어쓰지 않는다.
+  AND NOT (population_data ? 'superseded_reason');
 
 -- 확인용(적용 후 0이어야 한다):
 --   SELECT count(*) FROM public.projects

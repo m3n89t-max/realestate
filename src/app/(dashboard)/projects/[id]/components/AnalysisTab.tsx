@@ -1412,6 +1412,8 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
   const hasTourism = project.tourism_data != null
   const hasData = isCommercial ? hasCommercial : hasRealPrice
   const hasAnalysis = !!locationAnalysis
+  const populationState = evaluatePopulationDisplay(project.population_data)
+  const needsPopulation = populationState.needsRecollection || project.population_data?.needs_recollection === true
 
   // ── 자동 수집 ──────────────────────────────────────────────
   const [autoStep, setAutoStep] = useState<string | null>(null)
@@ -1429,7 +1431,6 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
     // 모든 매물: 점포·업종 구성과 상권 경계 참고자료 수집
     const needsCommercial = !hasCommercial
     const needsKakao = !project.kakao_density
-    const needsPopulation = !project.population_data
     const needsTourism = !hasTourism
     const needsPublicData = !project.public_data_layers
 
@@ -1488,7 +1489,7 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
     { label: 'POI 수집', done: hasPOI },
     { label: '점포·업종 구성', done: hasCommercial },
     { label: '시설 밀집 참고도', done: !!project.kakao_density },
-    { label: '주변 거주인구', done: !!project.population_data },
+    { label: '주변 거주인구', done: !needsPopulation },
     { label: '관광 시설', done: hasTourism },
     { label: '공공 자료', done: !!project.public_data_layers },
     { label: 'AI 입지 분석', done: hasAnalysis },

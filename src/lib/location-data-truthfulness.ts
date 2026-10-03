@@ -201,8 +201,10 @@ export function canRenderPopulationStats(
   if (input.status === 'unconfigured' || input.status === 'unsupported') return false
   if (input.status === 'failed' || input.error != null) return false
   if (hasDeprecatedPopulationField(input)) return false
+  if (input.estimation_method !== CURRENT_POPULATION_METHOD) return false
   const year = input.source_year == null ? '' : String(input.source_year).trim()
-  if (!year) return false
+  const level = input.adm_level == null ? '' : String(input.adm_level).trim()
+  if (!year || !level) return false
   const total = input.total_population
   return typeof total === 'number' && Number.isFinite(total) && total > 0
 }

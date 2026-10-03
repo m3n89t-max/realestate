@@ -220,10 +220,39 @@ test('스탬프는 멀쩡하지만 추정값만 없는 행은 available_without_
   assert.equal(canRenderPopulationStats({ ...currentRow, radius_500m_estimated: null }), true)
 })
 
-test('인구 통계 블록은 기준연도 없는 숫자를 렌더하지 않는다', () => {
+test('인구 통계 블록은 필수 메타데이터 3종이 모두 있어야 렌더한다', () => {
   assert.equal(canRenderPopulationStats(currentRow), true)
-  assert.equal(canRenderPopulationStats({ ...currentRow, source_year: null }), false)
-  assert.equal(canRenderPopulationStats({ ...currentRow, total_population: 0 }), false)
+  for (const broken of [
+    { ...currentRow, source_year: null },
+    { ...currentRow, source_year: '  ' },
+    { ...currentRow, adm_level: null },
+    { ...currentRow, adm_level: '' },
+    { ...currentRow, estimation_method: null },
+    { ...currentRow, estimation_method: 'legacy_method@0' },
+    { ...currentRow, total_population: 0 },
+  ]) {
+    assert.equal(canRenderPopulationStats(broken), false)
+  }
+})
+
+test('레거시 인구 마이그레이션은 앞 단계 분류를 다시 덮어쓰지 않는다', () => {
+  const source = readProjectFile('supabase/migrations/20261002090000_invalidate_legacy_population_estimates.sql')
+
+  // 마지막 일반 UPDATE는 1단계 failed, 2단계 deprecated_barrier 분류를 제외해야 한다.
+  assert.match(source, /-- 3\)[\s\S]*?NOT \(population_data \? 'superseded_reason'\)/)
+  // 세 단계 모두 재수집 대상이어야 워크플로우가 기존 객체를 완료로 오인하지 않는다.
+  const flags = source.match(/'needs_recollection', true/g) ?? []
+  assert.equal(flags.length, 3)
+})
+
+test('재수집 플래그와 표시 게이트 결과를 자동수집·워크플로우가 사용한다', () => {
+  const source = readProjectFile('src/app/(dashboard)/projects/[id]/components/AnalysisTab.tsx')
+
+  assert.match(source, /evaluatePopulationDisplay\(project\.population_data\)/)
+  assert.match(source, /needsPopulation\s*=\s*populationState\.needsRecollection/)
+  assert.match(source, /label:\s*'주변 거주인구',[\s\S]{0,120}done:\s*!needsPopulation/)
+  assert.doesNotMatch(source, /const needsPopulation = !project\.population_data/)
+  assert.doesNotMatch(source, /label:\s*'주변 거주인구',\s*done:\s*!!project\.population_data/)
 })
 
 // ── 산정 경로 단일화 (엣지 함수 소스 검증) ───────────────────────────────────
@@ -244,6 +273,15 @@ test('엣지 함수는 산정 경로가 하나뿐이고 계산한 방법을 그�
   // 환산식은 읍면동 평균 밀도 하나만 쓴다.
   assert.match(source, /ppltn_dnsty/)
   assert.match(source, /Math\.PI \* 0\.25/)
+})
+
+test('SGIS 조회 오류는 공개자료 미지원이 아니라 재시도 가능한 실패로 저장한다', () => {
+  const source = readProjectFile('supabase/functions/collect-population/index.ts')
+
+  // 폴백 중 하나라도 오류가 났고 끝내 자료를 못 찾았으면 unsupported로 세탁하면 안 된다.
+  assert.match(source, /populationLookupErrors/)
+  assert.match(source, /populationLookupErrors\.push/)
+  assert.match(source, /populationLookupErrors\.length\s*>\s*0[\s\S]{0,600}?'failed'/)
 })
 
 test('엣지 함수는 수집 실패를 파생 객체로 남기지 않는다', () => {

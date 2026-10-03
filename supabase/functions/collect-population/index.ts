@@ -233,6 +233,7 @@ Deno.serve(async (req) => {
     let popData: any = null
     let targetYear: string | null = null
     let usedAdmCd = emd || `${sido}${sgg}`
+    const populationLookupErrors: string[] = []
 
     const emdCd8 = emd.length >= 8 ? emd.substring(0, 8) : emd
     for (const cd of [...new Set([emdCd8, emd].filter(Boolean))]) {
@@ -240,7 +241,9 @@ Deno.serve(async (req) => {
         try {
           const stats = await getPopStat(y, cd, token)
           if (stats?.[0]) { popData = stats[0]; targetYear = y; usedAdmCd = cd; break }
-        } catch { /* fallthrough */ }
+        } catch (error) {
+          populationLookupErrors.push(error instanceof Error ? error.message : String(error))
+        }
       }
       if (popData) break
     }
@@ -251,7 +254,9 @@ Deno.serve(async (req) => {
         try {
           const stats = await getPopStat(y, usedAdmCd, token)
           if (stats?.[0]) { popData = stats[0]; targetYear = y; break }
-        } catch { /* fallthrough */ }
+        } catch (error) {
+          populationLookupErrors.push(error instanceof Error ? error.message : String(error))
+        }
       }
     }
 
@@ -261,11 +266,29 @@ Deno.serve(async (req) => {
         try {
           const stats = await getPopStat(y, sido, token)
           if (stats?.[0]) { popData = stats[0]; targetYear = y; break }
-        } catch { /* fallthrough */ }
+        } catch (error) {
+          populationLookupErrors.push(error instanceof Error ? error.message : String(error))
+        }
       }
     }
 
-    // 이 지역에 공개 통계가 없는 경우. '실패'와 구분한다 — 다시 눌러도 결과가 같다.
+    // API/네트워크/인증 오류가 한 번이라도 있었다면 '미지원 지역'으로 단정하지 않는다.
+    // 공개자료 없음은 모든 조회가 정상 응답했지만 비어 있을 때만 쓸 수 있는 상태다.
+    if ((!popData || !targetYear) && populationLookupErrors.length > 0) {
+      console.warn('[population] SGIS 인구통계 조회 오류:', populationLookupErrors)
+      const saveError = admin && projectId && orgId
+        ? await saveNonValueState(admin, projectId, orgId, 'failed', 'SGIS 인구 통계 조회 실패')
+        : null
+      if (saveError) throw new Error(`인구 통계 상태 저장 실패: ${saveError}`)
+      return new Response(JSON.stringify({
+        success: false,
+        status: 'failed',
+        source: 'SGIS',
+        message: '인구 자료를 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.',
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
+    // 모든 조회가 정상 응답했지만 비어 있을 때만 미지원 지역으로 판정한다.
     if (!popData || !targetYear) {
       const saveError = admin && projectId && orgId
         ? await saveNonValueState(admin, projectId, orgId, 'unsupported', 'SGIS 인구 통계 미제공 지역')
