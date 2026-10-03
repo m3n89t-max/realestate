@@ -2,6 +2,22 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, handleCors } from '../_shared/cors.ts'
 import { getAuthenticatedUser } from '../_shared/auth.ts'
 
+// ── 산정 방법 스탬프 ──────────────────────────────────────────────────────────
+//
+// 이 식별자는 src/lib/location-data-truthfulness.ts 의 CURRENT_POPULATION_METHOD 와
+// 반드시 같아야 한다. 다르면 화면이 이 함수가 저장한 값을 'superseded_method'로
+// 거부한다(tests/location-data-truthfulness.test.ts 가 두 값의 일치를 검사한다).
+//
+// 과거에는 계산 경로가 두 갈래였다. 읍면동 평균 밀도 환산과 집계구 가중 밀도
+// 환산이 공존했고, 화면은 둘을 똑같이 '약 N명'으로 보여줬다. 그래서 같은 주소가
+// 수집 시점에 따라 1.6~7.0배까지 다른 값을 냈다. 지금은 읍면동 평균 밀도 하나만 쓴다.
+//
+// 산식이 바뀌면 @1 을 올려라. 올리면 과거 행은 화면에서 자동으로 거부된다.
+const POPULATION_METHOD = 'adm_avg_density_x_circle_500m@1'
+
+/** 반경 500m 원 면적(㎢). π × 0.5² = π × 0.25 ≈ 0.785. */
+const CIRCLE_500M_AREA_KM2 = Math.PI * 0.25
+
 // ── SGIS 헬퍼 ────────────────────────────────────────────────────────────────
 
 async function getSgisToken(serviceId: string, securityKey: string): Promise<string> {
@@ -13,6 +29,7 @@ async function getSgisToken(serviceId: string, securityKey: string): Promise<str
 }
 
 async function transcoord(lng: number, lat: number, token: string): Promise<{ posX: number; posY: number }> {
+  // SGIS는 EPSG:5179를 쓴다. 서울 열린데이터(EPSG:5181)와 섞지 마라.
   const url = `https://sgisapi.kostat.go.kr/OpenAPI3/transformation/transcoord.json?src=4326&dst=5179&posX=${lng}&posY=${lat}&accessToken=${token}`
   const res = await fetch(url)
   const data = await res.json()
@@ -34,8 +51,10 @@ async function rgeocode(posX: number, posY: number, token: string) {
   return { sido, sgg, emd, adm_nm }
 }
 
-async function getPopStat(year: string, admCd: string, lowSearch = '0', token: string) {
-  const url = `https://sgisapi.kostat.go.kr/OpenAPI3/stats/population.json?year=${year}&adm_cd=${admCd}&low_search=${lowSearch}&accessToken=${token}`
+// 집계구 단위 하위검색(low_search 1)은 더 쓰지 않는다. 그 경로가 두 번째 산정식의
+// 입력이었고, 같은 읍면동에서 평균 환산값과 1.6~7.0배 차이를 냈다.
+async function getPopStat(year: string, admCd: string, token: string) {
+  const url = `https://sgisapi.kostat.go.kr/OpenAPI3/stats/population.json?year=${year}&adm_cd=${admCd}&low_search=0&accessToken=${token}`
   const res = await fetch(url)
   const data = await res.json()
   if (data.errCd !== 0) throw new Error(`SGIS 인구통계 실패: ${data.errMsg}`)
@@ -67,6 +86,10 @@ async function getIndustryStat(year: string, admCd: string, token: string) {
 }
 
 // ── 장벽 감지 ────────────────────────────────────────────────────────────────
+//
+// 장벽은 참고정보로만 쓴다. 인구 숫자에서 차감하지 않는다.
+// 과거 장벽 차감 계수로 인구를 깎던 로직은 제거했고, 그 폐기 필드를 들고 있는
+// 행은 화면에서 거부한다(차감이 반영됐는지 행만 보고는 알 수 없기 때문).
 
 function minDistToPolylineM(lat: number, lng: number, geom: { lat: number; lon: number }[]): number {
   const cosLat = Math.cos(lat * Math.PI / 180)
@@ -123,11 +146,43 @@ out geom;`
   }
 }
 
+// ── 실패 상태 저장 ───────────────────────────────────────────────────────────
+//
+// 실패를 숫자 0으로 남기지 않는다. 과거에는 density 0 / total_population 0 을
+// 들고 있는 population_data 가 남아서 화면이 '이 동네 인구 0명'처럼 렌더했다.
+// 실패 행에는 숫자를 하나도 넣지 않고 status 만 남긴다.
+async function saveNonValueState(
+  admin: ReturnType<typeof createClient>,
+  projectId: string,
+  orgId: string,
+  status: 'failed' | 'unsupported',
+  reason: string,
+): Promise<string | null> {
+  const population_data = {
+    status,
+    source: 'SGIS',
+    estimation_method: POPULATION_METHOD,
+    failure_reason: reason,
+    collected_at: new Date().toISOString(),
+  }
+  const { error } = await admin
+    .from('projects')
+    .update({ population_data })
+    .eq('id', projectId)
+    .eq('org_id', orgId)
+  return error?.message ?? null
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
   const corsRes = handleCors(req)
   if (corsRes) return corsRes
+
+  // 실패 상태를 DB에 남기려면 project/org를 알아야 하므로 바깥 스코프에 둔다.
+  let admin: ReturnType<typeof createClient> | null = null
+  let projectId: string | null = null
+  let orgId: string | null = null
 
   try {
     const { supabaseClient } = await getAuthenticatedUser(req)
@@ -137,6 +192,8 @@ Deno.serve(async (req) => {
     const serviceId = (Deno.env.get('SGIS_SERVICE_ID') ?? '').trim()
     const securityKey = (Deno.env.get('SGIS_SECURITY_KEY') ?? '').trim()
     if (!serviceId || !securityKey) {
+      // 관리자 설정 대기. 환경변수 이름을 응답에 노출하지 않는다.
+      // 저장도 하지 않는다 — 설정되면 다음 수집에서 바로 채워진다.
       return new Response(JSON.stringify({
         success: false,
         status: 'unconfigured',
@@ -145,14 +202,18 @@ Deno.serve(async (req) => {
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    const admin = createClient(
+    admin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     )
 
+    // projects 에는 address 와 jibun_address 가 있고 road_address 는 없다.
+    // 없는 컬럼을 select 에 넣으면 42703 으로 요청 전체가 죽는다.
     const { data: project } = await supabaseClient.from('projects').select('lat, lng, org_id').eq('id', project_id).single()
     if (!project?.lat || !project?.lng) throw new Error('프로젝트 좌표 없음')
 
+    projectId = project_id
+    orgId = project.org_id
     const { lat, lng } = project
 
     // 1. SGIS 인증
@@ -160,7 +221,7 @@ Deno.serve(async (req) => {
     const token = await getSgisToken(serviceId, securityKey)
     console.log('[population] SGIS auth 성공')
 
-    // 2. 좌표변환
+    // 2. 좌표변환 (4326 → 5179)
     const { posX, posY } = await transcoord(lng, lat, token)
 
     // 3. 역지오코딩
@@ -170,16 +231,19 @@ Deno.serve(async (req) => {
     // 4. 인구통계 (읍면동 → 시군구 → 시도 폴백)
     const YEARS = ['2023', '2022', '2021', '2020']
     let popData: any = null
-    let targetYear = '2023'
+    let targetYear: string | null = null
     let usedAdmCd = emd || `${sido}${sgg}`
+    const populationLookupErrors: string[] = []
 
     const emdCd8 = emd.length >= 8 ? emd.substring(0, 8) : emd
     for (const cd of [...new Set([emdCd8, emd].filter(Boolean))]) {
       for (const y of YEARS) {
         try {
-          const stats = await getPopStat(y, cd, '0', token)
+          const stats = await getPopStat(y, cd, token)
           if (stats?.[0]) { popData = stats[0]; targetYear = y; usedAdmCd = cd; break }
-        } catch { /* fallthrough */ }
+        } catch (error) {
+          populationLookupErrors.push(error instanceof Error ? error.message : String(error))
+        }
       }
       if (popData) break
     }
@@ -188,9 +252,11 @@ Deno.serve(async (req) => {
       usedAdmCd = `${sido}${sgg}`
       for (const y of YEARS) {
         try {
-          const stats = await getPopStat(y, usedAdmCd, '0', token)
+          const stats = await getPopStat(y, usedAdmCd, token)
           if (stats?.[0]) { popData = stats[0]; targetYear = y; break }
-        } catch { /* fallthrough */ }
+        } catch (error) {
+          populationLookupErrors.push(error instanceof Error ? error.message : String(error))
+        }
       }
     }
 
@@ -198,13 +264,43 @@ Deno.serve(async (req) => {
       usedAdmCd = sido
       for (const y of YEARS) {
         try {
-          const stats = await getPopStat(y, sido, '0', token)
+          const stats = await getPopStat(y, sido, token)
           if (stats?.[0]) { popData = stats[0]; targetYear = y; break }
-        } catch { /* fallthrough */ }
+        } catch (error) {
+          populationLookupErrors.push(error instanceof Error ? error.message : String(error))
+        }
       }
     }
 
-    if (!popData) throw new Error('SGIS 인구 통계 데이터 없음 (해당 지역 미제공)')
+    // API/네트워크/인증 오류가 한 번이라도 있었다면 '미지원 지역'으로 단정하지 않는다.
+    // 공개자료 없음은 모든 조회가 정상 응답했지만 비어 있을 때만 쓸 수 있는 상태다.
+    if ((!popData || !targetYear) && populationLookupErrors.length > 0) {
+      console.warn('[population] SGIS 인구통계 조회 오류:', populationLookupErrors)
+      const saveError = admin && projectId && orgId
+        ? await saveNonValueState(admin, projectId, orgId, 'failed', 'SGIS 인구 통계 조회 실패')
+        : null
+      if (saveError) throw new Error(`인구 통계 상태 저장 실패: ${saveError}`)
+      return new Response(JSON.stringify({
+        success: false,
+        status: 'failed',
+        source: 'SGIS',
+        message: '인구 자료를 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.',
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
+    // 모든 조회가 정상 응답했지만 비어 있을 때만 미지원 지역으로 판정한다.
+    if (!popData || !targetYear) {
+      const saveError = admin && projectId && orgId
+        ? await saveNonValueState(admin, projectId, orgId, 'unsupported', 'SGIS 인구 통계 미제공 지역')
+        : null
+      if (saveError) throw new Error(`인구 통계 상태 저장 실패: ${saveError}`)
+      return new Response(JSON.stringify({
+        success: false,
+        status: 'unsupported',
+        source: 'SGIS',
+        message: '이 지역은 공개된 인구 통계가 없습니다.',
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
 
     // 5. 1인 가구
     let single_households = 0
@@ -243,43 +339,28 @@ Deno.serve(async (req) => {
       }
     } catch { /* ignore */ }
 
-    // 6. 500m 추정 배후인구
+    // 6. 500m 거주인구 추정 — 산정 경로는 하나다.
+    //
+    //    행정구역 평균 인구밀도(ppltn_dnsty, SGIS가 그대로 주는 값)에
+    //    반경 500m 원 면적을 곱한다. 중간 계산으로 면적을 되만들지 않으므로
+    //    같은 주소·같은 연도면 항상 같은 값이 나온다.
     const adm_level = usedAdmCd.length >= 8 ? '읍면동' : usedAdmCd.length >= 5 ? '시군구' : '시도'
-    let radius_500m_estimated: number | null = null
-    let barrier_status: 'available' | 'failed' | 'not_collected' = 'not_collected'
-    let barrier_names: string[] = []
+    const density = parseFloat(popData.ppltn_dnsty || '0')
+    const radius_500m_estimated = Number.isFinite(density) && density > 0
+      ? Math.round(density * CIRCLE_500M_AREA_KM2)
+      : null
 
-    if (usedAdmCd.length >= 8) {
-      try {
-        const census = await getPopStat(targetYear, usedAdmCd, '1', token)
-        if (census?.length) {
-          const valid = census.filter((r: any) =>
-            parseFloat(r.ppltn_dnsty || '0') > 0 && parseInt(r.tot_ppltn || '0', 10) > 0
-          )
-          if (valid.length > 0) {
-            const totalPop = valid.reduce((s: number, r: any) => s + parseInt(r.tot_ppltn || '0', 10), 0)
-            const totalArea = valid.reduce((s: number, r: any) => {
-              const d = parseFloat(r.ppltn_dnsty || '0')
-              const p = parseInt(r.tot_ppltn || '0', 10)
-              return s + (d > 0 ? p / d : 0)
-            }, 0)
-            const useDensity = totalArea > 0 ? totalPop / totalArea : 0
-            if (useDensity > 0) {
-              const barrier = await detectBarriers(lat, lng, 500)
-              barrier_status = barrier.status
-              barrier_names = barrier.barriers
-              radius_500m_estimated = Math.round(useDensity * Math.PI * 0.25)
-              console.log(`[population] 500m 거주인구 단순 환산 ${radius_500m_estimated}명`)
-            }
-          }
-        }
-      } catch (e) {
-        console.log('[population] census block 실패, 500m 추정 생략')
-      }
+    if (radius_500m_estimated != null) {
+      console.log(`[population] 500m 거주인구 환산 ${radius_500m_estimated}명 (밀도 ${density}명/㎢, ${adm_level})`)
     }
 
+    // 7. 장벽은 참고정보로만 수집한다. 인구 숫자에 반영하지 않는다.
+    const barrier = await detectBarriers(lat, lng, 500)
+
     const population_data = {
-      density: parseFloat(popData.ppltn_dnsty || '0'),
+      status: 'available',
+      source: 'SGIS',
+      density,
       total_population: parseInt(popData.tot_ppltn || '0', 10),
       total_households: parseInt(popData.tot_family || '0', 10),
       single_households,
@@ -290,9 +371,10 @@ Deno.serve(async (req) => {
       adm_level,
       source_year: targetYear,
       radius_500m_estimated,
-      estimation_method: '행정구역 평균 인구밀도 × 반경 500m 원 면적 단순 환산',
-      barrier_status,
-      barrier_names,
+      // 이 값을 만든 산정 방법. 화면은 이 스탬프가 일치하지 않는 행을 거부한다.
+      estimation_method: POPULATION_METHOD,
+      barrier_status: barrier.status,
+      barrier_names: barrier.barriers,
       housing_stat,
       industry_stat,
       collected_at: new Date().toISOString(),
@@ -306,7 +388,12 @@ Deno.serve(async (req) => {
     })
   } catch (e: any) {
     console.error('[collect-population] error:', e.message)
-    return new Response(JSON.stringify({ success: false, error: e.message }), {
+    // 실패를 숫자 없는 상태로만 남긴다. 저장 자체가 실패해도 응답은 실패로 간다.
+    if (admin && projectId && orgId) {
+      const saveError = await saveNonValueState(admin, projectId, orgId, 'failed', e.message ?? '알 수 없는 오류')
+      if (saveError) console.error('[collect-population] 실패 상태 저장도 실패:', saveError)
+    }
+    return new Response(JSON.stringify({ success: false, status: 'failed', error: e.message }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
