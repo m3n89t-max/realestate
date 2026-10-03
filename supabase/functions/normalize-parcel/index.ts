@@ -122,6 +122,13 @@ async function collectRealPrice(
   property_type: string | null,
   apiKey: string
 ): Promise<any[]> {
+  // 요청 데이터셋은 매물 종류에서만 유도한다. 매핑에 없는 종류를 아파트로 대체하지 않는다.
+  const svcName = property_type ? DEAL_SERVICE_MAP[property_type] : undefined
+  if (!svcName) {
+    console.log('[RealPrice] 공개 실거래 자료 없는 매물 종류:', property_type)
+    return []
+  }
+
   const now = new Date()
   const months: string[] = []
   for (let i = 1; i <= 6; i++) {  // 최근 6개월 (1달 전부터 - 당월은 데이터 없음)
@@ -129,71 +136,64 @@ async function collectRealPrice(
     months.push(`${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}`)
   }
 
-  const svcNames = new Set<string>(['RTMSDataSvcAptTrade'])
-  if (property_type && DEAL_SERVICE_MAP[property_type]) {
-    svcNames.add(DEAL_SERVICE_MAP[property_type])
-  }
-
   const allItems: any[] = []
 
   await Promise.allSettled(
-    [...svcNames].flatMap(svcName =>
-      months.map(async ym => {
-        // serviceKey raw 연결 (이중 인코딩 방지)
-        const params = new URLSearchParams({
-          LAWD_CD:   sigungu_code,
-          DEAL_YMD:  ym,
-          pageNo:    '1',
-          numOfRows: '30',
-        })
-        const url = `https://apis.data.go.kr/1613000/${svcName}/get${svcName}?serviceKey=${apiKey}&${params}`
-
-        const res = await fetch(url)
-        if (!res.ok) {
-          console.error('[RealPrice] HTTP 오류:', svcName, ym, res.status)
-          return
-        }
-
-        const text = await res.text()
-        if (!text.trimStart().startsWith('<')) {
-          console.error('[RealPrice] XML 아님:', text.slice(0, 100))
-          return
-        }
-
-        // 에러 코드 체크 - 성공: '00', '000', '0000' / 에러: 그 외
-        const resultCode = xmlTagValue(text, 'resultCode') ?? xmlTagValue(text, 'ERROR_CODE')
-        if (resultCode && resultCode !== '00' && resultCode !== '000' && resultCode !== '0000') {
-          const msg = xmlTagValue(text, 'returnReasonCode') ?? xmlTagValue(text, 'resultMsg') ?? xmlTagValue(text, 'ERROR_MSG') ?? resultCode
-          console.error('[RealPrice] API 오류:', svcName, ym, resultCode, msg)
-          return
-        }
-
-        // <item> 블록 파싱
-        const itemBlocks = [...text.matchAll(/<item>([\s\S]*?)<\/item>/g)].map(m => m[1])
-        console.log('[RealPrice]', svcName, ym, 'items:', itemBlocks.length)
-        if (itemBlocks.length > 0) {
-          // 첫 아이템 raw 로그 (금액 파싱 디버그용)
-          console.log('[RealPrice] first item sample:', itemBlocks[0].slice(0, 200))
-        }
-        for (const block of itemBlocks) {
-          // 국토부 API가 영문 필드명으로 변경됨 (한글 태그 병행 지원)
-          const amountRaw = xmlTagValue(block, 'dealAmount') ?? xmlTagValue(block, '거래금액')
-          const amount = amountRaw ? parseInt(amountRaw.replace(/[^0-9]/g, '')) || null : null
-          const yr = xmlTagValue(block, 'dealYear')  ?? xmlTagValue(block, '년') ?? xmlTagValue(block, '계약년도')
-          const mo = xmlTagValue(block, 'dealMonth') ?? xmlTagValue(block, '월') ?? xmlTagValue(block, '계약월')
-          const dealYm = (yr && mo) ? `${yr}${mo.padStart(2, '0')}` : ym
-          allItems.push({
-            deal_ym: dealYm,
-            amount,
-            area:    parseFloat(xmlTagValue(block, 'excluUseAr') ?? xmlTagValue(block, '전용면적') ?? '0') || null,
-            floor:   xmlTagValue(block, 'floor') ?? xmlTagValue(block, '층'),
-            name:    xmlTagValue(block, 'aptNm')  ?? xmlTagValue(block, '아파트') ?? xmlTagValue(block, '건물명'),
-            dong:    xmlTagValue(block, 'umdNm')  ?? xmlTagValue(block, '법정동') ?? xmlTagValue(block, '법정동명'),
-            type:    svcName,
-          })
-        }
+    months.map(async ym => {
+      // serviceKey raw 연결 (이중 인코딩 방지)
+      const params = new URLSearchParams({
+        LAWD_CD:   sigungu_code,
+        DEAL_YMD:  ym,
+        pageNo:    '1',
+        numOfRows: '30',
       })
-    )
+      const url = `https://apis.data.go.kr/1613000/${svcName}/get${svcName}?serviceKey=${apiKey}&${params}`
+
+      const res = await fetch(url)
+      if (!res.ok) {
+        console.error('[RealPrice] HTTP 오류:', svcName, ym, res.status)
+        return
+      }
+
+      const text = await res.text()
+      if (!text.trimStart().startsWith('<')) {
+        console.error('[RealPrice] XML 아님:', text.slice(0, 100))
+        return
+      }
+
+      // 에러 코드 체크 - 성공: '00', '000', '0000' / 에러: 그 외
+      const resultCode = xmlTagValue(text, 'resultCode') ?? xmlTagValue(text, 'ERROR_CODE')
+      if (resultCode && resultCode !== '00' && resultCode !== '000' && resultCode !== '0000') {
+        const msg = xmlTagValue(text, 'returnReasonCode') ?? xmlTagValue(text, 'resultMsg') ?? xmlTagValue(text, 'ERROR_MSG') ?? resultCode
+        console.error('[RealPrice] API 오류:', svcName, ym, resultCode, msg)
+        return
+      }
+
+      // <item> 블록 파싱
+      const itemBlocks = [...text.matchAll(/<item>([\s\S]*?)<\/item>/g)].map(m => m[1])
+      console.log('[RealPrice]', svcName, ym, 'items:', itemBlocks.length)
+      if (itemBlocks.length > 0) {
+        // 첫 아이템 raw 로그 (금액 파싱 디버그용)
+        console.log('[RealPrice] first item sample:', itemBlocks[0].slice(0, 200))
+      }
+      for (const block of itemBlocks) {
+        // 국토부 API가 영문 필드명으로 변경됨 (한글 태그 병행 지원)
+        const amountRaw = xmlTagValue(block, 'dealAmount') ?? xmlTagValue(block, '거래금액')
+        const amount = amountRaw ? parseInt(amountRaw.replace(/[^0-9]/g, '')) || null : null
+        const yr = xmlTagValue(block, 'dealYear')  ?? xmlTagValue(block, '년') ?? xmlTagValue(block, '계약년도')
+        const mo = xmlTagValue(block, 'dealMonth') ?? xmlTagValue(block, '월') ?? xmlTagValue(block, '계약월')
+        const dealYm = (yr && mo) ? `${yr}${mo.padStart(2, '0')}` : ym
+        allItems.push({
+          deal_ym: dealYm,
+          amount,
+          area:    parseFloat(xmlTagValue(block, 'excluUseAr') ?? xmlTagValue(block, '전용면적') ?? '0') || null,
+          floor:   xmlTagValue(block, 'floor') ?? xmlTagValue(block, '층'),
+          name:    xmlTagValue(block, 'aptNm')  ?? xmlTagValue(block, '아파트') ?? xmlTagValue(block, '건물명'),
+          dong:    xmlTagValue(block, 'umdNm')  ?? xmlTagValue(block, '법정동') ?? xmlTagValue(block, '법정동명'),
+          type:    svcName,
+        })
+      }
+    })
   )
 
   allItems.sort((a, b) => (b.amount ?? 0) - (a.amount ?? 0))

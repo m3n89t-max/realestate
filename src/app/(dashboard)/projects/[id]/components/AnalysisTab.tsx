@@ -20,6 +20,7 @@ import {
   evaluatePopulationDisplay,
   hasDisplayableMetric,
 } from '@/lib/location-data-truthfulness'
+import { buildComparableSalesView } from '@/lib/comparable-sales'
 
 // ── POI 아이콘 맵 ─────────────────────────────────────────────
 const POI_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
@@ -936,77 +937,112 @@ function MapSection({
 }
 
 // ── 실거래가 섹션 ─────────────────────────────────────────────
-function RealPriceSection({ real_price_data, projectId, legalDong }: { real_price_data: RealPriceItem[], projectId: string, legalDong?: string | null }) {
+function RealPriceSection({ real_price_data, projectId, legalDong, propertyType, area }: {
+  real_price_data: RealPriceItem[] | null
+  projectId: string
+  legalDong?: string | null
+  /** 비교군 자산 종류는 이 값에서만 유도한다. */
+  propertyType?: string | null
+  /** 매물 전용면적(㎡). */
+  area?: number | null
+}) {
   const [showAll, setShowAll] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [collectFailed, setCollectFailed] = useState(false)
   const supabase = createClient()
 
   const collect = async () => {
     setLoading(true)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
       const { error } = await supabase.functions.invoke('collect-real-price', {
         body: { project_id: projectId },
       })
       if (error) throw error
+      setCollectFailed(false)
       toast.success('실거래가 수집이 완료되었습니다')
       window.location.reload()
     } catch {
+      setCollectFailed(true)
       toast.error('실거래가 수집에 실패했습니다')
     } finally {
       setLoading(false)
     }
   }
 
-  if (!real_price_data.length) return (
-    <div className="text-center py-6 space-y-3">
-      <TrendingUp size={32} className="mx-auto text-gray-200" />
-      <p className="text-sm text-gray-400">실거래가 데이터 없음</p>
-      <button onClick={collect} disabled={loading} className="btn-primary text-xs py-1.5">
-        {loading ? <><Loader2 size={12} className="animate-spin" /> 수집 중…</> : <><RefreshCw size={12} /> 실거래가 수집</>}
-      </button>
-    </div>
-  )
-  const amounts = real_price_data.map(t => t.amount).filter((a): a is number => a !== null && a > 0)
-  const avg = amounts.length ? Math.round(amounts.reduce((s, a) => s + a, 0) / amounts.length) : null
-  const max = amounts.length ? Math.max(...amounts) : null
-  const min = amounts.length ? Math.min(...amounts) : null
-  const list = showAll ? real_price_data.slice(0, 50) : real_price_data.slice(0, 10)
+  const view = buildComparableSalesView({
+    propertyType,
+    legalDong,
+    area,
+    items: real_price_data,
+    collectionFailed: collectFailed,
+  })
 
-  // 현재 데이터의 동 분포 파악
-  const dongs = [...new Set(real_price_data.map(t => t.dong).filter(Boolean))]
-  const singleDong = dongs.length === 1 ? dongs[0] : null
+  const collectButton = (
+    <button onClick={collect} disabled={loading} className="btn-primary text-xs py-1.5">
+      {loading ? <><Loader2 size={12} className="animate-spin" /> 수집 중…</> : <><RefreshCw size={12} /> 실거래가 수집</>}
+    </button>
+  )
+
+  // 자료를 보여줄 수 없는 상태는 상태별 문장만 내보낸다. 숫자를 만들지 않는다.
+  if (view.status !== 'available') {
+    return (
+      <div className="text-center py-6 space-y-3">
+        <TrendingUp size={32} className="mx-auto text-gray-200" />
+        <p className="text-sm text-gray-600">{view.headline}</p>
+        {view.status !== 'unsupported' && collectButton}
+        <p className="text-xs text-gray-400">출처: 국토교통부 실거래가 공개시스템</p>
+      </div>
+    )
+  }
+
+  const list = showAll ? view.statsItems.slice(0, 50) : view.statsItems.slice(0, 10)
 
   return (
     <div>
-      {/* 동 필터 안내 */}
-      {legalDong && (
-        <div className="flex items-center gap-1.5 mb-3 text-xs">
-          <MapPin size={11} className="text-brand-500 flex-shrink-0" />
-          <span className="text-gray-500">
-            {singleDong
-              ? <><span className="font-medium text-brand-700">{singleDong}</span> 인근 거래 {real_price_data.length}건</>
-              : <><span className="font-medium text-gray-700">{legalDong}</span> 주변 거래 {real_price_data.length}건</>
-            }
-          </span>
-        </div>
-      )}
-      {avg && (
-        <div className="grid grid-cols-3 gap-3 mb-4 p-3 bg-gray-50 rounded-lg">
+      {/* 초보 중개사가 첫 줄에서 이해할 평문 한 문장 */}
+      <p className="text-sm text-gray-700">{view.headline}</p>
+      <div className="flex items-center gap-1.5 mt-1 mb-3 text-xs">
+        <MapPin size={11} className="text-brand-500 flex-shrink-0" />
+        <span className="text-gray-600">{view.regionLabel}</span>
+        {view.periodLabel && <span className="text-gray-400">· {view.periodLabel}</span>}
+      </div>
+
+      {/* 금액은 같은 면적대 거래가 충분할 때만 렌더한다 */}
+      {view.canShowStats && view.stats ? (
+        <div className="grid grid-cols-3 gap-3 mb-2 p-3 bg-gray-50 rounded-lg">
           <div className="text-center">
             <p className="text-xs text-gray-400 mb-0.5">평균</p>
-            <p className="text-sm font-bold text-brand-700">{formatAmount(avg)}</p>
+            <p className="text-sm font-bold text-brand-700">{formatAmount(view.stats.average)}</p>
           </div>
           <div className="text-center border-x border-gray-200">
             <p className="text-xs text-gray-400 mb-0.5">최고</p>
-            <p className="text-sm font-bold text-red-600">{formatAmount(max)}</p>
+            <p className="text-sm font-bold text-red-600">{formatAmount(view.stats.max)}</p>
           </div>
           <div className="text-center">
             <p className="text-xs text-gray-400 mb-0.5">최저</p>
-            <p className="text-sm font-bold text-blue-600">{formatAmount(min)}</p>
+            <p className="text-sm font-bold text-blue-600">{formatAmount(view.stats.min)}</p>
           </div>
         </div>
+      ) : (
+        <p className="text-xs text-gray-500 mb-2">{view.statsNote}</p>
       )}
+
+      {/* 산식·구성비는 접힌 영역에 */}
+      <details className="mb-3">
+        <summary className="text-xs text-gray-400 cursor-pointer">비교군 구성과 계산 기준 보기</summary>
+        <div className="mt-2 space-y-1 text-xs text-gray-500">
+          {view.canShowStats && <p>{view.statsNote}</p>}
+          {view.excludedNote && <p>{view.excludedNote}</p>}
+          <p>
+            국토교통부 실거래가 자료는 시·군·구 단위로만 조회됩니다. 동 단위 조회가 제공되지 않아
+            같은 동 거래만 모을 수 없습니다.
+          </p>
+          {view.composition.slice(0, 5).map(c => (
+            <p key={c.dong}>{c.dong} {c.count}건 ({Math.round(c.ratio * 100)}%)</p>
+          ))}
+        </div>
+      </details>
+
       <div className="space-y-1.5">
         {list.map((t, i) => (
           <div key={i} className="flex items-center justify-between text-xs py-1.5 border-b border-gray-50 last:border-0">
@@ -1022,12 +1058,12 @@ function RealPriceSection({ real_price_data, projectId, legalDong }: { real_pric
           </div>
         ))}
       </div>
-      {real_price_data.length > 10 && (
+      {view.statsItems.length > 10 && (
         <button
           onClick={() => setShowAll(!showAll)}
           className="w-full mt-3 text-xs text-gray-400 hover:text-gray-600 flex items-center justify-center gap-1"
         >
-          {showAll ? <><ChevronUp size={12} /> 접기</> : <><ChevronDown size={12} /> 전체 {real_price_data.length}건 보기</>}
+          {showAll ? <><ChevronUp size={12} /> 접기</> : <><ChevronDown size={12} /> 전체 {view.statsItems.length}건 보기</>}
         </button>
       )}
       <button
@@ -1532,7 +1568,13 @@ export default function AnalysisTab({ projectId, project, locationAnalysis }: An
           <div className="flex-1 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
             {isCommercial
               ? <CommercialSection commercial_data={project.commercial_data} projectId={projectId} />
-              : <RealPriceSection real_price_data={project.real_price_data ?? []} projectId={projectId} legalDong={project.legal_dong} />
+              : <RealPriceSection
+                  real_price_data={project.real_price_data ?? null}
+                  projectId={projectId}
+                  legalDong={project.legal_dong}
+                  propertyType={project.property_type}
+                  area={project.area ?? null}
+                />
             }
           </div>
         </div>
