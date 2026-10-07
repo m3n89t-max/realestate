@@ -10,6 +10,10 @@ import {
 } from '@/lib/location-data-truthfulness'
 import type { PublicDataLayerResult } from '@/lib/public-data-layers'
 import type { SeoulCommercial, LocalCurrencySpending } from '@/lib/public-data-collectors'
+import {
+  buildMapDataLayerOptions,
+  type MapDataLayerId,
+} from '@/lib/map-data-layer-controls'
 
 declare global {
   interface Window { kakao: any }
@@ -66,102 +70,166 @@ export default function KakaoMap({
   const mapRef          = useRef<any>(null)
   const popCircleRef    = useRef<any>(null)
   const popLabelRef     = useRef<any>(null)
-  const flpopCircleRef  = useRef<any>(null)
   const flpopLabelRef   = useRef<any>(null)
   const cardOverlayRef  = useRef<any>(null)
-  const cardNoDataRef   = useRef<any>(null)
   const publicLayerRef  = useRef<any>(null)
+  const analysisCircleRef = useRef<any>(null)
+  const poiDataRef = useRef(poiData)
   const kakaoDensityRef = useRef(kakaoDensity)
-  const [showHeatmap, setShowHeatmap] = useState(false)
-  const [showPublicLayer, setShowPublicLayer] = useState(true)
+  const renderHeatmapRef = useRef<(() => void) | null>(null)
+  const [activeLayer, setActiveLayer] = useState<MapDataLayerId | null>(null)
   const [mapReady, setMapReady] = useState(false)
+  const [mapVersion, setMapVersion] = useState(0)
   const appKey = process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY
 
-  // kakaoDensity ref 동기화
-  useEffect(() => { kakaoDensityRef.current = kakaoDensity }, [kakaoDensity])
+  const results = publicDataLayers?.results ?? []
+  const hasPoi = buildFacilityHeatPoints(poiData, kakaoDensity).length > 0
+  const hasPopulationLayer = !!populationData && !(populationData as any).error && (
+    populationData.radius_500m_estimated != null ||
+    (populationData.total_population > 0 && populationData.density > 0)
+  )
+  const hasActivityLayer = (
+    (cardData?.has_data === true && hasDisplayableMetric(cardData?.floating_population)) ||
+    hasDisplayableMetric(commercialData?.floating_population)
+  )
+  const hasPublicLayerData = results.some(
+    r =>
+      (r.layerId === 'seoul_realtime_commercial' || r.layerId === 'local_currency_spending') &&
+      r.status === 'available',
+  )
+  const hasSpendingLayer = hasPublicLayerData || (
+    (cardData?.has_data === true && hasDisplayableMetric(cardData?.card_sales)) ||
+    hasDisplayableMetric(commercialData?.sales_data)
+  )
+  const mapLayerOptions = buildMapDataLayerOptions({
+    facilities: hasPoi,
+    population: hasPopulationLayer,
+    activity: hasActivityLayer,
+    spending: hasSpendingLayer,
+  })
+  const activeLayerOption = mapLayerOptions.find(layer => layer.id === activeLayer) ?? null
+  const showHeatmap = activeLayer === 'facilities'
+  const showPopulation = activeLayer === 'population'
+  const showActivity = activeLayer === 'activity'
+  const showSpending = activeLayer === 'spending'
+  const showPublicLayer = showSpending
+  const showLand = activeLayer === 'land'
 
-  // ── Effect 1: 지도 초기화 + 히트맵 (poiData / kakaoDensity 변경 시)
+  // 히트맵 입력 ref 동기화. 지도 인스턴스는 데이터 갱신 때 재생성하지 않는다.
+  useEffect(() => {
+    poiDataRef.current = poiData
+    kakaoDensityRef.current = kakaoDensity
+    renderHeatmapRef.current?.()
+  }, [poiData, kakaoDensity])
+
+  // ── Effect 1: 지도는 좌표가 바뀔 때만 초기화하고 데이터 갱신은 기존 지도에 반영한다.
   useEffect(() => {
     if (!appKey || !containerRef.current) return
 
+    let disposed = false
+    let initializedMap: any = null
+    let render: (() => void) | null = null
+    let script: HTMLScriptElement | null = null
+
     const initMap = () => {
       window.kakao.maps.load(() => {
-        const container = containerRef.current!
+        if (disposed || !containerRef.current) return
+        const container = containerRef.current
         const center = new window.kakao.maps.LatLng(lat, lng)
         const map = new window.kakao.maps.Map(container, { center, level })
+        initializedMap = map
         mapRef.current = map
-        setMapReady(true)
 
-        // 1. 매물 위치 마커
         const marker = new window.kakao.maps.Marker({ position: center, map })
         const infowindow = new window.kakao.maps.InfoWindow({
           content: '<div style="padding:5px 10px;font-size:12px;font-weight:600;white-space:nowrap;color:#1e3a8a;">📍 매물 주변 분석</div>',
         })
         infowindow.open(map, marker)
 
-        // 2. 업종 밀집도 원 (파란 실선)
-        if (kakaoDensity?.radius_m) {
-          new window.kakao.maps.Circle({
-            map,
-            center,
-            radius: kakaoDensity.radius_m,
-            strokeWeight: 1,
-            strokeColor: '#3b82f6',
-            strokeOpacity: 0.5,
-            fillColor: '#60a5fa',
-            fillOpacity: 0.1,
-          }).setMap(map)
-        }
-
-        // 3. 시설 밀집 참고도 (네이티브 Canvas) — 장소 좌표를 중복 제거해 시각화
         const canvas = canvasRef.current
-        if (!canvas) return
-
-        const toPixel = (iLat: number, iLng: number) => {
-          const b  = map.getBounds()
-          const sw = b.getSouthWest()
-          const ne = b.getNorthEast()
-          const w  = canvas.width
-          const h  = canvas.height
-          return {
-            x: Math.round(((iLng - sw.getLng()) / (ne.getLng() - sw.getLng())) * w),
-            y: Math.round(((ne.getLat() - iLat)  / (ne.getLat() - sw.getLat()))  * h),
+        if (canvas) {
+          const toPixel = (iLat: number, iLng: number) => {
+            const b = map.getBounds()
+            const sw = b.getSouthWest()
+            const ne = b.getNorthEast()
+            return {
+              x: Math.round(((iLng - sw.getLng()) / (ne.getLng() - sw.getLng())) * canvas.width),
+              y: Math.round(((ne.getLat() - iLat) / (ne.getLat() - sw.getLat())) * canvas.height),
+            }
           }
+
+          render = () => {
+            const width = container.offsetWidth
+            const height = container.offsetHeight
+            if (!width || !height) return
+            canvas.width = width
+            canvas.height = height
+            const points = buildFacilityHeatPoints(poiDataRef.current, kakaoDensityRef.current)
+              .map(point => ({ ...toPixel(point.lat, point.lng), value: point.value }))
+              .filter(point => point.x > -80 && point.x < canvas.width + 80 && point.y > -80 && point.y < canvas.height + 80)
+            drawHeatmap(canvas, points)
+          }
+          renderHeatmapRef.current = render
+          requestAnimationFrame(render)
+          window.kakao.maps.event.addListener(map, 'zoom_changed', render)
+          window.kakao.maps.event.addListener(map, 'dragend', render)
         }
 
-        const render = () => {
-          const w = container.offsetWidth
-          const h = container.offsetHeight
-          if (!w || !h) return  // 컨테이너 미준비 시 스킵
-          canvas.width  = w
-          canvas.height = h
-          const points = buildFacilityHeatPoints(poiData, kakaoDensityRef.current)
-            .map(point => ({ ...toPixel(point.lat, point.lng), value: point.value }))
-            .filter(point => point.x > -80 && point.x < canvas.width + 80 && point.y > -80 && point.y < canvas.height + 80)
-
-          drawHeatmap(canvas, points)
-        }
-
-        // 컨테이너 레이아웃 완료 후 렌더 (requestAnimationFrame)
-        requestAnimationFrame(render)
-        window.kakao.maps.event.addListener(map, 'zoom_changed', render)
-        window.kakao.maps.event.addListener(map, 'dragend', render)
+        setMapReady(true)
+        setMapVersion(version => version + 1)
       })
     }
 
-    const existing = document.querySelector('script[src*="dapi.kakao.com/v2/maps"]')
+    const existing = document.querySelector<HTMLScriptElement>('script[src*="dapi.kakao.com/v2/maps"]')
     if (window.kakao?.maps) {
       initMap()
     } else if (existing) {
+      script = existing
       existing.addEventListener('load', initMap)
     } else {
-      const script = document.createElement('script')
+      script = document.createElement('script')
       script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${appKey}&autoload=false`
       script.async = true
-      script.onload = initMap
+      script.addEventListener('load', initMap)
       document.head.appendChild(script)
     }
-  }, [lat, lng, level, appKey, poiData, kakaoDensity, locationAnalysis])
+
+    return () => {
+      disposed = true
+      script?.removeEventListener('load', initMap)
+      if (initializedMap && render) {
+        window.kakao.maps.event.removeListener(initializedMap, 'zoom_changed', render)
+        window.kakao.maps.event.removeListener(initializedMap, 'dragend', render)
+      }
+      if (mapRef.current === initializedMap) mapRef.current = null
+      if (renderHeatmapRef.current === render) renderHeatmapRef.current = null
+    }
+  }, [lat, lng, level, appKey])
+
+  // 생활·교통 분석 범위는 해당 레이어를 선택했을 때만 표시한다.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady || !window.kakao?.maps) return
+
+    if (analysisCircleRef.current) {
+      analysisCircleRef.current.setMap(null)
+      analysisCircleRef.current = null
+    }
+    if (!showHeatmap || !kakaoDensity?.radius_m) return
+
+    const circle = new window.kakao.maps.Circle({
+      map,
+      center: new window.kakao.maps.LatLng(lat, lng),
+      radius: kakaoDensity.radius_m,
+      strokeWeight: 1,
+      strokeColor: '#3b82f6',
+      strokeOpacity: 0.5,
+      fillColor: '#60a5fa',
+      fillOpacity: 0.1,
+    })
+    circle.setMap(map)
+    analysisCircleRef.current = circle
+  }, [showHeatmap, kakaoDensity?.radius_m, lat, lng, mapReady, mapVersion])
 
   // ── Effect 2: 배후 인구 원 (mapRef 준비 후 populationData 변경 시)
   useEffect(() => {
@@ -172,6 +240,7 @@ export default function KakaoMap({
     if (popCircleRef.current) { popCircleRef.current.setMap(null); popCircleRef.current = null }
     if (popLabelRef.current)  { popLabelRef.current.setMap(null);  popLabelRef.current  = null }
 
+    if (!showPopulation) return
     if (!populationData?.total_population || !populationData?.density || populationData.density <= 0) return
 
     const center = new window.kakao.maps.LatLng(lat, lng)
@@ -212,16 +281,16 @@ export default function KakaoMap({
     })
     label.setMap(map)
     popLabelRef.current = label
-  }, [populationData, lat, lng, mapReady, locationAnalysis])
+  }, [populationData, lat, lng, mapReady, mapVersion, locationAnalysis, showPopulation])
 
-  // ── Effect 3: 유동인구 원 (cardData 우선, fallback: commercial_data.floating_population)
+  // ── Effect 3: 제공기관 집계 범위의 유동인구 (임의의 반경 원을 그리지 않는다)
   useEffect(() => {
     const map = mapRef.current
     if (!map || !mapReady || !window.kakao?.maps) return
 
-    if (flpopCircleRef.current) { flpopCircleRef.current.setMap(null); flpopCircleRef.current = null }
     if (flpopLabelRef.current)  { flpopLabelRef.current.setMap(null);  flpopLabelRef.current  = null }
 
+    if (!showActivity) return
     // cardData 우선 사용, 없으면 commercialData fallback
     const useCard = cardData?.has_data && hasDisplayableMetric(cardData?.floating_population)
     const useCommercial = hasDisplayableMetric(commercialData?.floating_population)
@@ -237,27 +306,10 @@ export default function KakaoMap({
 
     if (!weekdayCount) return
 
-    const center = new window.kakao.maps.LatLng(lat, lng)
-    const flRadius = 300
-
     // 카드/상권 기반 티어별 색상 (🔥 핫 = 빨강, 🟡 보통 = 주황, 💤 한산 = 회색)
     const isHot    = useCard ? weekdayCount > 3000  : weekdayCount > 10000
     const isNormal = useCard ? weekdayCount > 500   : weekdayCount > 2000
-    const color        = isHot ? '#dc2626' : isNormal ? '#d97706' : '#94a3b8'
-    const strokeWeight = isHot ? 3 : isNormal ? 2 : 1.5
-    const fillOpacity  = isHot ? 0.18 : isNormal ? 0.1 : 0.04
-
-    const circle = new window.kakao.maps.Circle({
-      map, center, radius: flRadius,
-      strokeWeight,
-      strokeColor: color,
-      strokeOpacity: 0.95,
-      strokeStyle: isHot ? 'solid' : isNormal ? 'solid' : 'dashed',
-      fillColor: color,
-      fillOpacity,
-    })
-    circle.setMap(map)
-    flpopCircleRef.current = circle
+    const color = isHot ? '#dc2626' : isNormal ? '#d97706' : '#64748b'
 
     // 피크 시간대 계산
     let peakLabel = peakTimeLabel ?? ''
@@ -267,17 +319,17 @@ export default function KakaoMap({
       peakLabel = peakIdx >= 0 ? hourLabels[peakIdx] : ''
     }
 
-    const labelPos = new window.kakao.maps.LatLng(lat - (flRadius / 111_000) * 1.1, lng)
+    const labelPos = new window.kakao.maps.LatLng(lat - 0.0015, lng)
     const sourceTag = useCard ? '카드' : '상권'
     const label = new window.kakao.maps.CustomOverlay({
       map,
       position: labelPos,
-      content: `<div style="background:${color};color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;white-space:nowrap;opacity:0.92;">🚶 주중 ${weekdayCount.toLocaleString()}명(${sourceTag})${peakLabel ? ` · 피크 ${peakLabel}` : ''}</div>`,
+      content: `<div style="background:${color};color:#fff;font-size:10px;font-weight:700;padding:4px 9px;border-radius:8px;white-space:nowrap;opacity:0.94;">🚶 주중 ${weekdayCount.toLocaleString()}명(${sourceTag})${peakLabel ? ` · 피크 ${peakLabel}` : ''}<div style="font-size:8px;font-weight:500;opacity:0.8;margin-top:1px;">제공기관 집계 범위</div></div>`,
       yAnchor: 0,
     })
     label.setMap(map)
     flpopLabelRef.current = label
-  }, [commercialData, cardData, lat, lng, mapReady])
+  }, [commercialData, cardData, lat, lng, mapReady, mapVersion, showActivity])
 
   // ── Effect 4: 카드·상권 매출 현황 오버레이 (제주=카드, 전국=상권매출 병행)
   useEffect(() => {
@@ -285,8 +337,8 @@ export default function KakaoMap({
     if (!map || !mapReady || !window.kakao?.maps) return
 
     if (cardOverlayRef.current) { cardOverlayRef.current.setMap(null); cardOverlayRef.current = null }
-    if (cardNoDataRef.current)  { cardNoDataRef.current.setMap(null);  cardNoDataRef.current  = null }
 
+    if (!showSpending) return
     // 제주 카드 데이터
     const hasJejuCard = cardData?.has_data === true && hasDisplayableMetric(cardData?.card_sales)
     // 전국 상권 매출 데이터 (소상공인진흥공단 trdarSalersList)
@@ -295,52 +347,14 @@ export default function KakaoMap({
 
     const overlayPos = new window.kakao.maps.LatLng(lat, lng + 0.003)
 
-    // ── 전국 상권 유동인구 (소상공인 API — 카드 대체)
-    const commercialFp = commercialData?.floating_population
-    const hasCommercialFp = hasDisplayableMetric(commercialFp) && !!(commercialFp?.weekday > 0)
-
-    // ── 데이터 없음 표기
-    if (!hasJejuCard && !hasCommercialSales) {
-      if (hasCommercialFp) {
-        // 상권 유동인구 데이터로 대체 표시
-        const weekday: number = commercialFp.weekday ?? 0
-        const weekend: number = commercialFp.weekend ?? 0
-        const fpOverlay = new window.kakao.maps.CustomOverlay({
-          map,
-          position: overlayPos,
-          content: `
-            <div style="background:#fff;border:2px solid #a5b4fc;border-radius:12px;padding:10px 13px;box-shadow:0 2px 12px rgba(0,0,0,0.13);min-width:175px;font-family:sans-serif;">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;border-bottom:1px solid #f3f4f6;padding-bottom:5px;">
-                <span style="font-size:11px;font-weight:700;color:#4f46e5;">🚶 유동인구 현황</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px;">
-                <span style="color:#6b7280;">주중 유동인구</span>
-                <span style="font-weight:600;color:#1e293b;">${weekday.toLocaleString()}명</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;font-size:10px;">
-                <span style="color:#6b7280;">주말 유동인구</span>
-                <span style="font-weight:600;color:#1e293b;">${weekend.toLocaleString()}명</span>
-              </div>
-              <div style="font-size:9px;color:#9ca3af;text-align:right;margin-top:6px;">소상공인진흥공단</div>
-            </div>
-          `,
-          yAnchor: 0.5,
-          xAnchor: 0,
-        })
-        fpOverlay.setMap(map)
-        cardNoDataRef.current = fpOverlay
-      }
-      // 데이터가 없으면 overlay 표시하지 않음 (혼란 방지)
-      return
-    }
+    if (!hasJejuCard && !hasCommercialSales) return
 
     // ── 티어 분류 (🔥 핫플 / 🟡 보통 / 💤 한산)
     let tier: 'hot' | 'normal' | 'quiet' = 'normal'
     if (hasJejuCard) {
-      const weekday = cardData.floating_population?.weekday ?? 0
       const monthlySales = cardData.card_sales?.monthly_sales ?? 0
-      if (weekday > 3000 || monthlySales > 30_000_000) tier = 'hot'
-      else if (weekday > 500 || monthlySales > 5_000_000) tier = 'normal'
+      if (monthlySales > 30_000_000) tier = 'hot'
+      else if (monthlySales > 5_000_000) tier = 'normal'
       else tier = 'quiet'
     } else {
       const monthly = commercialSales?.monthly_sales ?? 0
@@ -361,24 +375,11 @@ export default function KakaoMap({
     let source = ''
 
     if (hasJejuCard) {
-      const fp = cardData.floating_population
       const cs = cardData.card_sales
-      const weekday: number = fp?.weekday ?? 0
-      const weekend: number = fp?.weekend ?? 0
-      const peakTime: string = fp?.peak_time ?? ''
       const monthlySales: number = cs?.monthly_sales ?? 0
       const latestMonth: string = cs?.latest_month ?? ''
 
       rows += `
-        <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px;">
-          <span style="color:#6b7280;">주중 카드사용</span>
-          <span style="font-weight:600;color:#1e293b;">${weekday.toLocaleString()}명</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px;">
-          <span style="color:#6b7280;">주말 카드사용</span>
-          <span style="font-weight:600;color:#1e293b;">${weekend.toLocaleString()}명</span>
-        </div>
-        ${peakTime ? `<div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px;"><span style="color:#6b7280;">피크 시간대</span><span style="font-weight:600;color:#7c3aed;">${peakTime}</span></div>` : ''}
         ${monthlySales > 0 ? `<div style="display:flex;justify-content:space-between;font-size:10px;margin-top:4px;padding-top:4px;border-top:1px dashed #e5e7eb;"><span style="color:#6b7280;">${latestMonth} 이용금액</span><span style="font-weight:700;color:#059669;">${Math.round(monthlySales / 10000).toLocaleString()}만원</span></div>` : ''}
       `
       source += '제주데이터허브'
@@ -422,7 +423,7 @@ export default function KakaoMap({
     })
     overlay.setMap(map)
     cardOverlayRef.current = overlay
-  }, [cardData, commercialData, lat, lng, mapReady])
+  }, [cardData, commercialData, lat, lng, mapReady, mapVersion, showSpending])
 
   // ── Effect 5: 무료 공공 데이터 레이어 오버레이
   // 서울 실시간 상권 결제 동향과 지역화폐 업종별 소비를 지도에 표시한다.
@@ -533,7 +534,8 @@ export default function KakaoMap({
               <span style="font-weight:600;color:#1e293b;">${won(cat.settlementAmount)}</span>
             </div>
           `).join('')}
-          <div style="font-size:8px;color:#cbd5e1;margin-top:4px;">지역화폐 결제분만 포함돼요 · 한국조폐공사</div>
+          <div style="font-size:8px;color:#94a3b8;margin-top:4px;">행정구역 통계 · 매물 지점 값 아님</div>
+          <div style="font-size:8px;color:#cbd5e1;margin-top:2px;">지역화폐 결제분만 포함돼요 · 한국조폐공사</div>
         </div>
       `
     }
@@ -551,7 +553,22 @@ export default function KakaoMap({
     })
     overlay.setMap(map)
     publicLayerRef.current = overlay
-  }, [publicDataLayers, showPublicLayer, lat, lng, mapReady])
+  }, [publicDataLayers, showPublicLayer, lat, lng, mapReady, mapVersion])
+
+  // ── Effect 6: 토지·지적 레이어
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady || !window.kakao?.maps) return
+
+    const cadastralType = window.kakao.maps.MapTypeId.USE_DISTRICT
+    if (showLand) {
+      map.addOverlayMapTypeId(cadastralType)
+    } else {
+      map.removeOverlayMapTypeId(cadastralType)
+    }
+
+    return () => map.removeOverlayMapTypeId(cadastralType)
+  }, [showLand, mapReady, mapVersion])
 
   if (!appKey) {
     return (
@@ -560,13 +577,6 @@ export default function KakaoMap({
       </div>
     )
   }
-
-  const hasPoi = poiData && Object.keys(poiData).length > 0
-  const hasPublicLayerData = (publicDataLayers?.results ?? []).some(
-    r =>
-      (r.layerId === 'seoul_realtime_commercial' || r.layerId === 'local_currency_spending') &&
-      r.status === 'available',
-  )
 
   return (
     <div className={`relative ${className || ''}`} style={style}>
@@ -585,36 +595,60 @@ export default function KakaoMap({
         }}
       />
 
-      {/* 하단 좌측: 레이어 토글 버튼 */}
-      <div className="absolute bottom-2 left-2 z-20 flex gap-1.5">
-        {hasPoi && (
-          <button
-            onClick={() => setShowHeatmap(v => !v)}
-            className={`text-[11px] px-2.5 py-1.5 rounded-full shadow-md border font-medium transition-all ${
-              showHeatmap
-                ? 'bg-orange-500 text-white border-orange-400'
-                : 'bg-white/90 backdrop-blur-sm text-gray-600 border-gray-200 hover:bg-gray-50'
-            }`}
-          >
-            시설 밀집 참고도
-          </button>
-        )}
-        {hasPublicLayerData && (
-          <button
-            onClick={() => setShowPublicLayer(v => !v)}
-            className={`text-[11px] px-2.5 py-1.5 rounded-full shadow-md border font-medium transition-all ${
-              showPublicLayer
-                ? 'bg-sky-600 text-white border-sky-500'
-                : 'bg-white/90 backdrop-blur-sm text-gray-600 border-gray-200 hover:bg-gray-50'
-            }`}
-          >
-            상권·소비
-          </button>
-        )}
+      {/* 하단: 한 번에 하나만 선택하는 지도 정보 레이어 */}
+      <div
+        role="group"
+        aria-label="지도 정보 레이어"
+        className="absolute bottom-2 left-2 right-2 z-20 flex gap-1.5 overflow-x-auto pb-0.5"
+      >
+        <button
+          type="button"
+          aria-pressed={activeLayer == null}
+          onClick={() => setActiveLayer(null)}
+          className={`shrink-0 text-[11px] px-2.5 py-1.5 rounded-full shadow-md border font-medium transition-all ${
+            activeLayer == null
+              ? 'bg-slate-700 text-white border-slate-600'
+              : 'bg-white/90 backdrop-blur-sm text-gray-600 border-gray-200 hover:bg-gray-50'
+          }`}
+        >
+          기본
+        </button>
+        {mapLayerOptions.map(layer => {
+          const selected = activeLayer === layer.id
+          return (
+            <button
+              key={layer.id}
+              type="button"
+              disabled={!layer.available}
+              aria-pressed={selected}
+              aria-label={`${layer.label}${layer.available ? '' : ' · 자료 없음'}`}
+              title={layer.available ? layer.description : `${layer.label}: 아직 수집된 자료가 없습니다.`}
+              onClick={() => setActiveLayer(selected ? null : layer.id)}
+              className={`shrink-0 text-[11px] px-2.5 py-1.5 rounded-full shadow-md border font-medium transition-all ${
+                selected
+                  ? `${layer.colorClass} text-white`
+                  : layer.available
+                    ? 'bg-white/90 backdrop-blur-sm text-gray-600 border-gray-200 hover:bg-gray-50'
+                    : 'bg-gray-100/90 text-gray-400 border-gray-200 cursor-not-allowed'
+              }`}
+            >
+              {layer.label}
+            </button>
+          )
+        })}
       </div>
 
+      {activeLayerOption && activeLayer !== 'population' && (
+        <div className="absolute top-3 left-3 z-20 max-w-[220px] rounded-xl border border-gray-200 bg-white/95 px-3 py-2 shadow-md backdrop-blur-sm">
+          <p className="text-[11px] font-bold text-gray-800">{activeLayerOption.label}</p>
+          <p className="mt-0.5 text-[9px] leading-4 text-gray-600">{activeLayerOption.description}</p>
+          <p className="mt-1 text-[10px] text-gray-600">범위: {activeLayerOption.scopeLabel}</p>
+          <p className="mt-0.5 text-[10px] text-gray-600">자료: {activeLayerOption.sourceLabel}</p>
+        </div>
+      )}
+
       {/* 배후 인구 분석 팝업 */}
-      {populationData && (
+      {activeLayer === 'population' && populationData && (
         <div className="absolute top-4 right-4 z-10 bg-white/95 backdrop-blur-sm p-3.5 rounded-xl shadow-md border border-brand-100 min-w-[190px]">
           <h4 className="text-xs font-bold text-gray-800 mb-2 flex items-center gap-1">
             <span>👥</span> 배후 인구 분석
@@ -679,7 +713,7 @@ export default function KakaoMap({
                 </div>
               </div>
               {populationData.collected_at && (
-                <p className="mt-2.5 text-[9px] text-gray-400 text-right">SGIS 통계청 기준</p>
+                <p className="mt-2.5 text-[10px] text-gray-600 text-right">자료: 통계청 SGIS · 범위: 행정구역 평균 및 500m 단순 환산</p>
               )}
             </div>
           )}
