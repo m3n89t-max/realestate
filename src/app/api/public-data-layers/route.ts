@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
 
     const { data: project } = await supabase
       .from('projects')
-      .select('id, org_id, address, jibun_address, lat, lng')
+      .select('id, org_id, address, jibun_address, lat, lng, sigungu_code, bjdong_code')
       .eq('id', project_id)
       .single()
 
@@ -58,10 +58,12 @@ export async function POST(req: NextRequest) {
         seoulPlaceName: nearest?.place.area_nm ?? null,
         sigunguName: extractSigungu(address),
         sidoName: extractSido(address),
+        sigunguCode: project.sigungu_code ?? null,
+        bjdongCode: project.bjdong_code ?? null,
       },
       {
         seoulOpenApiKey: process.env.SEOUL_OPENAPI_KEY ?? null,
-        dataGoKrKey: process.env.LOCAL_GIFT_CARD_API_KEY ?? process.env.PUBLIC_DATA_API_KEY ?? null,
+        dataGoKrKey: process.env.LOCAL_GIFT_CARD_API_KEY ?? null,
       },
     )
 

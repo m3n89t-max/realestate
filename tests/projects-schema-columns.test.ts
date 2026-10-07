@@ -31,10 +31,15 @@ function collectProjectColumns(): Set<string> {
       }
     }
 
-    // ALTER TABLE projects ADD COLUMN [IF NOT EXISTS] name type
-    const addRe = /ALTER TABLE\s+(?:public\.)?projects\s+ADD COLUMN\s+(?:IF NOT EXISTS\s+)?([a-z_][a-z0-9_]*)/gi
-    let m: RegExpExecArray | null
-    while ((m = addRe.exec(sql)) !== null) columns.add(m[1])
+    // ALTER TABLE projects ADD COLUMN ... 문 안의 모든 컬럼을 수집한다.
+    // 한 ALTER TABLE 문에 ADD COLUMN 절이 쉼표로 여러 개 올 수 있다.
+    const alterRe = /ALTER TABLE\s+(?:public\.)?projects\s+([\s\S]*?);/gi
+    let alter: RegExpExecArray | null
+    while ((alter = alterRe.exec(sql)) !== null) {
+      const addRe = /ADD COLUMN\s+(?:IF NOT EXISTS\s+)?([a-z_][a-z0-9_]*)/gi
+      let added: RegExpExecArray | null
+      while ((added = addRe.exec(alter[1])) !== null) columns.add(added[1])
+    }
   }
 
   return columns
