@@ -680,9 +680,18 @@ function MapSection({
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-between items-center px-1 gap-2">
+      <div className="flex flex-col gap-2 px-1 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs text-gray-500">지도의 마커와 팝업으로 상세 위치 정보를 확인하세요.</p>
-        <div className="flex gap-1.5 flex-shrink-0">
+        <div className="flex flex-wrap gap-1.5 sm:flex-shrink-0">
+          <a
+            href={`https://map.kakao.com/link/map/${lat},${lng}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-secondary flex h-7 items-center gap-1 px-2.5 py-1 text-[11px]"
+          >
+            <ExternalLink size={10} />
+            카카오지도
+          </a>
           <button onClick={collectPublicData} disabled={publicLoading || !lat} className="btn-secondary text-[11px] py-1 px-2.5 h-7">
             {publicLoading ? <><Loader2 size={11} className="animate-spin" /> 수집 중…</> : <><Layers size={11} /> 공공 자료 불러오기</>}
           </button>
@@ -693,15 +702,6 @@ function MapSection({
       </div>
       <div className="rounded-xl overflow-hidden border border-gray-100 relative">
         <KakaoMap lat={lat} lng={lng} level={4} style={{ width: '100%', height: 380 }} poiData={poi_data} kakaoDensity={kakao_density} locationAnalysis={locationAnalysis} populationData={population_data} commercialData={commercial_data} cardData={card_data} publicDataLayers={public_data_layers} />
-        <a
-          href={`https://map.kakao.com/link/map/${lat},${lng}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="absolute bottom-2 right-2 flex items-center gap-1 bg-white/90 backdrop-blur-sm text-xs text-gray-600 px-2 py-1 rounded-full shadow hover:bg-white z-10"
-        >
-          <ExternalLink size={10} />
-          카카오지도
-        </a>
       </div>
 
       {/* 무료 공공 데이터 레이어 */}
