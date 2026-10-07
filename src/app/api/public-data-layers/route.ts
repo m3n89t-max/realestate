@@ -64,6 +64,8 @@ export async function POST(req: NextRequest) {
       {
         seoulOpenApiKey: process.env.SEOUL_OPENAPI_KEY ?? null,
         dataGoKrKey: process.env.LOCAL_GIFT_CARD_API_KEY ?? null,
+        kaptListApiKey: process.env.KAPT_APT_LIST_API_KEY ?? null,
+        kaptBasicApiKey: process.env.KAPT_APT_BASIC_API_KEY ?? null,
       },
     )
 

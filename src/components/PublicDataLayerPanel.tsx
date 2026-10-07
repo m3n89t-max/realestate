@@ -97,6 +97,14 @@ function LayerCard({
   // 값이 없는 카드에 신뢰도 배지를 달면 배지의 의미가 희석된다.
   const hasValue = status === 'available'
   const confidence = confidenceOf(layer)
+  const kaptValue = layer.id === 'kapt_apartment_households' && result?.value && typeof result.value === 'object'
+    ? result.value as {
+        regionLabel?: string | null
+        complexCount?: number
+        totalHouseholds?: number
+        complexes?: Array<{ kaptCode: string; kaptName: string; households: number }>
+      }
+    : null
 
   return (
     <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
@@ -116,10 +124,24 @@ function LayerCard({
 
       <p className="text-[10px] text-gray-500 leading-relaxed mt-1.5">{layer.plainSentence}</p>
 
+      {hasValue && kaptValue && Number.isFinite(kaptValue.complexCount) && Number.isFinite(kaptValue.totalHouseholds) && (
+        <div className="mt-2 rounded-lg bg-emerald-50 px-2.5 py-2">
+          <p className="text-xs font-bold text-emerald-800">
+            같은 법정동 {kaptValue.complexCount!.toLocaleString()}개 단지 · {kaptValue.totalHouseholds!.toLocaleString()}세대
+          </p>
+          {kaptValue.regionLabel && (
+            <p className="mt-0.5 text-[10px] text-emerald-700">{kaptValue.regionLabel}</p>
+          )}
+          <p className="mt-1 text-[10px] font-medium text-orange-700">반경 500m 값이 아니며 거주인구로 환산하지 않습니다.</p>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mt-2">
         <span className="text-[9px] text-gray-400">{STATUS_BADGE[status]}</span>
         {result?.sourceAsOf && (
-          <span className="text-[9px] text-gray-400">기준 {result.sourceAsOf}</span>
+          <span className="text-[9px] text-gray-400">
+            {layer.id === 'kapt_apartment_households' ? '조회' : '기준'} {result.sourceAsOf}
+          </span>
         )}
       </div>
 
@@ -135,7 +157,24 @@ function LayerCard({
         산정 기준 보기
       </button>
 
-      {open && <LayerDetail layer={layer} />}
+      {open && (
+        <>
+          <LayerDetail layer={layer} />
+          {kaptValue?.complexes && kaptValue.complexes.length > 0 && (
+            <div className="mt-2 border-t border-gray-100 pt-2">
+              <p className="text-[10px] font-semibold text-gray-600">등록 단지</p>
+              <ul className="mt-1 space-y-1">
+                {kaptValue.complexes.map(complex => (
+                  <li key={complex.kaptCode} className="flex justify-between gap-2 text-[10px] text-gray-500">
+                    <span className="truncate">{complex.kaptName}</span>
+                    <span className="flex-shrink-0 font-medium text-gray-700">{complex.households.toLocaleString()}세대</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }

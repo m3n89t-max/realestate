@@ -655,7 +655,7 @@ export default function KakaoMap({
           </h4>
 
           {/* SGIS 수집 실패 시 에러 안내 */}
-          {(populationData as any).error && (
+          {populationData?.error && (
             <div className="bg-red-50 border border-red-200 rounded-lg px-2.5 py-2 text-[10px] text-red-600 mb-2">
               <p className="font-semibold mb-0.5">데이터 수집 실패</p>
               <p className="text-red-500">SGIS가 이 좌표를 찾지 못했습니다. &apos;배후 인구 분석&apos; 버튼으로 재시도하세요.</p>
@@ -663,7 +663,7 @@ export default function KakaoMap({
           )}
 
           {/* 섹션 1: 행정구역 평균밀도 기반 500m 거주인구 단순 환산 */}
-          {!(populationData as any).error && populationData.radius_500m_estimated != null && (() => {
+          {!populationData?.error && populationData?.radius_500m_estimated != null && (() => {
             const estimate = getPopulationEstimate(populationData)
             if (!estimate) return null
             const barrierMessage = describeBarrierStatus(populationData)
@@ -681,11 +681,12 @@ export default function KakaoMap({
             )
           })()}
 
-          {/* 구분선 — 에러 시 숨김 */}
-          {!(populationData as any).error && <div className="border-t border-gray-200 my-2" />}
+
+          {/* 구분선 — SGIS 행정구역 통계가 있을 때만 표시 */}
+          {!populationData?.error && populationData && <div className="border-t border-gray-200 my-2" />}
 
           {/* 섹션 2: 읍면동 행정구역 통계 — 에러 시 숨김 */}
-          {!(populationData as any).error && (
+          {!populationData?.error && populationData && (
             <div>
               <p className="text-[9px] font-semibold text-gray-500 mb-1.5">
                 🏘 {populationData.adm_nm || '행정구역'} ({populationData.adm_level || '시군구'}) 전체 통계

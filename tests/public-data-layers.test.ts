@@ -51,6 +51,15 @@ test('지역화폐 레이어는 전체 카드매출로 표기되지 않는다', 
   assert.ok(layer.label.includes('지역화폐'))
 })
 
+test('K-apt 공동주택 세대수는 법정동 사실값이며 500m 인구로 표기하지 않는다', () => {
+  const layer = PUBLIC_DATA_LAYERS.find(item => item.id === 'kapt_apartment_households')
+  assert.ok(layer)
+  assert.equal(layer.metricSemantics, 'administrative_observed')
+  assert.ok(layer.spatialUnit.includes('법정동'))
+  assert.ok(`${layer.plainSentence}${layer.coverageNote ?? ''}`.includes('500m'))
+  assert.ok(!`${layer.label}${layer.plainSentence}`.includes('거주인구'))
+})
+
 test('서울 상권 결제 레이어는 금액이 구간값임을 명시한다', () => {
   const layer = PUBLIC_DATA_LAYERS.find(item => item.id === 'seoul_realtime_commercial')
   assert.ok(layer)
@@ -97,6 +106,7 @@ test('전국 레이어는 모든 지역에 적용된다', () => {
     const ids = getApplicableLayers(address).map(layer => layer.id)
     assert.ok(ids.includes('local_currency_spending'), `${address}: 전국 레이어가 빠졌다`)
     assert.ok(ids.includes('sgis_resident_population'), `${address}: 전국 레이어가 빠졌다`)
+    assert.ok(ids.includes('kapt_apartment_households'), `${address}: K-apt 전국 레이어가 빠졌다`)
   }
 })
 

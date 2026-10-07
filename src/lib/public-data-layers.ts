@@ -88,6 +88,22 @@ export const PUBLIC_DATA_LAYERS: PublicDataLayer[] = [
     defaultVisible: true,
   },
   {
+    id: 'kapt_apartment_households',
+    label: '법정동 공동주택 세대수',
+    plainSentence: '같은 법정동에 등록된 K-apt 공동주택 단지와 공식 세대수를 보여줘요. 500m 반경 값은 아니에요.',
+    source: '국토교통부 K-apt',
+    metricSemantics: 'administrative_observed',
+    spatialUnit: '법정동 내 K-apt 등록 공동주택',
+    method: '법정동 코드로 단지 목록을 모두 조회한 뒤 각 단지의 기본정보에 있는 공식 세대수를 합산합니다.',
+    coverageNote: '좌표가 확인되지 않았으므로 반경 500m 공동주택이나 거주인구 추정에는 사용하지 않습니다.',
+    license: '이용허락범위 제한 없음',
+    officialUrl: 'https://www.data.go.kr/data/15058453/openapi.do',
+    scope: 'nationwide',
+    render: 'panel',
+    delivery: 'collector',
+    defaultVisible: true,
+  },
+  {
     id: 'kakao_facility_density',
     label: '시설 밀집 참고도',
     plainSentence: '가게와 편의시설이 어디에 모여 있는지 보여줘요.',
@@ -387,6 +403,7 @@ export type ConfidenceTier = '높음' | '보통' | '참고'
 export function confidenceOf(layer: PublicDataLayer): ConfidenceTier {
   switch (layer.metricSemantics) {
     case 'observed':
+    case 'administrative_observed':
       return '높음'
     case 'sample_observed':
       return '보통'

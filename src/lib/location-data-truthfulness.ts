@@ -2,6 +2,7 @@ import type { KakaoDensity, POIItem } from './types'
 
 export type MetricSemantics =
   | 'observed'
+  | 'administrative_observed'
   | 'sample_observed'
   | 'estimated'
   | 'redistributed_estimate'
