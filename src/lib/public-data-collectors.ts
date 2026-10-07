@@ -20,6 +20,10 @@ import {
 export interface CollectorEnv {
   seoulOpenApiKey: string | null
   dataGoKrKey: string | null
+  kaptListApiKey?: string | null
+  kaptBasicApiKey?: string | null
+  /** 테스트에서만 짧게 조정한다. 운영 기본값은 8초다. */
+  kaptRequestTimeoutMs?: number
   fetchImpl?: typeof fetch
 }
 
@@ -89,6 +93,159 @@ function toNullableNumber(value: unknown): number | null {
     return Number.isFinite(parsed) ? parsed : null
   }
   return null
+}
+
+// ── K-apt 공동주택 단지·세대수 ─────────────────────────────────
+
+export interface KaptApartmentListItem {
+  bjdCode: string
+  kaptCode: string
+  kaptName: string
+  sido: string
+  sigungu: string
+  eupmyeondong: string
+  ri: string | null
+}
+
+export interface KaptApartmentListPage {
+  items: KaptApartmentListItem[]
+  pageNo: number
+  numOfRows: number
+  totalCount: number
+}
+
+export interface KaptApartmentBasic {
+  bjdCode: string
+  kaptCode: string
+  kaptName: string
+  legalAddress: string | null
+  roadAddress: string | null
+  /** K-apt의 공식 세대수(kaptdaCnt). 거주인구가 아니다. */
+  households: number
+  /** K-apt의 호수(hoCnt). 세대수 대체값으로 사용하지 않는다. */
+  units: number | null
+  buildingCount: number | null
+}
+
+export interface KaptApartmentHouseholds {
+  bjdCode: string
+  regionLabel: string | null
+  complexCount: number
+  totalHouseholds: number
+  complexes: KaptApartmentBasic[]
+  provenance: DataProvenance
+}
+
+export function parseKaptApartmentList(raw: unknown, requestedBjdCode: string): KaptApartmentListPage | null {
+  if (!/^\d{10}$/.test(requestedBjdCode) || !raw || typeof raw !== 'object') return null
+  const root = raw as Record<string, any>
+  if (String(root.header?.resultCode ?? '') !== '00') return null
+
+  const body = root.body
+  const pageNo = toNullableNumber(body?.pageNo)
+  const numOfRows = toNullableNumber(body?.numOfRows)
+  const totalCount = toNullableNumber(body?.totalCount)
+  if (
+    pageNo == null || !Number.isInteger(pageNo) || pageNo < 1 ||
+    numOfRows == null || !Number.isInteger(numOfRows) || numOfRows < 1 ||
+    totalCount == null || !Number.isInteger(totalCount) || totalCount < 0
+  ) return null
+
+  const rawItems = Array.isArray(body?.items)
+    ? body.items
+    : Array.isArray(body?.items?.item)
+      ? body.items.item
+      : body?.items?.item
+        ? [body.items.item]
+        : []
+
+  const items: KaptApartmentListItem[] = []
+  for (const item of rawItems) {
+    const bjdCode = String(item?.bjdCode ?? '')
+    const kaptCode = String(item?.kaptCode ?? '').trim()
+    const kaptName = String(item?.kaptName ?? '').trim()
+    if (bjdCode !== requestedBjdCode || !kaptCode || !kaptName) return null
+    items.push({
+      bjdCode,
+      kaptCode,
+      kaptName,
+      sido: String(item.as1 ?? '').trim(),
+      sigungu: String(item.as2 ?? '').trim(),
+      eupmyeondong: String(item.as3 ?? '').trim(),
+      ri: item.as4 ? String(item.as4).trim() || null : null,
+    })
+  }
+
+  if (items.length > numOfRows || (totalCount === 0 && items.length > 0)) return null
+  return { items, pageNo, numOfRows, totalCount }
+}
+
+export function parseKaptApartmentBasic(raw: unknown, requestedKaptCode: string): KaptApartmentBasic | null {
+  if (!requestedKaptCode || !raw || typeof raw !== 'object') return null
+  const root = raw as Record<string, any>
+  if (String(root.header?.resultCode ?? '') !== '00') return null
+  const item = root.body?.item
+  if (!item || typeof item !== 'object') return null
+
+  const kaptCode = String(item.kaptCode ?? '').trim()
+  const bjdCode = String(item.bjdCode ?? '')
+  const kaptName = String(item.kaptName ?? '').trim()
+  const households = toNullableNumber(item.kaptdaCnt)
+  if (
+    kaptCode !== requestedKaptCode || !/^\d{10}$/.test(bjdCode) || !kaptName ||
+    households == null || !Number.isInteger(households) || households < 0
+  ) return null
+
+  const units = toNullableNumber(item.hoCnt)
+  const buildingCount = toNullableNumber(item.kaptDongCnt)
+  return {
+    bjdCode,
+    kaptCode,
+    kaptName,
+    legalAddress: item.kaptAddr ? String(item.kaptAddr).trim() || null : null,
+    roadAddress: item.doroJuso ? String(item.doroJuso).trim() || null : null,
+    households,
+    units: units != null && Number.isInteger(units) && units >= 0 ? units : null,
+    buildingCount: buildingCount != null && Number.isInteger(buildingCount) && buildingCount >= 0 ? buildingCount : null,
+  }
+}
+
+function normalizeServiceKey(value: string): string {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
+async function fetchJsonWithTimeout(
+  fetchImpl: typeof fetch,
+  url: string,
+  timeoutMs: number,
+): Promise<{ ok: boolean; json: unknown }> {
+  const controller = new AbortController()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let response: Response | null = null
+  const operation = (async () => {
+    response = await fetchImpl(url, { signal: controller.signal })
+    const json = await response.json()
+    return { ok: response.ok, json }
+  })()
+
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          controller.abort()
+          void response?.body?.cancel().catch(() => undefined)
+          reject(new Error('K-apt request timed out'))
+        }, timeoutMs)
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
 }
 
 export function parseSeoulCommercial(raw: unknown, placeName: string): SeoulCommercial | null {
@@ -255,6 +412,112 @@ export function extractSigungu(address?: string | null): string | null {
   // 광역시도명(서울특별시 등)을 제외하고 첫 시군구를 고른다.
   const candidate = match.find(token => !/(특별시|광역시|특별자치시|특별자치도)$/.test(token))
   return candidate ?? null
+}
+
+async function collectKaptApartmentHouseholds(
+  target: CollectorTarget,
+  env: CollectorEnv,
+): Promise<PublicDataLayerResult> {
+  const layerId = 'kapt_apartment_households'
+  if (!env.kaptListApiKey || !env.kaptBasicApiKey) return emptyResult(layerId, 'unconfigured')
+
+  const sigunguCode = target.sigunguCode?.trim() ?? ''
+  const bjdongCode = target.bjdongCode?.trim() ?? ''
+  const fullBjdCode = `${sigunguCode}${bjdongCode}`
+  if (!/^\d{10}$/.test(fullBjdCode)) return emptyResult(layerId, 'empty')
+
+  const doFetch = env.fetchImpl ?? fetch
+  const requestTimeoutMs = Number.isFinite(env.kaptRequestTimeoutMs) && (env.kaptRequestTimeoutMs ?? 0) > 0
+    ? env.kaptRequestTimeoutMs!
+    : 8_000
+  const listEndpoint = 'https://apis.data.go.kr/1613000/AptListService4/getLegaldongAptList4'
+  const basicEndpoint = 'https://apis.data.go.kr/1613000/AptBasisInfoServiceV5/getAphusBassInfoV5'
+
+  try {
+    const listItems: KaptApartmentListItem[] = []
+    const kaptCodes = new Set<string>()
+    let expectedTotal: number | null = null
+
+    for (let pageNo = 1; pageNo <= 100; pageNo += 1) {
+      const params = new URLSearchParams({
+        serviceKey: normalizeServiceKey(env.kaptListApiKey),
+        bjdCode: fullBjdCode,
+        pageNo: String(pageNo),
+        numOfRows: '100',
+      })
+      const response = await fetchJsonWithTimeout(doFetch, `${listEndpoint}?${params}`, requestTimeoutMs)
+      if (!response.ok) return emptyResult(layerId, 'failed')
+      const parsed = parseKaptApartmentList(response.json, fullBjdCode)
+      if (!parsed || parsed.pageNo !== pageNo) return emptyResult(layerId, 'failed')
+
+      expectedTotal ??= parsed.totalCount
+      if (parsed.totalCount !== expectedTotal || listItems.length + parsed.items.length > expectedTotal) {
+        return emptyResult(layerId, 'failed')
+      }
+      for (const item of parsed.items) {
+        if (kaptCodes.has(item.kaptCode)) return emptyResult(layerId, 'failed')
+        kaptCodes.add(item.kaptCode)
+        listItems.push(item)
+      }
+
+      if (listItems.length === expectedTotal) break
+      if (parsed.items.length === 0 || pageNo === 100) return emptyResult(layerId, 'failed')
+    }
+
+    if (expectedTotal === 0) return emptyResult(layerId, 'empty')
+    if (expectedTotal == null || listItems.length !== expectedTotal) return emptyResult(layerId, 'failed')
+
+    const complexes: KaptApartmentBasic[] = []
+    for (let offset = 0; offset < listItems.length; offset += 5) {
+      const chunk = listItems.slice(offset, offset + 5)
+      const resolved = await Promise.all(chunk.map(async listItem => {
+        const params = new URLSearchParams({
+          serviceKey: normalizeServiceKey(env.kaptBasicApiKey!),
+          kaptCode: listItem.kaptCode,
+        })
+        const response = await fetchJsonWithTimeout(doFetch, `${basicEndpoint}?${params}`, requestTimeoutMs)
+        if (!response.ok) return null
+        const parsed = parseKaptApartmentBasic(response.json, listItem.kaptCode)
+        if (!parsed || parsed.bjdCode !== fullBjdCode) return null
+        return parsed
+      }))
+      if (resolved.some(item => item == null)) return emptyResult(layerId, 'failed')
+      complexes.push(...resolved as KaptApartmentBasic[])
+    }
+
+    complexes.sort((a, b) => a.kaptName.localeCompare(b.kaptName, 'ko'))
+    const collectedAt = new Date().toISOString()
+    const first = listItems[0]
+    const regionLabel = [first?.sido, first?.sigungu, first?.eupmyeondong, first?.ri]
+      .filter(Boolean)
+      .join(' ') || null
+    const value: KaptApartmentHouseholds = {
+      bjdCode: fullBjdCode,
+      regionLabel,
+      complexCount: complexes.length,
+      totalHouseholds: complexes.reduce((sum, item) => sum + item.households, 0),
+      complexes,
+      provenance: {
+        source: '국토교통부 K-apt 공동주택 단지 목록·기본정보',
+        metric_semantics: 'administrative_observed',
+        source_as_of: collectedAt.slice(0, 10),
+        collected_at: collectedAt,
+        spatial_unit: '법정동 내 K-apt 등록 공동주택',
+        method: '법정동 단지 목록을 모두 조회하고 각 단지의 공식 세대수(kaptdaCnt)를 합산',
+        coverage_note: 'API 조회일 기준 등록정보입니다. 좌표가 없어 반경 500m 값과 거주인구 추정에는 사용하지 않습니다.',
+      },
+    }
+
+    return {
+      layerId,
+      status: 'available',
+      value,
+      collectedAt,
+      sourceAsOf: value.provenance.source_as_of,
+    }
+  } catch {
+    return emptyResult(layerId, 'failed')
+  }
 }
 
 async function collectSeoulCommercial(
@@ -437,14 +700,19 @@ export async function collectPublicDataLayers(
 
   // 수집기가 구현된 레이어는 독립 실행한다 (allSettled: 하나의 실패가 형제를 취소하지 않는다).
   const settled = await Promise.allSettled([
+    collectKaptApartmentHouseholds(target, env),
     collectSeoulCommercial(target, env),
     collectLocalCurrency(target, env),
   ])
 
+  const collectedLayerIds = [
+    'kapt_apartment_households',
+    'seoul_realtime_commercial',
+    'local_currency_spending',
+  ] as const
   const collected: PublicDataLayerResult[] = settled.map((outcome, index) => {
     if (outcome.status === 'fulfilled') return outcome.value
-    const layerId = index === 0 ? 'seoul_realtime_commercial' : 'local_currency_spending'
-    return emptyResult(layerId, 'failed')
+    return emptyResult(collectedLayerIds[index], 'failed')
   })
 
   const collectedIds = new Set(collected.map(item => item.layerId))

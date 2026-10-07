@@ -53,6 +53,12 @@ test('행정구역 소비 통계는 매물 지점의 값이 아니라고 지도�
   assert.match(source, /행정구역 통계 · 매물 지점 값 아님/)
 })
 
+test('K-apt 세대수는 좌표 확보 전 지도 인구 레이어를 활성화하지 않는다', () => {
+  const source = readFileSync(path.join(process.cwd(), 'src/components/KakaoMap.tsx'), 'utf8')
+  assert.doesNotMatch(source, /kapt_apartment_households/)
+  assert.doesNotMatch(source, /같은 법정동 K-apt 공동주택/)
+})
+
 test('모바일 지도에서 인구 정보 카드와 공통 설명 카드를 겹쳐 표시하지 않는다', () => {
   const source = readFileSync(path.join(process.cwd(), 'src/components/KakaoMap.tsx'), 'utf8')
   assert.match(source, /activeLayerOption && activeLayer !== 'population'/)

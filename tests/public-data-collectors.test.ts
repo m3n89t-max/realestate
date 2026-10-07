@@ -3,10 +3,242 @@ import assert from 'node:assert/strict'
 
 import {
   collectPublicDataLayers,
+  parseKaptApartmentBasic,
+  parseKaptApartmentList,
   parseSeoulCommercial,
   parseLocalCurrencySpending,
   type CollectorEnv,
 } from '../src/lib/public-data-collectors'
+
+const KAPT_LIST_SAMPLE = {
+  header: { resultCode: '00', resultMsg: 'NORMAL SERVICE.' },
+  body: {
+    items: [
+      { bjdCode: '5011013700', kaptCode: 'A10027875', kaptName: '연동센트럴', as1: '제주특별자치도', as2: '제주시', as3: '연동', as4: '' },
+      { bjdCode: '5011013700', kaptCode: 'A10027876', kaptName: '연동그린', as1: '제주특별자치도', as2: '제주시', as3: '연동', as4: '' },
+    ],
+    numOfRows: '100',
+    pageNo: '1',
+    totalCount: '2',
+  },
+}
+
+const KAPT_BASIC_SAMPLE = {
+  header: { resultCode: '00', resultMsg: 'NORMAL SERVICE.' },
+  body: {
+    item: {
+      bjdCode: '5011013700',
+      kaptCode: 'A10027875',
+      kaptName: '연동센트럴',
+      kaptAddr: '제주특별자치도 제주시 연동 1',
+      doroJuso: '제주특별자치도 제주시 신대로 1',
+      kaptdaCnt: '480',
+      hoCnt: 500,
+      kaptDongCnt: 4,
+    },
+  },
+}
+
+test('K-apt 목록 응답은 10자리 법정동과 단지코드를 보존한다', () => {
+  const parsed = parseKaptApartmentList(KAPT_LIST_SAMPLE, '5011013700')
+  assert.ok(parsed)
+  assert.equal(parsed.pageNo, 1)
+  assert.equal(parsed.totalCount, 2)
+  assert.equal(parsed.items[0].kaptCode, 'A10027875')
+  assert.equal(parsed.items[0].bjdCode, '5011013700')
+})
+
+test('K-apt 기본정보는 kaptdaCnt만 공식 세대수로 사용한다', () => {
+  const parsed = parseKaptApartmentBasic(KAPT_BASIC_SAMPLE, 'A10027875')
+  assert.ok(parsed)
+  assert.equal(parsed.households, 480)
+  assert.equal(parsed.units, 500)
+  assert.equal(parsed.buildingCount, 4)
+  assert.equal((parsed as unknown as Record<string, unknown>).population, undefined)
+})
+
+test('K-apt 수집기는 법정동의 전체 단지 기본정보를 합산하되 500m 값은 만들지 않는다', async () => {
+  const requestedUrls: string[] = []
+  const fetchImpl: typeof fetch = async input => {
+    const url = String(input)
+    requestedUrls.push(url)
+    if (url.includes('/AptListService4/getLegaldongAptList4')) {
+      return new Response(JSON.stringify(KAPT_LIST_SAMPLE), { status: 200 })
+    }
+    if (url.includes('kaptCode=A10027875')) {
+      return new Response(JSON.stringify(KAPT_BASIC_SAMPLE), { status: 200 })
+    }
+    if (url.includes('kaptCode=A10027876')) {
+      return new Response(JSON.stringify({
+        ...KAPT_BASIC_SAMPLE,
+        body: { item: { ...KAPT_BASIC_SAMPLE.body.item, kaptCode: 'A10027876', kaptName: '연동그린', kaptdaCnt: '320' } },
+      }), { status: 200 })
+    }
+    return new Response('{}', { status: 404 })
+  }
+
+  const results = await collectPublicDataLayers(
+    {
+      address: '제주특별자치도 제주시 연동', lat: 33.48, lng: 126.49,
+      sidoName: '제주특별자치도', sigunguName: '제주시', sigunguCode: '50110', bjdongCode: '13700',
+    },
+    {
+      seoulOpenApiKey: null, dataGoKrKey: null,
+      kaptListApiKey: 'list-key', kaptBasicApiKey: 'basic-key', fetchImpl,
+    },
+  )
+
+  const result = results.find(item => item.layerId === 'kapt_apartment_households')
+  assert.equal(result?.status, 'available')
+  const value = result?.value as Record<string, any>
+  assert.equal(value.bjdCode, '5011013700')
+  assert.equal(value.complexCount, 2)
+  assert.equal(value.totalHouseholds, 800)
+  assert.equal(value.provenance.spatial_unit, '법정동 내 K-apt 등록 공동주택')
+  assert.equal(value.radiusMeters, undefined)
+  assert.equal(value.estimatedPopulation, undefined)
+  assert.ok(requestedUrls.some(url => url.includes('bjdCode=5011013700')))
+  assert.equal(requestedUrls.filter(url => url.includes('/getAphusBassInfoV5')).length, 2)
+})
+
+test('K-apt 목록은 totalCount까지 모든 페이지를 조회한 뒤 합산한다', async () => {
+  const requestedListPages: string[] = []
+  const fetchImpl: typeof fetch = async input => {
+    const url = new URL(String(input))
+    if (url.pathname.includes('/AptListService4/getLegaldongAptList4')) {
+      const pageNo = url.searchParams.get('pageNo') ?? ''
+      requestedListPages.push(pageNo)
+      const item = pageNo === '1' ? KAPT_LIST_SAMPLE.body.items[0] : KAPT_LIST_SAMPLE.body.items[1]
+      return new Response(JSON.stringify({
+        header: KAPT_LIST_SAMPLE.header,
+        body: { items: [item], numOfRows: '1', pageNo, totalCount: '2' },
+      }), { status: 200 })
+    }
+    const kaptCode = url.searchParams.get('kaptCode') ?? ''
+    const households = kaptCode === 'A10027875' ? '480' : '320'
+    return new Response(JSON.stringify({
+      ...KAPT_BASIC_SAMPLE,
+      body: { item: { ...KAPT_BASIC_SAMPLE.body.item, kaptCode, kaptName: kaptCode === 'A10027875' ? '연동센트럴' : '연동그린', kaptdaCnt: households } },
+    }), { status: 200 })
+  }
+
+  const results = await collectPublicDataLayers(
+    {
+      address: '제주특별자치도 제주시 연동', lat: 33.48, lng: 126.49,
+      sigunguCode: '50110', bjdongCode: '13700',
+    },
+    {
+      seoulOpenApiKey: null, dataGoKrKey: null,
+      kaptListApiKey: 'list-key', kaptBasicApiKey: 'basic-key', fetchImpl,
+    },
+  )
+
+  const result = results.find(item => item.layerId === 'kapt_apartment_households')
+  assert.deepEqual(requestedListPages, ['1', '2'])
+  assert.equal(result?.status, 'available')
+  assert.equal((result?.value as Record<string, unknown>).totalHouseholds, 800)
+})
+
+test('K-apt 목록 중간 페이지가 비면 부분 합계를 폐기한다', async () => {
+  const fetchImpl: typeof fetch = async input => {
+    const url = new URL(String(input))
+    const pageNo = url.searchParams.get('pageNo') ?? '1'
+    if (pageNo === '1') {
+      return new Response(JSON.stringify({
+        header: KAPT_LIST_SAMPLE.header,
+        body: { items: [KAPT_LIST_SAMPLE.body.items[0]], numOfRows: '1', pageNo: '1', totalCount: '2' },
+      }), { status: 200 })
+    }
+    return new Response(JSON.stringify({
+      header: KAPT_LIST_SAMPLE.header,
+      body: { items: [], numOfRows: '1', pageNo: '2', totalCount: '2' },
+    }), { status: 200 })
+  }
+
+  const results = await collectPublicDataLayers(
+    { address: '제주특별자치도 제주시 연동', lat: null, lng: null, sigunguCode: '50110', bjdongCode: '13700' },
+    {
+      seoulOpenApiKey: null, dataGoKrKey: null,
+      kaptListApiKey: 'list-key', kaptBasicApiKey: 'basic-key', fetchImpl,
+    },
+  )
+
+  const result = results.find(item => item.layerId === 'kapt_apartment_households')
+  assert.equal(result?.status, 'failed')
+  assert.equal(result?.value, null)
+})
+
+test('K-apt 요청이 응답하지 않아도 수집 전체가 제한시간 안에 실패로 끝난다', async () => {
+  const fetchImpl: typeof fetch = async () => new Promise<Response>(() => {})
+  const collection = collectPublicDataLayers(
+    { address: '제주특별자치도 제주시 연동', lat: null, lng: null, sigunguCode: '50110', bjdongCode: '13700' },
+    {
+      seoulOpenApiKey: null, dataGoKrKey: null,
+      kaptListApiKey: 'list-key', kaptBasicApiKey: 'basic-key', kaptRequestTimeoutMs: 20, fetchImpl,
+    },
+  )
+
+  const outcome = await Promise.race([
+    collection,
+    new Promise<'still-pending'>(resolve => setTimeout(() => resolve('still-pending'), 100)),
+  ])
+  assert.notEqual(outcome, 'still-pending')
+  assert.ok(Array.isArray(outcome))
+  const result = outcome.find(item => item.layerId === 'kapt_apartment_households')
+  assert.equal(result?.status, 'failed')
+})
+
+test('K-apt 응답 헤더 뒤 본문이 끝나지 않아도 제한시간 안에 실패로 끝난다', async () => {
+  const fetchImpl: typeof fetch = async () => new Response(new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode('{"header":'))
+    },
+  }), { status: 200, headers: { 'content-type': 'application/json' } })
+  const collection = collectPublicDataLayers(
+    { address: '제주특별자치도 제주시 연동', lat: null, lng: null, sigunguCode: '50110', bjdongCode: '13700' },
+    {
+      seoulOpenApiKey: null, dataGoKrKey: null,
+      kaptListApiKey: 'list-key', kaptBasicApiKey: 'basic-key', kaptRequestTimeoutMs: 20, fetchImpl,
+    },
+  )
+
+  const outcome = await Promise.race([
+    collection,
+    new Promise<'still-pending'>(resolve => setTimeout(() => resolve('still-pending'), 100)),
+  ])
+  assert.notEqual(outcome, 'still-pending')
+  assert.ok(Array.isArray(outcome))
+  const result = outcome.find(item => item.layerId === 'kapt_apartment_households')
+  assert.equal(result?.status, 'failed')
+})
+
+test('K-apt 기본정보가 하나라도 실패하면 부분 세대수 합계를 사용하지 않는다', async () => {
+  const fetchImpl: typeof fetch = async input => {
+    const url = String(input)
+    if (url.includes('/AptListService4/getLegaldongAptList4')) {
+      return new Response(JSON.stringify(KAPT_LIST_SAMPLE), { status: 200 })
+    }
+    if (url.includes('kaptCode=A10027875')) {
+      return new Response(JSON.stringify(KAPT_BASIC_SAMPLE), { status: 200 })
+    }
+    return new Response('{}', { status: 503 })
+  }
+
+  const results = await collectPublicDataLayers(
+    {
+      address: '제주특별자치도 제주시 연동', lat: 33.48, lng: 126.49,
+      sidoName: '제주특별자치도', sigunguName: '제주시', sigunguCode: '50110', bjdongCode: '13700',
+    },
+    {
+      seoulOpenApiKey: null, dataGoKrKey: null,
+      kaptListApiKey: 'list-key', kaptBasicApiKey: 'basic-key', fetchImpl,
+    },
+  )
+
+  const result = results.find(item => item.layerId === 'kapt_apartment_households')
+  assert.equal(result?.status, 'failed')
+  assert.equal(result?.value, null)
+})
 
 const SEOUL_SAMPLE = {
   list_total_count: 6,
