@@ -599,7 +599,7 @@ export default function KakaoMap({
       <div
         role="group"
         aria-label="지도 정보 레이어"
-        className="absolute bottom-2 left-2 right-2 z-20 flex gap-1.5 overflow-x-auto pb-0.5"
+        className="absolute bottom-10 left-2 right-2 z-20 flex gap-1.5 overflow-x-auto pb-0.5"
       >
         <button
           type="button"

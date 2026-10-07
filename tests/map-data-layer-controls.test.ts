@@ -71,6 +71,11 @@ test('카카오지도 링크는 하단 레이어 선택 영역을 가리지 않�
   assert.doesNotMatch(linkSource, /absolute bottom-2 right-2/)
 })
 
+test('하단 레이어 선택 영역은 카카오 지도 로고와 저작권 영역을 가리지 않는다', () => {
+  const source = readFileSync(path.join(process.cwd(), 'src/components/KakaoMap.tsx'), 'utf8')
+  assert.match(source, /absolute bottom-10 left-2 right-2/)
+})
+
 test('유동 레이어는 임의의 300m 원을 만들거나 소비 레이어의 대체값으로 섞이지 않는다', () => {
   const source = readFileSync(path.join(process.cwd(), 'src/components/KakaoMap.tsx'), 'utf8')
   assert.doesNotMatch(source, /const flRadius = 300/)
