@@ -100,6 +100,314 @@ const LOCAL_CURRENCY_SAMPLE = {
   },
 }
 
+const LOCAL_CURRENCY_V1_SAMPLE = {
+  currentCount: 3,
+  matchCount: 3,
+  page: 1,
+  perPage: 1000,
+  totalCount: 3,
+  data: [
+    {
+      crtr_ym: '202607',
+      usage_rgn_cd: '26350',
+      ksic: 'I56111',
+      ksic_nm: '한식 음식점업',
+      par_gend: 'M',
+      par_ag: '03',
+      stlm_nocs: 120,
+      stlm_amt: 3400000,
+      emd_cd: '26350105',
+      emd_nm: '우동',
+    },
+    {
+      crtr_ym: '202607',
+      usage_rgn_cd: '26350',
+      ksic: 'I56111',
+      ksic_nm: '한식 음식점업',
+      par_gend: 'F',
+      par_ag: '03',
+      stlm_nocs: 80,
+      stlm_amt: 2600000,
+      emd_cd: '26350105',
+      emd_nm: '우동',
+    },
+    {
+      crtr_ym: '202607',
+      usage_rgn_cd: '26350',
+      ksic: 'G47122',
+      ksic_nm: '체인화 편의점',
+      par_gend: 'F',
+      par_ag: '04',
+      stlm_nocs: 50,
+      stlm_amt: 1000000,
+      emd_cd: '26350105',
+      emd_nm: '우동',
+    },
+  ],
+}
+
+test('지역화폐 v1 응답은 같은 업종의 성별·연령 행을 하나로 합산한다', () => {
+  const parsed = parseLocalCurrencySpending(LOCAL_CURRENCY_V1_SAMPLE, {
+    sido: '부산광역시',
+    sigungu: '해운대구',
+  })
+
+  assert.ok(parsed)
+  assert.equal(parsed.region, '부산광역시 해운대구 우동')
+  assert.equal(parsed.categories.length, 2)
+  assert.deepEqual(parsed.categories[0], {
+    industry: '한식 음식점업',
+    settlementAmount: 6000000,
+    settlementCount: 200,
+  })
+  assert.equal(parsed.totalAmount, 7000000)
+  assert.equal(parsed.provenance.source_as_of, '202607')
+})
+
+test('지역화폐 수집기는 신청한 v1 endpoint와 법정동 코드 파라미터를 사용한다', async () => {
+  const requested: URL[] = []
+  const env: CollectorEnv = {
+    seoulOpenApiKey: null,
+    dataGoKrKey: 'decoded-key',
+    fetchImpl: async input => {
+      const url = new URL(String(input))
+      requested.push(url)
+      return new Response(JSON.stringify(LOCAL_CURRENCY_V1_SAMPLE), { status: 200 })
+    },
+  }
+
+  const results = await collectPublicDataLayers(
+    {
+      address: '부산광역시 해운대구 우동',
+      lat: 35.16,
+      lng: 129.16,
+      sigunguCode: '26350',
+      bjdongCode: '10500',
+    },
+    env,
+  )
+
+  assert.equal(requested.length, 1)
+  assert.equal(requested[0].pathname, '/B190001/localGiftsKsciPaymentV1/paymentsV1')
+  assert.equal(requested[0].searchParams.get('page'), '1')
+  assert.equal(requested[0].searchParams.get('perPage'), '1000')
+  assert.equal(requested[0].searchParams.get('returnType'), 'JSON')
+  assert.equal(requested[0].searchParams.get('cond[usage_rgn_cd::EQ]'), '26350')
+  assert.equal(requested[0].searchParams.get('cond[emd_cd::EQ]'), '26350105')
+  assert.equal(results.find(result => result.layerId === 'local_currency_spending')?.status, 'available')
+})
+
+test('지역화폐 인증키는 인코딩 키를 받아도 한 번만 인코딩한다', async () => {
+  const requested: URL[] = []
+  await collectPublicDataLayers(
+    {
+      address: '부산광역시 해운대구 우동',
+      lat: 35.16,
+      lng: 129.16,
+      sigunguCode: '26350',
+      bjdongCode: '10500',
+    },
+    {
+      seoulOpenApiKey: null,
+      dataGoKrKey: 'abc%2Bdef%3D',
+      fetchImpl: async input => {
+        requested.push(new URL(String(input)))
+        return new Response(JSON.stringify(LOCAL_CURRENCY_V1_SAMPLE), { status: 200 })
+      },
+    },
+  )
+
+  assert.equal(requested[0].searchParams.get('serviceKey'), 'abc+def=')
+  assert.ok(!requested[0].search.includes('%252B'), '인코딩 키를 URLSearchParams가 다시 인코딩하면 인증이 깨진다')
+})
+
+test('지역화폐는 읍면동 코드가 없으면 시군구 합계를 특정 동 값처럼 수집하지 않는다', async () => {
+  let called = false
+  const results = await collectPublicDataLayers(
+    {
+      address: '부산광역시 해운대구 우동',
+      lat: 35.16,
+      lng: 129.16,
+      sigunguCode: '26350',
+      bjdongCode: null,
+    },
+    {
+      seoulOpenApiKey: null,
+      dataGoKrKey: 'decoded-key',
+      fetchImpl: async () => {
+        called = true
+        return new Response(JSON.stringify(LOCAL_CURRENCY_V1_SAMPLE), { status: 200 })
+      },
+    },
+  )
+
+  assert.equal(called, false)
+  assert.equal(results.find(result => result.layerId === 'local_currency_spending')?.status, 'empty')
+})
+
+test('지역화폐는 totalCount까지 후속 페이지를 모두 합친 뒤 집계한다', async () => {
+  const pages: number[] = []
+  const firstPage = {
+    ...LOCAL_CURRENCY_V1_SAMPLE,
+    currentCount: 2,
+    matchCount: 3,
+    totalCount: 3,
+    data: LOCAL_CURRENCY_V1_SAMPLE.data.slice(0, 2),
+  }
+  const secondPage = {
+    ...LOCAL_CURRENCY_V1_SAMPLE,
+    currentCount: 1,
+    matchCount: 3,
+    page: 2,
+    totalCount: 3,
+    data: LOCAL_CURRENCY_V1_SAMPLE.data.slice(2),
+  }
+
+  const results = await collectPublicDataLayers(
+    {
+      address: '부산광역시 해운대구 우동',
+      lat: 35.16,
+      lng: 129.16,
+      sigunguCode: '26350',
+      bjdongCode: '10500',
+    },
+    {
+      seoulOpenApiKey: null,
+      dataGoKrKey: 'decoded-key',
+      fetchImpl: async input => {
+        const page = Number(new URL(String(input)).searchParams.get('page'))
+        pages.push(page)
+        return new Response(JSON.stringify(page === 1 ? firstPage : secondPage), { status: 200 })
+      },
+    },
+  )
+
+  assert.deepEqual(pages, [1, 2])
+  const value = results.find(result => result.layerId === 'local_currency_spending')?.value as {
+    categories: Array<{ industry: string }>
+    totalAmount: number
+  }
+  assert.equal(value.categories.length, 2)
+  assert.equal(value.totalAmount, 7000000)
+})
+
+test('지역화폐 v1 응답에 페이지 메타데이터가 없으면 부분값을 사용하지 않는다', async () => {
+  const missingMetadata: Record<string, unknown> = { ...LOCAL_CURRENCY_V1_SAMPLE }
+  delete missingMetadata.currentCount
+  delete missingMetadata.matchCount
+  delete missingMetadata.page
+
+  const results = await collectPublicDataLayers(
+    {
+      address: '부산광역시 해운대구 우동',
+      lat: 35.16,
+      lng: 129.16,
+      sigunguCode: '26350',
+      bjdongCode: '10500',
+    },
+    {
+      seoulOpenApiKey: null,
+      dataGoKrKey: 'decoded-key',
+      fetchImpl: async () => new Response(JSON.stringify(missingMetadata), { status: 200 }),
+    },
+  )
+
+  assert.equal(results.find(result => result.layerId === 'local_currency_spending')?.status, 'failed')
+})
+
+test('지역화폐 서버가 같은 페이지를 반복하면 중복 합계를 저장하지 않는다', async () => {
+  const pages: number[] = []
+  const repeatedFirstPage = {
+    ...LOCAL_CURRENCY_V1_SAMPLE,
+    currentCount: 2,
+    matchCount: 4,
+    page: 1,
+    data: LOCAL_CURRENCY_V1_SAMPLE.data.slice(0, 2),
+  }
+
+  const results = await collectPublicDataLayers(
+    {
+      address: '부산광역시 해운대구 우동',
+      lat: 35.16,
+      lng: 129.16,
+      sigunguCode: '26350',
+      bjdongCode: '10500',
+    },
+    {
+      seoulOpenApiKey: null,
+      dataGoKrKey: 'decoded-key',
+      fetchImpl: async input => {
+        pages.push(Number(new URL(String(input)).searchParams.get('page')))
+        return new Response(JSON.stringify(repeatedFirstPage), { status: 200 })
+      },
+    },
+  )
+
+  assert.deepEqual(pages, [1, 2])
+  assert.equal(results.find(result => result.layerId === 'local_currency_spending')?.status, 'failed')
+})
+
+test('지역화폐 서버가 페이지 번호만 바꿔 같은 데이터를 반복하면 중복 합계를 저장하지 않는다', async () => {
+  const pages: number[] = []
+  const repeatedData = LOCAL_CURRENCY_V1_SAMPLE.data.slice(0, 2)
+
+  const results = await collectPublicDataLayers(
+    {
+      address: '부산광역시 해운대구 우동',
+      lat: 35.16,
+      lng: 129.16,
+      sigunguCode: '26350',
+      bjdongCode: '10500',
+    },
+    {
+      seoulOpenApiKey: null,
+      dataGoKrKey: 'decoded-key',
+      fetchImpl: async input => {
+        const page = Number(new URL(String(input)).searchParams.get('page'))
+        pages.push(page)
+        return new Response(JSON.stringify({
+          ...LOCAL_CURRENCY_V1_SAMPLE,
+          currentCount: 2,
+          matchCount: 4,
+          page,
+          data: repeatedData,
+        }), { status: 200 })
+      },
+    },
+  )
+
+  assert.deepEqual(pages, [1, 2])
+  assert.equal(results.find(result => result.layerId === 'local_currency_spending')?.status, 'failed')
+})
+
+test('지역화폐 v1 응답의 법정동 코드가 요청 지역과 다르면 값을 버린다', async () => {
+  const mismatched = {
+    ...LOCAL_CURRENCY_V1_SAMPLE,
+    data: LOCAL_CURRENCY_V1_SAMPLE.data.map(item => ({
+      ...item,
+      usage_rgn_cd: '26110',
+      emd_cd: '26110101',
+      emd_nm: '중앙동',
+    })),
+  }
+  const results = await collectPublicDataLayers(
+    {
+      address: '부산광역시 해운대구 우동',
+      lat: 35.16,
+      lng: 129.16,
+      sigunguCode: '26350',
+      bjdongCode: '10500',
+    },
+    {
+      seoulOpenApiKey: null,
+      dataGoKrKey: 'decoded-key',
+      fetchImpl: async () => new Response(JSON.stringify(mismatched), { status: 200 }),
+    },
+  )
+
+  assert.equal(results.find(result => result.layerId === 'local_currency_spending')?.status, 'empty')
+})
+
 test('지역화폐 응답은 결제금액 기준으로 내림차순 정렬된다', () => {
   const parsed = parseLocalCurrencySpending(LOCAL_CURRENCY_SAMPLE)
   assert.ok(parsed)

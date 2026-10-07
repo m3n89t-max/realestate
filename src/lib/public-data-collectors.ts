@@ -33,6 +33,10 @@ export interface CollectorTarget {
   sigunguName?: string | null
   /** 시도명. 동명 시군구를 구분하는 데 필수다. */
   sidoName?: string | null
+  /** 법정동코드 앞 5자리. 지역사랑상품권 API의 사용처지역코드다. */
+  sigunguCode?: string | null
+  /** 법정동코드 뒤 5자리. 앞 3자리를 시군구코드와 합쳐 읍면동코드로 쓴다. */
+  bjdongCode?: string | null
 }
 
 // ── 서울 실시간 상권현황 ──────────────────────────────────────
@@ -148,35 +152,75 @@ export interface LocalCurrencySpending {
   provenance: DataProvenance
 }
 
-export function parseLocalCurrencySpending(raw: unknown): LocalCurrencySpending | null {
+export function parseLocalCurrencySpending(
+  raw: unknown,
+  requestedRegion?: {
+    sido: string | null
+    sigungu: string | null
+    sigunguCode?: string | null
+    emdCode?: string | null
+  },
+): LocalCurrencySpending | null {
   if (!raw || typeof raw !== 'object') return null
-  const response = (raw as Record<string, any>).response
-  if (!response || typeof response !== 'object') return null
-  const resultCode = String(response.header?.resultCode ?? '')
+  const root = raw as Record<string, any>
+  const response = root.response
+  const resultCode = String(response?.header?.resultCode ?? '')
   if (resultCode && resultCode !== '00') return null
 
-  const items: any[] = Array.isArray(response.body?.items)
-    ? response.body.items
-    : Array.isArray(response.body?.items?.item)
-      ? response.body.items.item
-      : []
+  const items: any[] = Array.isArray(root.data)
+    ? root.data
+    : Array.isArray(response?.body?.items)
+      ? response.body.items
+      : Array.isArray(response?.body?.items?.item)
+        ? response.body.items.item
+        : []
   if (items.length === 0) return null
 
-  const categories: LocalCurrencyCategory[] = items
-    .map(item => ({
-      industry: String(item.induty ?? item.indutyNm ?? '업종 미표기'),
-      settlementAmount: toNumber(item.setlAmt),
-      settlementCount: toNullableNumber(item.setlCnt),
-    }))
-    .filter(item => item.settlementAmount > 0)
+  const regionItems = Array.isArray(root.data) && requestedRegion?.sigunguCode
+    ? items.filter(item => {
+        if (String(item.usage_rgn_cd ?? '') !== requestedRegion.sigunguCode) return false
+        return !requestedRegion.emdCode || String(item.emd_cd ?? '') === requestedRegion.emdCode
+      })
+    : items
+  if (regionItems.length === 0) return null
+
+  const latestPeriod = regionItems
+    .map(item => String(item.crtr_ym ?? item.crtrYm ?? ''))
+    .filter(Boolean)
+    .sort()
+    .at(-1) ?? null
+  const latestItems = latestPeriod
+    ? regionItems.filter(item => String(item.crtr_ym ?? item.crtrYm ?? '') === latestPeriod)
+    : regionItems
+
+  const grouped = new Map<string, LocalCurrencyCategory>()
+  for (const item of latestItems) {
+    const industry = String(item.ksic_nm ?? item.induty ?? item.indutyNm ?? '업종 미표기')
+    const settlementAmount = toNumber(item.stlm_amt ?? item.setlAmt)
+    const settlementCount = toNullableNumber(item.stlm_nocs ?? item.setlCnt)
+    if (settlementAmount <= 0) continue
+
+    const previous = grouped.get(industry)
+    grouped.set(industry, {
+      industry,
+      settlementAmount: (previous?.settlementAmount ?? 0) + settlementAmount,
+      settlementCount:
+        previous?.settlementCount == null && settlementCount == null
+          ? null
+          : (previous?.settlementCount ?? 0) + (settlementCount ?? 0),
+    })
+  }
+
+  const categories: LocalCurrencyCategory[] = [...grouped.values()]
     .sort((a, b) => b.settlementAmount - a.settlementAmount)
 
   if (categories.length === 0) return null
 
-  const first = items[0] ?? {}
-  const sido = first.ctpvNm ? String(first.ctpvNm) : null
-  const sigungu = first.sggNm ? String(first.sggNm) : null
-  const region = [sido, sigungu, first.emdNm].filter(Boolean).join(' ') || '지역 미표기'
+  const first = latestItems[0] ?? {}
+  const sido = first.ctpvNm ? String(first.ctpvNm) : requestedRegion?.sido ?? null
+  const sigungu = first.sggNm ? String(first.sggNm) : requestedRegion?.sigungu ?? null
+  const emdName = first.emd_nm ?? first.emdNm
+  const region = [sido, sigungu, emdName].filter(Boolean).join(' ') || '지역 미표기'
 
   return {
     region,
@@ -187,7 +231,7 @@ export function parseLocalCurrencySpending(raw: unknown): LocalCurrencySpending 
     provenance: {
       source: '한국조폐공사 지역사랑상품권',
       metric_semantics: 'local_currency',
-      source_as_of: first.crtrYm ? String(first.crtrYm) : null,
+      source_as_of: latestPeriod,
       collected_at: new Date().toISOString(),
       spatial_unit: '시군구 · 읍면동 × 업종',
       method: '지역사랑상품권 결제금액과 결제건수를 업종별로 집계',
@@ -259,26 +303,94 @@ async function collectLocalCurrency(
 
   const sigungu = target.sigunguName ?? extractSigungu(target.address)
   const sido = target.sidoName ?? extractSido(target.address)
+  const sigunguCode = target.sigunguCode?.trim() ?? ''
+  const bjdongCode = target.bjdongCode?.trim() ?? ''
+  const emdCode = /^\d{5}$/.test(bjdongCode) ? `${sigunguCode}${bjdongCode.slice(0, 3)}` : null
   // 시도를 특정할 수 없으면 조회하지 않는다.
   // '중구'는 서울·부산·대구·인천·대전·울산에 모두 있어 시군구명만으로는 다른 지역 값을 가져온다.
-  if (!sigungu || !sido) return emptyResult(layerId, 'empty')
+  // 읍면동 코드 없이 시군구 전체를 합산하면 첫 읍면동 값처럼 오표시될 수 있으므로 조회하지 않는다.
+  if (!sigungu || !sido || !/^\d{5}$/.test(sigunguCode) || !emdCode) {
+    return emptyResult(layerId, 'empty')
+  }
 
   const doFetch = env.fetchImpl ?? fetch
+  let serviceKey = env.dataGoKrKey
+  try {
+    // 공공데이터포털에서 인코딩 키를 전달받아도 URLSearchParams가 이중 인코딩하지 않도록 한 번 복원한다.
+    serviceKey = decodeURIComponent(serviceKey)
+  } catch {
+    // 올바른 percent-encoding이 아닌 키는 원문을 사용한다.
+  }
   const params = new URLSearchParams({
-    serviceKey: env.dataGoKrKey,
-    pageNo: '1',
-    numOfRows: '30',
-    type: 'json',
-    ctpvNm: sido,
-    sggNm: sigungu,
+    serviceKey,
+    page: '1',
+    perPage: '1000',
+    returnType: 'JSON',
+    'cond[usage_rgn_cd::EQ]': sigunguCode,
+    'cond[emd_cd::EQ]': emdCode,
   })
-  const url = `https://apis.data.go.kr/B190001/localGiftCardSettlement/settlementByIndustry?${params}`
+  const endpoint = 'https://apis.data.go.kr/B190001/localGiftsKsciPaymentV1/paymentsV1'
 
   try {
-    const res = await doFetch(url)
-    if (!res.ok) return emptyResult(layerId, 'failed')
-    const json = await res.json()
-    const parsed = parseLocalCurrencySpending(json)
+    const allData: unknown[] = []
+    const pageSignatures = new Set<string>()
+    let firstResponse: Record<string, unknown> | null = null
+    let expectedMatchCount: number | null = null
+
+    for (let page = 1; page <= 100; page += 1) {
+      params.set('page', String(page))
+      const res = await doFetch(`${endpoint}?${params}`)
+      if (!res.ok) return emptyResult(layerId, 'failed')
+      const json = await res.json() as Record<string, unknown>
+
+      // 구형 응답 형식은 페이지 메타데이터가 없으므로 기존 파서에 그대로 넘긴다.
+      if (!Array.isArray(json.data)) {
+        const parsed = parseLocalCurrencySpending(json, { sido, sigungu, sigunguCode, emdCode })
+        if (!parsed) return emptyResult(layerId, 'empty')
+        if (!matchesRequestedRegion(parsed, sido, sigungu)) return emptyResult(layerId, 'empty')
+        return {
+          layerId,
+          status: 'available',
+          value: parsed,
+          collectedAt: parsed.provenance.collected_at ?? null,
+          sourceAsOf: parsed.provenance.source_as_of,
+        }
+      }
+
+      const responsePage = Number(json.page)
+      const currentCount = Number(json.currentCount)
+      const matchCount = Number(json.matchCount)
+      if (
+        json.page == null ||
+        json.currentCount == null ||
+        json.matchCount == null ||
+        !Number.isInteger(responsePage) ||
+        !Number.isInteger(currentCount) ||
+        !Number.isInteger(matchCount) ||
+        responsePage !== page ||
+        currentCount !== json.data.length ||
+        matchCount < 0
+      ) {
+        return emptyResult(layerId, 'failed')
+      }
+
+      const pageSignature = JSON.stringify(json.data)
+      if (pageSignatures.has(pageSignature)) return emptyResult(layerId, 'failed')
+      pageSignatures.add(pageSignature)
+
+      expectedMatchCount ??= matchCount
+      if (matchCount !== expectedMatchCount || allData.length + json.data.length > expectedMatchCount) {
+        return emptyResult(layerId, 'failed')
+      }
+
+      firstResponse ??= json
+      allData.push(...json.data)
+      if (allData.length === expectedMatchCount) break
+      if (json.data.length === 0 || page === 100) return emptyResult(layerId, 'failed')
+    }
+
+    const mergedResponse = { ...firstResponse, currentCount: allData.length, data: allData }
+    const parsed = parseLocalCurrencySpending(mergedResponse, { sido, sigungu, sigunguCode, emdCode })
     if (!parsed) return emptyResult(layerId, 'empty')
 
     // 방어선: 응답이 요청한 지역을 가리키지 않으면 버린다.
