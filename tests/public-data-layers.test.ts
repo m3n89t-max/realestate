@@ -182,6 +182,15 @@ test('최근 공공자료 수집 결과만 외부 API 재호출 없이 재사용
     '현재 위치 코드와 다른 캐시를 재사용하면 안 된다',
   )
 
+  assert.equal(
+    isFreshPublicDataLayerPayload(
+      { collected_at: new Date(now - 1_000).toISOString(), results: [{ status: 'failed' }, { status: 'unconfigured' }] },
+      now,
+    ),
+    false,
+    '실패만 담긴 결과는 재사용하지 않는다',
+  )
+
   const locked = {
     collection_lock: {
       started_at: '2026-10-08T03:59:30Z',
