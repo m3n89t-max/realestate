@@ -481,6 +481,13 @@ export function isFreshPublicDataLayerPayload(
   if (!Number.isFinite(collectedAtMs)) return false
   const ageMs = nowMs - collectedAtMs
   if (!(ageMs >= 0 && ageMs < maxAgeMs)) return false
+  // 실패만 담긴 결과는 재사용하지 않는다. 일시적 장애를 5분간 고정하면
+  // 사용자가 다시 눌러도 같은 실패 화면만 보게 된다.
+  const results = (payload as { results?: unknown }).results
+  if (Array.isArray(results)) {
+    const hasAvailable = results.some((r) => (r as { status?: unknown })?.status === 'available')
+    if (!hasAvailable) return false
+  }
   if (!expectedTarget) return true
   return (
     record.region_address === expectedTarget.address
