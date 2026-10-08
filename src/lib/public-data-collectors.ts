@@ -414,6 +414,20 @@ export function extractSigungu(address?: string | null): string | null {
   return candidate ?? null
 }
 
+/**
+ * 공공데이터포털 게이트웨이가 "등록되지 않은 서비스키"를 반환했는지 판정한다.
+ *
+ * 포털은 계정당 하나의 인증키를 모든 승인 서비스에 공통으로 쓴다.
+ * 전용 환경변수에 다른 값이 들어가면 활용신청이 승인 상태여도 이 오류가 나온다.
+ */
+function isServiceKeyNotRegistered(json: unknown): boolean {
+  if (!json || typeof json !== 'object') return false
+  const header = (json as Record<string, any>).OpenAPI_ServiceResponse?.cmmMsgHeader
+  if (!header || typeof header !== 'object') return false
+  return String(header.errMsg ?? '') === 'SERVICE_KEY_IS_NOT_REGISTERED_ERROR'
+    || String(header.returnReasonCode ?? '') === '30'
+}
+
 async function collectKaptApartmentHouseholds(
   target: CollectorTarget,
   env: CollectorEnv,
@@ -426,6 +440,31 @@ async function collectKaptApartmentHouseholds(
   const fullBjdCode = `${sigunguCode}${bjdongCode}`
   if (!/^\d{10}$/.test(fullBjdCode)) return emptyResult(layerId, 'empty')
 
+  // 전용 키가 미등록으로 거부되면 이미 검증된 포털 공통 키로 한 번만 재시도한다.
+  const keyPairs: Array<{ listKey: string; basicKey: string }> = [
+    { listKey: env.kaptListApiKey, basicKey: env.kaptBasicApiKey },
+  ]
+  if (env.dataGoKrKey && env.dataGoKrKey !== env.kaptListApiKey) {
+    keyPairs.push({ listKey: env.dataGoKrKey, basicKey: env.dataGoKrKey })
+  }
+
+  let lastResult = emptyResult(layerId, 'failed')
+  for (const pair of keyPairs) {
+    const attempt = await collectKaptWithKeys(target, env, fullBjdCode, pair)
+    if (!attempt.keyNotRegistered) return attempt.result
+    lastResult = attempt.result
+  }
+  return lastResult
+}
+
+async function collectKaptWithKeys(
+  target: CollectorTarget,
+  env: CollectorEnv,
+  fullBjdCode: string,
+  keys: { listKey: string; basicKey: string },
+): Promise<{ result: PublicDataLayerResult; keyNotRegistered: boolean }> {
+  const layerId = 'kapt_apartment_households'
+  const failed = (keyNotRegistered = false) => ({ result: emptyResult(layerId, 'failed'), keyNotRegistered })
   const doFetch = env.fetchImpl ?? fetch
   const requestTimeoutMs = Number.isFinite(env.kaptRequestTimeoutMs) && (env.kaptRequestTimeoutMs ?? 0) > 0
     ? env.kaptRequestTimeoutMs!
@@ -440,48 +479,52 @@ async function collectKaptApartmentHouseholds(
 
     for (let pageNo = 1; pageNo <= 100; pageNo += 1) {
       const params = new URLSearchParams({
-        serviceKey: normalizeServiceKey(env.kaptListApiKey),
+        serviceKey: normalizeServiceKey(keys.listKey),
         bjdCode: fullBjdCode,
         pageNo: String(pageNo),
         numOfRows: '100',
       })
       const response = await fetchJsonWithTimeout(doFetch, `${listEndpoint}?${params}`, requestTimeoutMs)
-      if (!response.ok) return emptyResult(layerId, 'failed')
+      if (!response.ok) return failed(isServiceKeyNotRegistered(response.json))
       const parsed = parseKaptApartmentList(response.json, fullBjdCode)
-      if (!parsed || parsed.pageNo !== pageNo) return emptyResult(layerId, 'failed')
+      if (!parsed || parsed.pageNo !== pageNo) return failed()
 
       expectedTotal ??= parsed.totalCount
       if (parsed.totalCount !== expectedTotal || listItems.length + parsed.items.length > expectedTotal) {
-        return emptyResult(layerId, 'failed')
+        return failed()
       }
       for (const item of parsed.items) {
-        if (kaptCodes.has(item.kaptCode)) return emptyResult(layerId, 'failed')
+        if (kaptCodes.has(item.kaptCode)) return failed()
         kaptCodes.add(item.kaptCode)
         listItems.push(item)
       }
 
       if (listItems.length === expectedTotal) break
-      if (parsed.items.length === 0 || pageNo === 100) return emptyResult(layerId, 'failed')
+      if (parsed.items.length === 0 || pageNo === 100) return failed()
     }
 
-    if (expectedTotal === 0) return emptyResult(layerId, 'empty')
-    if (expectedTotal == null || listItems.length !== expectedTotal) return emptyResult(layerId, 'failed')
+    if (expectedTotal === 0) return { result: emptyResult(layerId, 'empty'), keyNotRegistered: false }
+    if (expectedTotal == null || listItems.length !== expectedTotal) return failed()
 
     const complexes: KaptApartmentBasic[] = []
+    let basicKeyNotRegistered = false
     for (let offset = 0; offset < listItems.length; offset += 5) {
       const chunk = listItems.slice(offset, offset + 5)
       const resolved = await Promise.all(chunk.map(async listItem => {
         const params = new URLSearchParams({
-          serviceKey: normalizeServiceKey(env.kaptBasicApiKey!),
+          serviceKey: normalizeServiceKey(keys.basicKey),
           kaptCode: listItem.kaptCode,
         })
         const response = await fetchJsonWithTimeout(doFetch, `${basicEndpoint}?${params}`, requestTimeoutMs)
-        if (!response.ok) return null
+        if (!response.ok) {
+          if (isServiceKeyNotRegistered(response.json)) basicKeyNotRegistered = true
+          return null
+        }
         const parsed = parseKaptApartmentBasic(response.json, listItem.kaptCode)
         if (!parsed || parsed.bjdCode !== fullBjdCode) return null
         return parsed
       }))
-      if (resolved.some(item => item == null)) return emptyResult(layerId, 'failed')
+      if (resolved.some(item => item == null)) return failed(basicKeyNotRegistered)
       complexes.push(...resolved as KaptApartmentBasic[])
     }
 
@@ -509,14 +552,17 @@ async function collectKaptApartmentHouseholds(
     }
 
     return {
-      layerId,
-      status: 'available',
-      value,
-      collectedAt,
-      sourceAsOf: value.provenance.source_as_of,
+      result: {
+        layerId,
+        status: 'available',
+        value,
+        collectedAt,
+        sourceAsOf: value.provenance.source_as_of,
+      },
+      keyNotRegistered: false,
     }
   } catch {
-    return emptyResult(layerId, 'failed')
+    return failed()
   }
 }
 
