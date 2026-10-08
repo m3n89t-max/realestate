@@ -168,6 +168,79 @@ test('K-apt 목록 중간 페이지가 비면 부분 합계를 폐기한다', as
   assert.equal(result?.value, null)
 })
 
+test('K-apt 전용 키가 미등록 오류를 받으면 포털 공통 인증키로 재시도한다', async () => {
+  // 공공데이터포털은 계정당 하나의 인증키를 모든 승인 서비스에 공통 사용한다.
+  // 전용 환경변수에 다른 서비스의 키가 들어가면 승인 상태와 무관하게 403이 반환되므로,
+  // 미등록 오류일 때만 이미 검증된 포털 공통 키로 한 번 재시도한다.
+  const usedKeys: string[] = []
+  const fetchImpl: typeof fetch = async input => {
+    const url = new URL(String(input))
+    const key = url.searchParams.get('serviceKey') ?? ''
+    if (url.pathname.endsWith('getLegaldongAptList4')) usedKeys.push(key)
+    if (key === 'wrong-kapt-key') {
+      return new Response(JSON.stringify({
+        OpenAPI_ServiceResponse: {
+          cmmMsgHeader: {
+            errMsg: 'SERVICE_KEY_IS_NOT_REGISTERED_ERROR',
+            returnAuthMsg: '등록되지 않은 서비스키',
+            returnReasonCode: '30',
+          },
+        },
+      }), { status: 403 })
+    }
+    if (url.pathname.endsWith('getLegaldongAptList4')) {
+      return new Response(JSON.stringify({
+        header: KAPT_LIST_SAMPLE.header,
+        body: { items: [KAPT_LIST_SAMPLE.body.items[0]], numOfRows: '100', pageNo: '1', totalCount: '1' },
+      }), { status: 200 })
+    }
+    return new Response(JSON.stringify(KAPT_BASIC_SAMPLE), { status: 200 })
+  }
+
+  const results = await collectPublicDataLayers(
+    { address: '제주특별자치도 제주시 연동', lat: null, lng: null, sigunguCode: '50110', bjdongCode: '13700' },
+    {
+      seoulOpenApiKey: null,
+      dataGoKrKey: 'portal-common-key',
+      kaptListApiKey: 'wrong-kapt-key',
+      kaptBasicApiKey: 'wrong-kapt-key',
+      fetchImpl,
+    },
+  )
+
+  const result = results.find(item => item.layerId === 'kapt_apartment_households')
+  assert.deepEqual(usedKeys, ['wrong-kapt-key', 'portal-common-key'])
+  assert.equal(result?.status, 'available')
+  assert.equal((result?.value as Record<string, unknown>).totalHouseholds, 480)
+})
+
+test('K-apt 키 후보가 모두 미등록이면 실패로 닫고 합계를 만들지 않는다', async () => {
+  const fetchImpl: typeof fetch = async () => new Response(JSON.stringify({
+    OpenAPI_ServiceResponse: {
+      cmmMsgHeader: {
+        errMsg: 'SERVICE_KEY_IS_NOT_REGISTERED_ERROR',
+        returnAuthMsg: '등록되지 않은 서비스키',
+        returnReasonCode: '30',
+      },
+    },
+  }), { status: 403 })
+
+  const results = await collectPublicDataLayers(
+    { address: '제주특별자치도 제주시 연동', lat: null, lng: null, sigunguCode: '50110', bjdongCode: '13700' },
+    {
+      seoulOpenApiKey: null,
+      dataGoKrKey: 'portal-common-key',
+      kaptListApiKey: 'wrong-kapt-key',
+      kaptBasicApiKey: 'wrong-kapt-key',
+      fetchImpl,
+    },
+  )
+
+  const result = results.find(item => item.layerId === 'kapt_apartment_households')
+  assert.equal(result?.status, 'failed')
+  assert.equal(result?.value, null)
+})
+
 test('K-apt 요청이 응답하지 않아도 수집 전체가 제한시간 안에 실패로 끝난다', async () => {
   const fetchImpl: typeof fetch = async () => new Promise<Response>(() => {})
   const collection = collectPublicDataLayers(
