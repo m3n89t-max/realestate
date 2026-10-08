@@ -361,6 +361,11 @@ export interface LayerFailureDiagnostics {
   /** 공공데이터포털 게이트웨이 errMsg 또는 서비스 resultCode */
   gatewayMessage?: string | null
   gatewayCode?: string | null
+  /**
+   * 파싱 실패 시 응답의 구조 단서. 값이 아니라 키 이름과 타입만 담는다.
+   * 인증키나 응답 본문 값은 절대 포함하지 않는다.
+   */
+  shape?: string | null
 }
 
 export interface LayerSummary {

@@ -465,8 +465,29 @@ function failedWithDiagnostics(
       httpStatus: options.httpStatus ?? null,
       gatewayMessage: reason.message,
       gatewayCode: reason.code,
+      shape: stage.endsWith('_parse') ? describeShape(options.json) : null,
     },
   }
+}
+
+/**
+ * 응답의 구조만 문자열로 요약한다. 키 이름과 타입만 담고 값은 담지 않는다.
+ * 인증키가 값으로 들어올 경로가 없도록 문자열 값은 길이만 남긴다.
+ */
+function describeShape(value: unknown, depth = 0): string {
+  if (value === null) return 'null'
+  if (Array.isArray(value)) {
+    return depth >= 3
+      ? `array(${value.length})`
+      : `array(${value.length})[${value.length ? describeShape(value[0], depth + 1) : ''}]`
+  }
+  const type = typeof value
+  if (type === 'string') return `string(len=${(value as string).length})`
+  if (type === 'number' || type === 'boolean' || type === 'undefined') return type
+  if (type !== 'object') return type
+  if (depth >= 3) return 'object'
+  const entries = Object.entries(value as Record<string, unknown>).slice(0, 12)
+  return `{${entries.map(([k, v]) => `${k}:${describeShape(v, depth + 1)}`).join(',')}}`
 }
 
 async function collectKaptApartmentHouseholds(
