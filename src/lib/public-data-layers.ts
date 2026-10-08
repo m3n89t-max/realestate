@@ -347,6 +347,20 @@ export interface PublicDataLayerResult {
   value: unknown
   collectedAt: string | null
   sourceAsOf: string | null
+  /**
+   * 실패 원인 진단. 인증키나 전체 URL은 절대 담지 않는다.
+   * 게이트웨이가 돌려준 사유와 실패한 단계만 보존한다.
+   */
+  diagnostics?: LayerFailureDiagnostics | null
+}
+
+export interface LayerFailureDiagnostics {
+  /** 어느 단계에서 끝났는지. 예: 'list_http', 'list_parse', 'basic_http' */
+  stage: string
+  httpStatus?: number | null
+  /** 공공데이터포털 게이트웨이 errMsg 또는 서비스 resultCode */
+  gatewayMessage?: string | null
+  gatewayCode?: string | null
 }
 
 export interface LayerSummary {

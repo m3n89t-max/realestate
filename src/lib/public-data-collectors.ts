@@ -222,14 +222,14 @@ async function fetchJsonWithTimeout(
   fetchImpl: typeof fetch,
   url: string,
   timeoutMs: number,
-): Promise<{ ok: boolean; json: unknown }> {
+): Promise<{ ok: boolean; status: number; json: unknown }> {
   const controller = new AbortController()
   let timer: ReturnType<typeof setTimeout> | undefined
   let response: Response | null = null
   const operation = (async () => {
     response = await fetchImpl(url, { signal: controller.signal })
     const json = await response.json()
-    return { ok: response.ok, json }
+    return { ok: response.ok, status: response.status, json }
   })()
 
   try {
@@ -428,6 +428,47 @@ function isServiceKeyNotRegistered(json: unknown): boolean {
     || String(header.returnReasonCode ?? '') === '30'
 }
 
+/**
+ * 게이트웨이/서비스 응답에서 실패 사유만 뽑는다.
+ * 인증키나 요청 URL은 절대 포함하지 않는다.
+ */
+function readGatewayReason(json: unknown): { message: string | null; code: string | null } {
+  if (!json || typeof json !== 'object') return { message: null, code: null }
+  const root = json as Record<string, any>
+  const gateway = root.OpenAPI_ServiceResponse?.cmmMsgHeader
+  if (gateway && typeof gateway === 'object') {
+    return {
+      message: gateway.errMsg ? String(gateway.errMsg) : null,
+      code: gateway.returnReasonCode != null ? String(gateway.returnReasonCode) : null,
+    }
+  }
+  const serviceHeader = root.header
+  if (serviceHeader && typeof serviceHeader === 'object') {
+    return {
+      message: serviceHeader.resultMsg ? String(serviceHeader.resultMsg) : null,
+      code: serviceHeader.resultCode != null ? String(serviceHeader.resultCode) : null,
+    }
+  }
+  return { message: null, code: null }
+}
+
+function failedWithDiagnostics(
+  layerId: string,
+  stage: string,
+  options: { httpStatus?: number | null; json?: unknown } = {},
+): PublicDataLayerResult {
+  const reason = readGatewayReason(options.json)
+  return {
+    ...emptyResult(layerId, 'failed'),
+    diagnostics: {
+      stage,
+      httpStatus: options.httpStatus ?? null,
+      gatewayMessage: reason.message,
+      gatewayCode: reason.code,
+    },
+  }
+}
+
 async function collectKaptApartmentHouseholds(
   target: CollectorTarget,
   env: CollectorEnv,
@@ -464,7 +505,13 @@ async function collectKaptWithKeys(
   keys: { listKey: string; basicKey: string },
 ): Promise<{ result: PublicDataLayerResult; keyNotRegistered: boolean }> {
   const layerId = 'kapt_apartment_households'
-  const failed = (keyNotRegistered = false) => ({ result: emptyResult(layerId, 'failed'), keyNotRegistered })
+  const failed = (
+    stage: string,
+    options: { httpStatus?: number | null; json?: unknown; keyNotRegistered?: boolean } = {},
+  ) => ({
+    result: failedWithDiagnostics(layerId, stage, { httpStatus: options.httpStatus, json: options.json }),
+    keyNotRegistered: options.keyNotRegistered ?? false,
+  })
   const doFetch = env.fetchImpl ?? fetch
   const requestTimeoutMs = Number.isFinite(env.kaptRequestTimeoutMs) && (env.kaptRequestTimeoutMs ?? 0) > 0
     ? env.kaptRequestTimeoutMs!
@@ -485,29 +532,40 @@ async function collectKaptWithKeys(
         numOfRows: '100',
       })
       const response = await fetchJsonWithTimeout(doFetch, `${listEndpoint}?${params}`, requestTimeoutMs)
-      if (!response.ok) return failed(isServiceKeyNotRegistered(response.json))
+      if (!response.ok) {
+        return failed('list_http', {
+          httpStatus: response.status,
+          json: response.json,
+          keyNotRegistered: isServiceKeyNotRegistered(response.json),
+        })
+      }
       const parsed = parseKaptApartmentList(response.json, fullBjdCode)
-      if (!parsed || parsed.pageNo !== pageNo) return failed()
+      if (!parsed || parsed.pageNo !== pageNo) {
+        return failed('list_parse', { httpStatus: response.status, json: response.json })
+      }
 
       expectedTotal ??= parsed.totalCount
       if (parsed.totalCount !== expectedTotal || listItems.length + parsed.items.length > expectedTotal) {
-        return failed()
+        return failed('list_total_mismatch', { httpStatus: response.status })
       }
       for (const item of parsed.items) {
-        if (kaptCodes.has(item.kaptCode)) return failed()
+        if (kaptCodes.has(item.kaptCode)) return failed('list_duplicate_complex')
         kaptCodes.add(item.kaptCode)
         listItems.push(item)
       }
 
       if (listItems.length === expectedTotal) break
-      if (parsed.items.length === 0 || pageNo === 100) return failed()
+      if (parsed.items.length === 0 || pageNo === 100) return failed('list_incomplete_pages')
     }
 
     if (expectedTotal === 0) return { result: emptyResult(layerId, 'empty'), keyNotRegistered: false }
-    if (expectedTotal == null || listItems.length !== expectedTotal) return failed()
+    if (expectedTotal == null || listItems.length !== expectedTotal) return failed('list_incomplete_total')
 
     const complexes: KaptApartmentBasic[] = []
     let basicKeyNotRegistered = false
+    let basicFailureStatus: number | null = null
+    let basicFailureJson: unknown = null
+    let basicFailureStage = 'basic_parse'
     for (let offset = 0; offset < listItems.length; offset += 5) {
       const chunk = listItems.slice(offset, offset + 5)
       const resolved = await Promise.all(chunk.map(async listItem => {
@@ -518,13 +576,27 @@ async function collectKaptWithKeys(
         const response = await fetchJsonWithTimeout(doFetch, `${basicEndpoint}?${params}`, requestTimeoutMs)
         if (!response.ok) {
           if (isServiceKeyNotRegistered(response.json)) basicKeyNotRegistered = true
+          basicFailureStage = 'basic_http'
+          basicFailureStatus = response.status
+          basicFailureJson = response.json
           return null
         }
         const parsed = parseKaptApartmentBasic(response.json, listItem.kaptCode)
-        if (!parsed || parsed.bjdCode !== fullBjdCode) return null
+        if (!parsed || parsed.bjdCode !== fullBjdCode) {
+          basicFailureStage = 'basic_parse'
+          basicFailureStatus = response.status
+          basicFailureJson = response.json
+          return null
+        }
         return parsed
       }))
-      if (resolved.some(item => item == null)) return failed(basicKeyNotRegistered)
+      if (resolved.some(item => item == null)) {
+        return failed(basicFailureStage, {
+          httpStatus: basicFailureStatus,
+          json: basicFailureJson,
+          keyNotRegistered: basicKeyNotRegistered,
+        })
+      }
       complexes.push(...resolved as KaptApartmentBasic[])
     }
 
@@ -562,7 +634,7 @@ async function collectKaptWithKeys(
       keyNotRegistered: false,
     }
   } catch {
-    return failed()
+    return failed('request_error')
   }
 }
 
