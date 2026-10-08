@@ -214,6 +214,42 @@ test('K-apt 전용 키가 미등록 오류를 받으면 포털 공통 인증키�
   assert.equal((result?.value as Record<string, unknown>).totalHouseholds, 480)
 })
 
+test('K-apt 실패 시 인증키 없이 게이트웨이 사유와 단계를 진단으로 남긴다', async () => {
+  const fetchImpl: typeof fetch = async () => new Response(JSON.stringify({
+    OpenAPI_ServiceResponse: {
+      cmmMsgHeader: {
+        errMsg: 'LIMITED_NUMBER_OF_SERVICE_REQUESTS_EXCEEDS_ERROR',
+        returnAuthMsg: '서비스 요청제한횟수 초과에러',
+        returnReasonCode: '22',
+      },
+    },
+  }), { status: 429 })
+
+  const results = await collectPublicDataLayers(
+    { address: '제주특별자치도 제주시 연동', lat: null, lng: null, sigunguCode: '50110', bjdongCode: '13700' },
+    {
+      seoulOpenApiKey: null,
+      dataGoKrKey: null,
+      kaptListApiKey: 'secret-list-key',
+      kaptBasicApiKey: 'secret-basic-key',
+      fetchImpl,
+    },
+  )
+
+  const result = results.find(item => item.layerId === 'kapt_apartment_households')
+  assert.equal(result?.status, 'failed')
+  assert.equal(result?.value, null)
+  assert.equal(result?.diagnostics?.stage, 'list_http')
+  assert.equal(result?.diagnostics?.httpStatus, 429)
+  assert.equal(result?.diagnostics?.gatewayMessage, 'LIMITED_NUMBER_OF_SERVICE_REQUESTS_EXCEEDS_ERROR')
+  assert.equal(result?.diagnostics?.gatewayCode, '22')
+
+  // 인증키는 진단 어디에도 남지 않는다.
+  const serialized = JSON.stringify(result)
+  assert.ok(!serialized.includes('secret-list-key'))
+  assert.ok(!serialized.includes('secret-basic-key'))
+})
+
 test('K-apt 키 후보가 모두 미등록이면 실패로 닫고 합계를 만들지 않는다', async () => {
   const fetchImpl: typeof fetch = async () => new Response(JSON.stringify({
     OpenAPI_ServiceResponse: {
