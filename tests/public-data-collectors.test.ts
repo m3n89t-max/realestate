@@ -52,6 +52,15 @@ test('주민등록 법정동 페이지는 단건 객체와 페이지 메타데�
   assert.equal(parsed.items[0].households, 1820)
 })
 
+test('주민등록 파서는 운영 게이트웨이의 대문자 Response 루트를 읽는다', () => {
+  const parsed = parseResidentRegistrationPage(
+    { Response: RESIDENT_REGISTRATION_SAMPLE },
+    '5011025924',
+  )
+  assert.ok(parsed)
+  assert.equal(parsed.items[0].population, 3980)
+})
+
 test('주민등록 수집기는 직전 완료월의 단일 리동 사실값만 수집하고 500m 값을 만들지 않는다', async () => {
   let requestedUrl = ''
   const fetchImpl: typeof fetch = async input => {
