@@ -142,7 +142,7 @@ export function parseResidentRegistrationPage(
 ): ResidentRegistrationPage | null {
   if (!/^\d{10}$/.test(requestedStdgCd) || !raw || typeof raw !== 'object') return null
   const outer = raw as Record<string, any>
-  const root = outer.head || outer.items ? outer : outer.response
+  const root = outer.head || outer.items ? outer : outer.response ?? outer.Response
   if (!root || typeof root !== 'object') return null
   const resultCode = String(root.head?.resultCode ?? '')
   if (resultCode !== '0' && resultCode !== '00') return null
