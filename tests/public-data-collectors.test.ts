@@ -3,12 +3,137 @@ import assert from 'node:assert/strict'
 
 import {
   collectPublicDataLayers,
+  parseResidentRegistrationPage,
+  previousCompletedMonth,
   parseKaptApartmentBasic,
   parseKaptApartmentList,
   parseSeoulCommercial,
   parseLocalCurrencySpending,
   type CollectorEnv,
 } from '../src/lib/public-data-collectors'
+
+const RESIDENT_REGISTRATION_SAMPLE = {
+  head: {
+    resultCode: '0',
+    resultMsg: '정상',
+    totalCount: '1',
+    numOfRows: '100',
+    pageNo: '1',
+  },
+  items: {
+    item: {
+      statsYm: '202609',
+      stdgCd: '5011025924',
+      ctpvNm: '제주특별자치도',
+      sggNm: '제주시',
+      stdgNm: '조천읍',
+      liNm: '함덕리',
+      admmCd: '5011025900',
+      dongNm: '조천읍',
+      tong: '',
+      ban: '',
+      totNmprCnt: '3980',
+      hhCnt: '1820',
+      hhNmpr: '2.19',
+      maleNmprCnt: '2010',
+      femlNmprCnt: '1970',
+      maleFemlRate: '1.02',
+    },
+  },
+}
+
+test('주민등록 법정동 페이지는 단건 객체와 페이지 메타데이터를 보존한다', () => {
+  const parsed = parseResidentRegistrationPage(RESIDENT_REGISTRATION_SAMPLE, '5011025924')
+  assert.ok(parsed)
+  assert.equal(parsed.pageNo, 1)
+  assert.equal(parsed.totalCount, 1)
+  assert.equal(parsed.items[0].statsYm, '202609')
+  assert.equal(parsed.items[0].population, 3980)
+  assert.equal(parsed.items[0].households, 1820)
+})
+
+test('주민등록 수집기는 직전 완료월의 단일 리동 사실값만 수집하고 500m 값을 만들지 않는다', async () => {
+  let requestedUrl = ''
+  const fetchImpl: typeof fetch = async input => {
+    requestedUrl = String(input)
+    return new Response(JSON.stringify(RESIDENT_REGISTRATION_SAMPLE), { status: 200 })
+  }
+
+  const results = await collectPublicDataLayers(
+    {
+      address: '제주특별자치도 제주시 조천읍 함덕리', lat: 33.54, lng: 126.66,
+      sigunguCode: '50110', bjdongCode: '25924',
+    },
+    {
+      seoulOpenApiKey: null,
+      dataGoKrKey: null,
+      residentRegistrationApiKey: ['resident', 'key'].join('-'),
+      residentRegistrationNow: new Date('2026-10-08T00:00:00Z'),
+      fetchImpl,
+    },
+  )
+
+  const url = new URL(requestedUrl)
+  assert.equal(url.pathname, '/1741000/stdgPpltnHhStus/selectStdgPpltnHhStus')
+  assert.equal(url.searchParams.get('stdgCd'), '5011025924')
+  assert.equal(url.searchParams.get('srchFrYm'), '202609')
+  assert.equal(url.searchParams.get('srchToYm'), '202609')
+  assert.equal(url.searchParams.get('lv'), '7')
+  assert.equal(url.searchParams.get('regSeCd'), '1')
+  assert.equal(url.searchParams.get('type'), 'JSON')
+  assert.equal(url.searchParams.get('numOfRows'), '100')
+  assert.equal(url.searchParams.get('pageNo'), '1')
+
+  const result = results.find(item => item.layerId === 'resident_registration_population')
+  assert.equal(result?.status, 'available')
+  const value = result?.value as Record<string, any>
+  assert.equal(value.regionLabel, '제주특별자치도 제주시 조천읍 함덕리')
+  assert.equal(value.totalPopulation, 3980)
+  assert.equal(value.totalHouseholds, 1820)
+  assert.equal(value.provenance.spatial_unit, '법정동·리 전체')
+  assert.equal(value.radiusMeters, undefined)
+  assert.equal(value.radius500mPopulation, undefined)
+})
+
+test('주민등록 기준월은 대한민국 월 경계에서 직전 완료월을 사용한다', () => {
+  assert.equal(
+    previousCompletedMonth(new Date('2026-09-30T15:30:00Z')),
+    '202609',
+    '2026-10-01 00:30 KST에는 9월 자료를 조회해야 한다',
+  )
+})
+
+test('주민등록 lv=7 단일월 응답이 여러 건이면 후속 페이지를 호출하지 않고 실패로 닫는다', async () => {
+  let calls = 0
+  const fetchImpl: typeof fetch = async () => {
+    calls += 1
+    return new Response(JSON.stringify({
+      ...RESIDENT_REGISTRATION_SAMPLE,
+      head: { ...RESIDENT_REGISTRATION_SAMPLE.head, totalCount: '201' },
+    }), { status: 200 })
+  }
+  const results = await collectPublicDataLayers(
+    {
+      address: '제주특별자치도 제주시 조천읍 함덕리',
+      lat: 33.541,
+      lng: 126.669,
+      seoulPlaceName: null,
+      sigunguName: '제주시',
+      sidoName: '제주특별자치도',
+      sigunguCode: '50110',
+      bjdongCode: '25924',
+    },
+    {
+      seoulOpenApiKey: null,
+      dataGoKrKey: null,
+      residentRegistrationApiKey: ['resident', 'key'].join('-'),
+      residentRegistrationNow: new Date('2026-10-08T00:00:00Z'),
+      fetchImpl,
+    },
+  )
+  assert.equal(calls, 1)
+  assert.equal(results.find(item => item.layerId === 'resident_registration_population')?.status, 'failed')
+})
 
 const KAPT_LIST_SAMPLE = {
   header: { resultCode: '00', resultMsg: 'NORMAL SERVICE.' },

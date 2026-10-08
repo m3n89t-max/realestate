@@ -7,6 +7,8 @@ import {
   getApplicableLayers,
   describeLayerStatus,
   summarizeLayers,
+  isFreshPublicDataLayerPayload,
+  hasActivePublicDataCollectionLock,
   FORBIDDEN_LAYER_PHRASES,
   type PublicDataLayerResult,
 } from '../src/lib/public-data-layers'
@@ -60,6 +62,15 @@ test('K-apt 공동주택 세대수는 법정동 사실값이며 500m 인구로 �
   assert.ok(!`${layer.label}${layer.plainSentence}`.includes('거주인구'))
 })
 
+test('주민등록 인구·세대는 법정동 사실값이며 500m 인구로 표기하지 않는다', () => {
+  const layer = PUBLIC_DATA_LAYERS.find(item => item.id === 'resident_registration_population')
+  assert.ok(layer)
+  assert.equal(layer.metricSemantics, 'administrative_observed')
+  assert.ok(layer.spatialUnit.includes('법정동'))
+  assert.ok(`${layer.plainSentence}${layer.coverageNote ?? ''}`.includes('500m'))
+  assert.ok(!layer.label.includes('주변'))
+})
+
 test('서울 상권 결제 레이어는 금액이 구간값임을 명시한다', () => {
   const layer = PUBLIC_DATA_LAYERS.find(item => item.id === 'seoul_realtime_commercial')
   assert.ok(layer)
@@ -107,6 +118,7 @@ test('전국 레이어는 모든 지역에 적용된다', () => {
     assert.ok(ids.includes('local_currency_spending'), `${address}: 전국 레이어가 빠졌다`)
     assert.ok(ids.includes('sgis_resident_population'), `${address}: 전국 레이어가 빠졌다`)
     assert.ok(ids.includes('kapt_apartment_households'), `${address}: K-apt 전국 레이어가 빠졌다`)
+    assert.ok(ids.includes('resident_registration_population'), `${address}: 주민등록 전국 레이어가 빠졌다`)
   }
 })
 
@@ -147,4 +159,45 @@ test('값이 없는 레이어는 표시 대상이 아니다', () => {
     { layerId: 'seoul_realtime_commercial', status: 'available', value: null, collectedAt: null, sourceAsOf: null },
   ])
   assert.deepEqual(summary.available, [], '기준기간이 없으면 사용 가능으로 분류하지 않는다')
+})
+
+test('최근 공공자료 수집 결과만 외부 API 재호출 없이 재사용한다', () => {
+  const now = Date.parse('2026-10-08T04:00:00Z')
+  assert.equal(isFreshPublicDataLayerPayload({ collected_at: '2026-10-08T03:57:00Z' }, now), true)
+  assert.equal(isFreshPublicDataLayerPayload({ collected_at: '2026-10-08T03:54:59Z' }, now), false)
+  assert.equal(isFreshPublicDataLayerPayload({ collected_at: 'not-a-date' }, now), false)
+  assert.equal(isFreshPublicDataLayerPayload(null, now), false)
+
+  const target = { address: '함덕리 1', lat: 33.5, lng: 126.6, sigunguCode: '50110', bjdongCode: '25924' }
+  const matching = {
+    collected_at: '2026-10-08T03:57:00Z',
+    region_address: target.address,
+    region_location: { lat: target.lat, lng: target.lng },
+    region_codes: { sigungu_code: target.sigunguCode, bjdong_code: target.bjdongCode },
+  }
+  assert.equal(isFreshPublicDataLayerPayload(matching, now, 5 * 60 * 1_000, target), true)
+  assert.equal(
+    isFreshPublicDataLayerPayload(matching, now, 5 * 60 * 1_000, { ...target, bjdongCode: '25925' }),
+    false,
+    '현재 위치 코드와 다른 캐시를 재사용하면 안 된다',
+  )
+
+  const locked = {
+    collection_lock: {
+      started_at: '2026-10-08T03:59:30Z',
+      target: {
+        address: target.address,
+        lat: target.lat,
+        lng: target.lng,
+        sigungu_code: target.sigunguCode,
+        bjdong_code: target.bjdongCode,
+      },
+    },
+  }
+  assert.equal(hasActivePublicDataCollectionLock(locked, target, now), true)
+  assert.equal(
+    hasActivePublicDataCollectionLock(locked, { ...target, bjdongCode: '25925' }, now),
+    false,
+    '다른 위치 요청은 과거 위치의 잠금에 막히면 안 된다',
+  )
 })

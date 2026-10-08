@@ -243,38 +243,21 @@ Deno.serve(async (req) => {
       }
     } catch { /* ignore */ }
 
-    // 6. 500m 추정 배후인구
+    // 6. 보행 장벽 참고정보
+    // 읍면동 평균밀도 × 원 면적은 넓은 읍·면의 주거 밀집을 반영하지 못한다.
+    // 실제 주거 분포를 확보하기 전까지 500m 인구 숫자를 생성하지 않는다.
     const adm_level = usedAdmCd.length >= 8 ? '읍면동' : usedAdmCd.length >= 5 ? '시군구' : '시도'
-    let radius_500m_estimated: number | null = null
+    const radius_500m_estimated: number | null = null
     let barrier_status: 'available' | 'failed' | 'not_collected' = 'not_collected'
     let barrier_names: string[] = []
 
     if (usedAdmCd.length >= 8) {
       try {
-        const census = await getPopStat(targetYear, usedAdmCd, '1', token)
-        if (census?.length) {
-          const valid = census.filter((r: any) =>
-            parseFloat(r.ppltn_dnsty || '0') > 0 && parseInt(r.tot_ppltn || '0', 10) > 0
-          )
-          if (valid.length > 0) {
-            const totalPop = valid.reduce((s: number, r: any) => s + parseInt(r.tot_ppltn || '0', 10), 0)
-            const totalArea = valid.reduce((s: number, r: any) => {
-              const d = parseFloat(r.ppltn_dnsty || '0')
-              const p = parseInt(r.tot_ppltn || '0', 10)
-              return s + (d > 0 ? p / d : 0)
-            }, 0)
-            const useDensity = totalArea > 0 ? totalPop / totalArea : 0
-            if (useDensity > 0) {
-              const barrier = await detectBarriers(lat, lng, 500)
-              barrier_status = barrier.status
-              barrier_names = barrier.barriers
-              radius_500m_estimated = Math.round(useDensity * Math.PI * 0.25)
-              console.log(`[population] 500m 거주인구 단순 환산 ${radius_500m_estimated}명`)
-            }
-          }
-        }
-      } catch (e) {
-        console.log('[population] census block 실패, 500m 추정 생략')
+        const barrier = await detectBarriers(lat, lng, 500)
+        barrier_status = barrier.status
+        barrier_names = barrier.barriers
+      } catch {
+        barrier_status = 'failed'
       }
     }
 
@@ -290,7 +273,7 @@ Deno.serve(async (req) => {
       adm_level,
       source_year: targetYear,
       radius_500m_estimated,
-      estimation_method: '행정구역 평균 인구밀도 × 반경 500m 원 면적 단순 환산',
+      estimation_method: null,
       barrier_status,
       barrier_names,
       housing_stat,
