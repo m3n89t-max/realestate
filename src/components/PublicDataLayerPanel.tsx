@@ -105,6 +105,14 @@ function LayerCard({
         complexes?: Array<{ kaptCode: string; kaptName: string; households: number }>
       }
     : null
+  const residentValue = layer.id === 'resident_registration_population' && result?.value && typeof result.value === 'object'
+    ? result.value as {
+        regionLabel?: string
+        totalPopulation?: number
+        totalHouseholds?: number
+        membersPerHousehold?: number | null
+      }
+    : null
 
   return (
     <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
@@ -136,11 +144,23 @@ function LayerCard({
         </div>
       )}
 
+      {hasValue && residentValue && Number.isFinite(residentValue.totalPopulation) && Number.isFinite(residentValue.totalHouseholds) && (
+        <div className="mt-2 rounded-lg bg-sky-50 px-2.5 py-2">
+          <p className="text-xs font-bold text-sky-800">
+            {residentValue.regionLabel || '소속 법정동·리'} 전체 {residentValue.totalPopulation!.toLocaleString()}명 · {residentValue.totalHouseholds!.toLocaleString()}세대
+          </p>
+          {residentValue.membersPerHousehold != null && Number.isFinite(residentValue.membersPerHousehold) && (
+            <p className="mt-0.5 text-[10px] text-sky-700">세대당 {residentValue.membersPerHousehold.toLocaleString()}명</p>
+          )}
+          <p className="mt-1 text-[10px] font-medium text-orange-700">법정동·리 전체 값이며 반경 500m 값이 아닙니다.</p>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mt-2">
         <span className="text-[9px] text-gray-400">{STATUS_BADGE[status]}</span>
         {result?.sourceAsOf && (
           <span className="text-[9px] text-gray-400">
-            {layer.id === 'kapt_apartment_households' ? '조회' : '기준'} {result.sourceAsOf}
+            {layer.id === 'kapt_apartment_households' ? '조회' : '기준'} {result.sourceAsOf.replace(/^(\d{4})(\d{2})$/, '$1-$2')}
           </span>
         )}
       </div>

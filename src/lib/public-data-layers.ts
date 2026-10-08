@@ -104,6 +104,22 @@ export const PUBLIC_DATA_LAYERS: PublicDataLayer[] = [
     defaultVisible: true,
   },
   {
+    id: 'resident_registration_population',
+    label: '법정동·리 주민등록 인구·세대',
+    plainSentence: '매물이 속한 법정동이나 리 전체의 주민등록 인구와 세대수를 보여줘요. 500m 반경 값은 아니에요.',
+    source: '행정안전부 주민등록 인구통계',
+    metricSemantics: 'administrative_observed',
+    spatialUnit: '법정동·리 전체',
+    method: '10자리 법정동코드로 직전 완료월의 단일 리·동 주민등록 인구와 세대수를 조회합니다.',
+    coverageNote: '통·반 경계 좌표가 없어 반경 500m 인구로 사용하지 않습니다. 주민등록 신고 기준이며 실제 체류인구와는 다를 수 있습니다.',
+    license: '이용허락범위 제한 없음',
+    officialUrl: 'https://www.data.go.kr/data/15108071/openapi.do',
+    scope: 'nationwide',
+    render: 'panel',
+    delivery: 'collector',
+    defaultVisible: true,
+  },
+  {
     id: 'kakao_facility_density',
     label: '시설 밀집 참고도',
     plainSentence: '가게와 편의시설이 어디에 모여 있는지 보여줘요.',
@@ -414,6 +430,86 @@ export function summarizeLayers(results: PublicDataLayerResult[]): LayerSummary 
   }
 
   return summary
+}
+
+const PUBLIC_DATA_CACHE_MS = 5 * 60 * 1_000
+
+export interface PublicDataCollectionTarget {
+  address: string | null
+  lat: number | null
+  lng: number | null
+  sigunguCode: string | null
+  bjdongCode: string | null
+}
+
+function matchesCollectionTarget(
+  stored: {
+    address?: unknown
+    lat?: unknown
+    lng?: unknown
+    sigungu_code?: unknown
+    bjdong_code?: unknown
+  } | null | undefined,
+  expected: PublicDataCollectionTarget,
+): boolean {
+  return (
+    stored?.address === expected.address
+    && stored?.lat === expected.lat
+    && stored?.lng === expected.lng
+    && stored?.sigungu_code === expected.sigunguCode
+    && stored?.bjdong_code === expected.bjdongCode
+  )
+}
+
+/** 최근 저장한 결과를 재사용해 반복 클릭·병렬 요청이 공공 API 쿼터를 소모하지 않게 한다. */
+export function isFreshPublicDataLayerPayload(
+  payload: unknown,
+  nowMs = Date.now(),
+  maxAgeMs = PUBLIC_DATA_CACHE_MS,
+  expectedTarget?: PublicDataCollectionTarget,
+): boolean {
+  if (!payload || typeof payload !== 'object') return false
+  const record = payload as {
+    collected_at?: unknown
+    region_address?: unknown
+    region_location?: { lat?: unknown; lng?: unknown } | null
+    region_codes?: { sigungu_code?: unknown; bjdong_code?: unknown } | null
+  }
+  const collectedAt = record.collected_at
+  if (typeof collectedAt !== 'string') return false
+  const collectedAtMs = Date.parse(collectedAt)
+  if (!Number.isFinite(collectedAtMs)) return false
+  const ageMs = nowMs - collectedAtMs
+  if (!(ageMs >= 0 && ageMs < maxAgeMs)) return false
+  if (!expectedTarget) return true
+  return (
+    record.region_address === expectedTarget.address
+    && record.region_location?.lat === expectedTarget.lat
+    && record.region_location?.lng === expectedTarget.lng
+    && record.region_codes?.sigungu_code === expectedTarget.sigunguCode
+    && record.region_codes?.bjdong_code === expectedTarget.bjdongCode
+  )
+}
+
+/** 같은 위치에서 이미 시작된 분산 수집 잠금이 아직 유효한지 확인한다. */
+export function hasActivePublicDataCollectionLock(
+  payload: unknown,
+  expectedTarget: PublicDataCollectionTarget,
+  nowMs = Date.now(),
+  lockTtlMs = 60_000,
+): boolean {
+  if (!payload || typeof payload !== 'object') return false
+  const lock = (payload as {
+    collection_lock?: {
+      started_at?: unknown
+      target?: Parameters<typeof matchesCollectionTarget>[0]
+    }
+  }).collection_lock
+  if (!lock || typeof lock.started_at !== 'string') return false
+  const startedAtMs = Date.parse(lock.started_at)
+  if (!Number.isFinite(startedAtMs)) return false
+  const ageMs = nowMs - startedAtMs
+  return ageMs >= 0 && ageMs < lockTtlMs && matchesCollectionTarget(lock.target, expectedTarget)
 }
 
 /** 입력 품질에 따른 신뢰도 등급. 약한 추정이 강한 관측처럼 보이지 않게 한다. */

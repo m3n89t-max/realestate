@@ -84,10 +84,8 @@ export default function KakaoMap({
 
   const results = publicDataLayers?.results ?? []
   const hasPoi = buildFacilityHeatPoints(poiData, kakaoDensity).length > 0
-  const hasPopulationLayer = !!populationData && !(populationData as any).error && (
-    populationData.radius_500m_estimated != null ||
-    (populationData.total_population > 0 && populationData.density > 0)
-  )
+  const populationEstimate = getPopulationEstimate(populationData)
+  const hasPopulationLayer = populationEstimate != null
   const hasActivityLayer = (
     (cardData?.has_data === true && hasDisplayableMetric(cardData?.floating_population)) ||
     hasDisplayableMetric(commercialData?.floating_population)
@@ -241,13 +239,14 @@ export default function KakaoMap({
     if (popLabelRef.current)  { popLabelRef.current.setMap(null);  popLabelRef.current  = null }
 
     if (!showPopulation) return
-    if (!populationData?.total_population || !populationData?.density || populationData.density <= 0) return
+    const estimate = getPopulationEstimate(populationData)
+    if (!estimate) return
 
     const center = new window.kakao.maps.LatLng(lat, lng)
     // 배후인구 반경: 500m 고정 (업종밀집도와 같은 분석범위)
     const popRadius = 500
 
-    const density = populationData.density
+    const density = populationData.density ?? 0
     const color = density > 5000 ? '#ef4444' : density > 1000 ? '#f97316' : '#22c55e'
 
     const circle = new window.kakao.maps.Circle({
@@ -264,11 +263,7 @@ export default function KakaoMap({
     circle.setMap(map)
     popCircleRef.current = circle
 
-    // 행정구역 평균 인구밀도로 단순 환산한 거주인구 추정값만 표시한다.
-    const estimate = getPopulationEstimate(populationData)
-    const labelText = estimate
-      ? `약 ${estimate.value.toLocaleString()}명(추정)`
-      : `${(populationData.total_population / 10000).toFixed(1)}만명`
+    const labelText = `약 ${estimate.value.toLocaleString()}명(추정)`
     const labelPos = new window.kakao.maps.LatLng(
       lat + (popRadius / 111_000) * 0.9,
       lng
@@ -662,10 +657,9 @@ export default function KakaoMap({
             </div>
           )}
 
-          {/* 섹션 1: 행정구역 평균밀도 기반 500m 거주인구 단순 환산 */}
-          {!populationData?.error && populationData?.radius_500m_estimated != null && (() => {
-            const estimate = getPopulationEstimate(populationData)
-            if (!estimate) return null
+          {/* 검증된 소지역 재배분 방식의 500m 거주인구만 표시 */}
+          {!populationData?.error && populationEstimate && (() => {
+            const estimate = populationEstimate
             const barrierMessage = describeBarrierStatus(populationData)
             return (
               <div className="mb-2.5">
@@ -681,43 +675,6 @@ export default function KakaoMap({
             )
           })()}
 
-
-          {/* 구분선 — SGIS 행정구역 통계가 있을 때만 표시 */}
-          {!populationData?.error && populationData && <div className="border-t border-gray-200 my-2" />}
-
-          {/* 섹션 2: 읍면동 행정구역 통계 — 에러 시 숨김 */}
-          {!populationData?.error && populationData && (
-            <div>
-              <p className="text-[9px] font-semibold text-gray-500 mb-1.5">
-                🏘 {populationData.adm_nm || '행정구역'} ({populationData.adm_level || '시군구'}) 전체 통계
-              </p>
-              <div className="space-y-1.5">
-                <div className="flex justify-between items-center text-[11px]">
-                  <span className="text-gray-500">인구 밀도</span>
-                  <span className="font-semibold text-brand-600">{populationData.density?.toLocaleString()}명/㎢</span>
-                </div>
-                <div className="flex justify-between items-center text-[11px]">
-                  <span className="text-gray-500">총 인구</span>
-                  <span className="font-semibold text-gray-700">{populationData.total_population?.toLocaleString()}명</span>
-                </div>
-                <div className="flex justify-between items-center text-[11px]">
-                  <span className="text-gray-500">총 가구 수</span>
-                  <span className="font-semibold text-gray-700">{populationData.total_households?.toLocaleString()}가구</span>
-                </div>
-                <div className="flex justify-between items-center text-[11px]">
-                  <span className="text-gray-500">1인가구 비율</span>
-                  <span className="font-semibold text-orange-600">
-                    {populationData.total_households > 0
-                      ? ((populationData.single_households / populationData.total_households) * 100).toFixed(1)
-                      : 0}%
-                  </span>
-                </div>
-              </div>
-              {populationData.collected_at && (
-                <p className="mt-2.5 text-[10px] text-gray-600 text-right">자료: 통계청 SGIS · 범위: 행정구역 평균 및 500m 단순 환산</p>
-              )}
-            </div>
-          )}
         </div>
       )}
     </div>

@@ -712,17 +712,16 @@ function MapSection({
 
         {/* ① 거주인구 참고값 */}
         <div className="bg-white border border-blue-100 rounded-xl p-3 shadow-sm">
-          <p className="font-bold text-blue-700 mb-2 flex items-center gap-1">
-            <span className="w-3 h-3 rounded-full border-2 border-dashed inline-block flex-shrink-0" style={{borderColor:'#ef4444'}} />
-            주변 거주인구 참고값
-          </p>
+          <p className="font-bold text-blue-700 mb-2 flex items-center gap-1">500m 거주인구 분석</p>
           <div className="bg-blue-50 rounded-lg px-2.5 py-2 text-[10px] leading-relaxed text-blue-800 mb-2">
-            행정구역의 평균 인구밀도를 매물 주변 500m 원에 단순 환산한 추정값이에요. 실제 보행권 인구와는 다를 수 있어요.
+            읍면동 전체 평균을 원 면적에 곱한 값은 표시하지 않아요. 공식 소지역 인구와 실제 주거 분포를 함께 확인한 뒤 제공할 예정이에요.
           </div>
           {/* 실제 값 표시 */}
-          {population_data?.radius_500m_estimated != null && (() => {
+          {(() => {
             const estimate = getPopulationEstimate(population_data)
-            if (!estimate) return null
+            if (!estimate) {
+              return <p className="text-[10px] font-medium text-gray-500">현재는 신뢰할 수 있는 500m 숫자가 없습니다.</p>
+            }
             return (
               <div className="text-[10px] text-gray-600 space-y-0.5">
                 <div className="flex justify-between">
@@ -733,12 +732,6 @@ function MapSection({
               </div>
             )
           })()}
-          <div className="flex gap-1.5 mt-2 pt-1.5 border-t border-gray-100">
-            <span className="flex items-center gap-0.5 text-[9px] text-gray-400"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#ef4444'}} />고밀</span>
-            <span className="flex items-center gap-0.5 text-[9px] text-gray-400"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#f97316'}} />중밀</span>
-            <span className="flex items-center gap-0.5 text-[9px] text-gray-400"><span className="w-2 h-2 rounded-full inline-block" style={{background:'#22c55e'}} />저밀</span>
-            <span className="text-[9px] text-gray-500 ml-auto">SGIS 행정구역 통계</span>
-          </div>
         </div>
 
         {/* ② 보행 장벽 참고정보 */}

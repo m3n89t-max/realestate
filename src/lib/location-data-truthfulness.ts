@@ -24,6 +24,10 @@ interface PopulationEstimateInput {
   adm_level?: string | null
   source_year?: string | number | null
   commercial_grade?: string | null
+  metric_semantics?: string | null
+  spatial_unit?: string | null
+  estimation_method?: string | null
+  source_as_of?: string | null
 }
 
 export interface PopulationEstimate {
@@ -55,17 +59,22 @@ const FACILITY_WEIGHT: Record<string, number> = {
 
 export function getPopulationEstimate(input: PopulationEstimateInput | null | undefined): PopulationEstimate | null {
   if (!input) return null
+  // 기존 값은 읍면동 전체를 균일하게 펼친 수치라 함덕 같은 넓은 읍·면에서
+  // 명백한 과소추정을 만든다. 실제 주거 분포를 사용한 새 방법만 fail-open 한다.
+  if (
+    input.metric_semantics !== 'redistributed_estimate' ||
+    input.spatial_unit !== 'radius_500m' ||
+    input.estimation_method !== 'official_residential_redistribution_v1' ||
+    !input.source_as_of
+  ) return null
   const raw = input.radius_500m_estimated
   if (raw == null || !Number.isFinite(raw) || raw < 0) return null
-
-  const year = input.source_year ? `${input.source_year}년` : '기준연도 미표기'
-  const level = input.adm_level ? `${input.adm_level} 통계` : '공간단위 미표기'
 
   return {
     value: Math.round(raw),
     title: '매물 주변 500m 거주인구',
-    description: '행정구역 평균 인구밀도로 단순 환산한 참고값이에요.',
-    sourceLabel: `${year} · ${level}`,
+    description: '공식 인구를 실제 주거 분포에 따라 재배분한 추정값이에요.',
+    sourceLabel: `${input.source_as_of} · 반경 500m`,
   }
 }
 

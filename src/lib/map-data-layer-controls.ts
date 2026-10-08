@@ -37,9 +37,9 @@ export const MAP_DATA_LAYER_DEFINITIONS: readonly MapDataLayerDefinition[] = [
   {
     id: 'population',
     label: '인구',
-    description: '행정구역 평균으로 환산한 500m 거주인구 참고값이에요.',
-    scopeLabel: '반경 500m 추정 · 행정구역 통계',
-    sourceLabel: '통계청 SGIS',
+    description: '공식 총인구를 소지역 주거 분포에 따라 재배분한 500m 추정값이에요.',
+    scopeLabel: '반경 500m 추정 · 소지역 재배분',
+    sourceLabel: '공식 인구·주거 자료',
     colorClass: 'bg-blue-600 border-blue-500',
   },
   {

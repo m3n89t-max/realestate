@@ -20,6 +20,10 @@ import {
 export interface CollectorEnv {
   seoulOpenApiKey: string | null
   dataGoKrKey: string | null
+  residentRegistrationApiKey?: string | null
+  /** 테스트에서 조회 기준월을 고정한다. 운영은 현재 시각의 직전 완료월을 사용한다. */
+  residentRegistrationNow?: Date
+  residentRegistrationRequestTimeoutMs?: number
   kaptListApiKey?: string | null
   kaptBasicApiKey?: string | null
   /** 테스트에서만 짧게 조정한다. 운영 기본값은 8초다. */
@@ -93,6 +97,102 @@ function toNullableNumber(value: unknown): number | null {
     return Number.isFinite(parsed) ? parsed : null
   }
   return null
+}
+
+// ── 행정안전부 법정동·리 주민등록 인구·세대 ──────────────────
+
+export interface ResidentRegistrationItem {
+  statsYm: string
+  stdgCd: string
+  ctpvNm: string
+  sggNm: string
+  stdgNm: string
+  liNm: string | null
+  admmCd: string | null
+  dongNm: string | null
+  population: number
+  households: number
+  membersPerHousehold: number | null
+  malePopulation: number | null
+  femalePopulation: number | null
+}
+
+export interface ResidentRegistrationPage {
+  items: ResidentRegistrationItem[]
+  pageNo: number
+  numOfRows: number
+  totalCount: number
+}
+
+export interface ResidentRegistrationPopulation {
+  statsYm: string
+  stdgCd: string
+  regionLabel: string
+  totalPopulation: number
+  totalHouseholds: number
+  membersPerHousehold: number | null
+  malePopulation: number | null
+  femalePopulation: number | null
+  provenance: DataProvenance
+}
+
+export function parseResidentRegistrationPage(
+  raw: unknown,
+  requestedStdgCd: string,
+): ResidentRegistrationPage | null {
+  if (!/^\d{10}$/.test(requestedStdgCd) || !raw || typeof raw !== 'object') return null
+  const outer = raw as Record<string, any>
+  const root = outer.head || outer.items ? outer : outer.response
+  if (!root || typeof root !== 'object') return null
+  const resultCode = String(root.head?.resultCode ?? '')
+  if (resultCode !== '0' && resultCode !== '00') return null
+
+  const pageNo = toNullableNumber(root.head?.pageNo)
+  const numOfRows = toNullableNumber(root.head?.numOfRows)
+  const totalCount = toNullableNumber(root.head?.totalCount)
+  if (
+    pageNo == null || !Number.isInteger(pageNo) || pageNo < 1 ||
+    numOfRows == null || !Number.isInteger(numOfRows) || numOfRows < 1 ||
+    totalCount == null || !Number.isInteger(totalCount) || totalCount < 0
+  ) return null
+
+  const item = root.items?.item
+  const rawItems: any[] = Array.isArray(item) ? item : item ? [item] : []
+  const items: ResidentRegistrationItem[] = []
+  for (const row of rawItems) {
+    const statsYm = String(row?.statsYm ?? '')
+    const stdgCd = String(row?.stdgCd ?? '')
+    const population = toNullableNumber(row?.totNmprCnt)
+    const households = toNullableNumber(row?.hhCnt)
+    const malePopulation = toNullableNumber(row?.maleNmprCnt)
+    const femalePopulation = toNullableNumber(row?.femlNmprCnt)
+    if (
+      !/^\d{6}$/.test(statsYm) || stdgCd !== requestedStdgCd ||
+      population == null || !Number.isInteger(population) || population < 0 ||
+      households == null || !Number.isInteger(households) || households < 0 ||
+      (malePopulation != null && (!Number.isInteger(malePopulation) || malePopulation < 0)) ||
+      (femalePopulation != null && (!Number.isInteger(femalePopulation) || femalePopulation < 0)) ||
+      (malePopulation != null && femalePopulation != null && malePopulation + femalePopulation !== population)
+    ) return null
+
+    items.push({
+      statsYm,
+      stdgCd,
+      ctpvNm: String(row.ctpvNm ?? '').trim(),
+      sggNm: String(row.sggNm ?? '').trim(),
+      stdgNm: String(row.stdgNm ?? '').trim(),
+      liNm: row.liNm ? String(row.liNm).trim() || null : null,
+      admmCd: row.admmCd ? String(row.admmCd).trim() || null : null,
+      dongNm: row.dongNm ? String(row.dongNm).trim() || null : null,
+      population,
+      households,
+      membersPerHousehold: toNullableNumber(row.hhNmpr),
+      malePopulation,
+      femalePopulation,
+    })
+  }
+  if (items.length > numOfRows || (totalCount === 0 && items.length > 0)) return null
+  return { items, pageNo, numOfRows, totalCount }
 }
 
 // ── K-apt 공동주택 단지·세대수 ─────────────────────────────────
@@ -509,6 +609,102 @@ function describeShape(value: unknown, depth = 0): string {
   return `{${entries.map(([k, v]) => `${k}:${describeShape(v, depth + 1)}`).join(',')}}`
 }
 
+export function previousCompletedMonth(now: Date): string {
+  // 제공기관의 통계월은 대한민국 달력 기준이다. UTC 기준으로 계산하면
+  // 매월 1일 00:00~08:59 KST에 두 달 전 자료를 요청하게 된다.
+  const koreaNow = new Date(now.getTime() + 9 * 60 * 60 * 1_000)
+  const month = new Date(Date.UTC(koreaNow.getUTCFullYear(), koreaNow.getUTCMonth() - 1, 1))
+  return `${month.getUTCFullYear()}${String(month.getUTCMonth() + 1).padStart(2, '0')}`
+}
+
+async function collectResidentRegistrationPopulation(
+  target: CollectorTarget,
+  env: CollectorEnv,
+): Promise<PublicDataLayerResult> {
+  const layerId = 'resident_registration_population'
+  if (!env.residentRegistrationApiKey) return emptyResult(layerId, 'unconfigured')
+
+  const stdgCd = `${target.sigunguCode?.trim() ?? ''}${target.bjdongCode?.trim() ?? ''}`
+  if (!/^\d{10}$/.test(stdgCd)) return emptyResult(layerId, 'empty')
+
+  const statsYm = previousCompletedMonth(env.residentRegistrationNow ?? new Date())
+  const doFetch = env.fetchImpl ?? fetch
+  const timeoutMs = Number.isFinite(env.residentRegistrationRequestTimeoutMs)
+    && (env.residentRegistrationRequestTimeoutMs ?? 0) > 0
+    ? env.residentRegistrationRequestTimeoutMs!
+    : 8_000
+  const endpoint = 'https://apis.data.go.kr/1741000/stdgPpltnHhStus/selectStdgPpltnHhStus'
+  try {
+    const params = new URLSearchParams({
+      serviceKey: normalizeServiceKey(env.residentRegistrationApiKey),
+      stdgCd,
+      srchFrYm: statsYm,
+      srchToYm: statsYm,
+      lv: '7',
+      regSeCd: '1',
+      type: 'JSON',
+      numOfRows: '100',
+      pageNo: '1',
+    })
+    const response = await fetchJsonWithTimeout(doFetch, `${endpoint}?${params}`, timeoutMs)
+    if (!response.ok) {
+      return failedWithDiagnostics(layerId, 'resident_http', {
+        httpStatus: response.status,
+        json: response.json,
+      })
+    }
+    const parsed = parseResidentRegistrationPage(response.json, stdgCd)
+    if (!parsed || parsed.pageNo !== 1) {
+      return failedWithDiagnostics(layerId, 'resident_parse', {
+        httpStatus: response.status,
+        json: response.json,
+      })
+    }
+    if (parsed.totalCount === 0) return emptyResult(layerId, 'empty')
+    // lv=7 + 단일 통계월의 계약상 결과는 단일 리·동 합계 한 건이다.
+    // totalCount부터 1이 아니면 후속 페이지를 호출하지 않고 실패로 닫는다.
+    if (parsed.totalCount !== 1 || parsed.items.length !== 1 || parsed.items[0].statsYm !== statsYm) {
+      return failedWithDiagnostics(layerId, 'resident_ambiguous_rows')
+    }
+
+    const item = parsed.items[0]
+    const collectedAt = new Date().toISOString()
+    const regionLabel = [item.ctpvNm, item.sggNm, item.stdgNm, item.liNm]
+      .filter(Boolean)
+      .join(' ')
+    if (!regionLabel) return failedWithDiagnostics(layerId, 'resident_missing_region')
+
+    const value: ResidentRegistrationPopulation = {
+      statsYm: item.statsYm,
+      stdgCd: item.stdgCd,
+      regionLabel,
+      totalPopulation: item.population,
+      totalHouseholds: item.households,
+      membersPerHousehold: item.membersPerHousehold,
+      malePopulation: item.malePopulation,
+      femalePopulation: item.femalePopulation,
+      provenance: {
+        source: '행정안전부 법정동별 주민등록 인구 및 세대현황',
+        metric_semantics: 'administrative_observed',
+        source_as_of: item.statsYm,
+        collected_at: collectedAt,
+        spatial_unit: '법정동·리 전체',
+        method: '10자리 법정동코드와 lv=7로 단일 리·동의 직전 완료월 전체 등록인구를 조회',
+        coverage_note: '법정동·리 전체 값입니다. 통·반 경계 좌표가 없어 반경 500m 값으로 사용하지 않습니다.',
+      },
+    }
+    return {
+      layerId,
+      status: 'available',
+      value,
+      collectedAt,
+      sourceAsOf: item.statsYm,
+    }
+  } catch {
+    return failedWithDiagnostics(layerId, 'resident_request_error')
+  }
+}
+
 async function collectKaptApartmentHouseholds(
   target: CollectorTarget,
   env: CollectorEnv,
@@ -858,12 +1054,14 @@ export async function collectPublicDataLayers(
 
   // 수집기가 구현된 레이어는 독립 실행한다 (allSettled: 하나의 실패가 형제를 취소하지 않는다).
   const settled = await Promise.allSettled([
+    collectResidentRegistrationPopulation(target, env),
     collectKaptApartmentHouseholds(target, env),
     collectSeoulCommercial(target, env),
     collectLocalCurrency(target, env),
   ])
 
   const collectedLayerIds = [
+    'resident_registration_population',
     'kapt_apartment_households',
     'seoul_realtime_commercial',
     'local_currency_spending',

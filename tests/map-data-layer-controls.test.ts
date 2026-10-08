@@ -59,6 +59,12 @@ test('K-apt 세대수는 좌표 확보 전 지도 인구 레이어를 활성화�
   assert.doesNotMatch(source, /같은 법정동 K-apt 공동주택/)
 })
 
+test('법정동 주민등록 인구는 경계 확보 전 지도 500m 인구 레이어를 활성화하지 않는다', () => {
+  const source = readFileSync(path.join(process.cwd(), 'src/components/KakaoMap.tsx'), 'utf8')
+  assert.doesNotMatch(source, /resident_registration_population/)
+  assert.match(source, /getPopulationEstimate\(populationData\)/)
+})
+
 test('모바일 지도에서 인구 정보 카드와 공통 설명 카드를 겹쳐 표시하지 않는다', () => {
   const source = readFileSync(path.join(process.cwd(), 'src/components/KakaoMap.tsx'), 'utf8')
   assert.match(source, /activeLayerOption && activeLayer !== 'population'/)
