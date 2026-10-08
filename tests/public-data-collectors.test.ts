@@ -168,6 +168,57 @@ test('K-apt 목록 중간 페이지가 비면 부분 합계를 폐기한다', as
   assert.equal(result?.value, null)
 })
 
+const KAPT_LIST_REAL_RESPONSE = {
+  // 운영에서 확인된 실제 응답 형태: `response` 루트로 한 겹 감싸이고
+  // 페이지 필드가 문자열이 아니라 숫자다.
+  response: {
+    header: { resultCode: '00', resultMsg: 'NORMAL SERVICE.' },
+    body: {
+      items: [
+        { bjdCode: '5011013700', kaptCode: 'A10027875', kaptName: '연동센트럴', as1: '제주특별자치도', as2: '제주시', as3: '연동', as4: '' },
+      ],
+      numOfRows: 100,
+      pageNo: 1,
+      totalCount: 1,
+    },
+  },
+}
+
+const KAPT_BASIC_REAL_RESPONSE = {
+  response: {
+    header: { resultCode: '00', resultMsg: 'NORMAL SERVICE.' },
+    body: {
+      item: {
+        bjdCode: '5011013700',
+        kaptCode: 'A10027875',
+        kaptName: '연동센트럴',
+        kaptAddr: '제주특별자치도 제주시 연동 1',
+        doroJuso: '제주특별자치도 제주시 신대로 1',
+        kaptdaCnt: 480,
+        hoCnt: 500,
+        kaptDongCnt: 4,
+      },
+    },
+  },
+}
+
+test('K-apt 목록 파서는 response 루트로 감싼 실제 응답을 읽는다', () => {
+  const parsed = parseKaptApartmentList(KAPT_LIST_REAL_RESPONSE, '5011013700')
+  assert.ok(parsed, 'response 루트 응답을 거부하면 운영에서 항상 실패한다')
+  assert.equal(parsed?.pageNo, 1)
+  assert.equal(parsed?.numOfRows, 100)
+  assert.equal(parsed?.totalCount, 1)
+  assert.equal(parsed?.items.length, 1)
+  assert.equal(parsed?.items[0].kaptCode, 'A10027875')
+})
+
+test('K-apt 기본정보 파서는 response 루트로 감싼 실제 응답을 읽는다', () => {
+  const parsed = parseKaptApartmentBasic(KAPT_BASIC_REAL_RESPONSE, 'A10027875')
+  assert.ok(parsed, 'response 루트 응답을 거부하면 세대수를 영원히 못 읽는다')
+  assert.equal(parsed?.households, 480)
+  assert.equal(parsed?.bjdCode, '5011013700')
+})
+
 test('K-apt 전용 키가 미등록 오류를 받으면 포털 공통 인증키로 재시도한다', async () => {
   // 공공데이터포털은 계정당 하나의 인증키를 모든 승인 서비스에 공통 사용한다.
   // 전용 환경변수에 다른 서비스의 키가 들어가면 승인 상태와 무관하게 403이 반환되므로,
