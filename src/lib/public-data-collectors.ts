@@ -136,9 +136,27 @@ export interface KaptApartmentHouseholds {
   provenance: DataProvenance
 }
 
+/**
+ * 공공데이터포털 서비스 응답의 실제 루트를 찾는다.
+ *
+ * 공식 Swagger 예시는 `{header, body}`지만 운영 응답은 `{response: {header, body}}`로
+ * 한 겹 더 감싸여 온다. 두 형태를 모두 받아야 한다.
+ */
+function unwrapServiceResponse(raw: unknown): Record<string, any> | null {
+  if (!raw || typeof raw !== 'object') return null
+  const root = raw as Record<string, any>
+  if (root.header || root.body) return root
+  const nested = root.response
+  if (nested && typeof nested === 'object' && (nested.header || nested.body)) {
+    return nested as Record<string, any>
+  }
+  return null
+}
+
 export function parseKaptApartmentList(raw: unknown, requestedBjdCode: string): KaptApartmentListPage | null {
   if (!/^\d{10}$/.test(requestedBjdCode) || !raw || typeof raw !== 'object') return null
-  const root = raw as Record<string, any>
+  const root = unwrapServiceResponse(raw)
+  if (!root) return null
   if (String(root.header?.resultCode ?? '') !== '00') return null
 
   const body = root.body
@@ -182,7 +200,8 @@ export function parseKaptApartmentList(raw: unknown, requestedBjdCode: string): 
 
 export function parseKaptApartmentBasic(raw: unknown, requestedKaptCode: string): KaptApartmentBasic | null {
   if (!requestedKaptCode || !raw || typeof raw !== 'object') return null
-  const root = raw as Record<string, any>
+  const root = unwrapServiceResponse(raw)
+  if (!root) return null
   if (String(root.header?.resultCode ?? '') !== '00') return null
   const item = root.body?.item
   if (!item || typeof item !== 'object') return null
