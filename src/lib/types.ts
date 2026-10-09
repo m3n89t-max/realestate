@@ -263,7 +263,16 @@ export interface PopulationData {
   adm_level?: string
   source_year?: string
   radius_500m_estimated?: number | null
+  radius_500m_households_estimated?: number | null
   estimation_method?: string | null
+  metric_semantics?: string | null
+  spatial_unit?: string | null
+  source_as_of?: string | null
+  source?: string | null
+  stats_area_count?: number | null
+  boundary_base_year?: string | null
+  coverage_ratio?: number | null
+  coverage_note?: string | null
   barrier_status?: 'available' | 'failed' | 'not_collected'
   barrier_names?: string[]
   collected_at: string

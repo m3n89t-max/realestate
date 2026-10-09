@@ -38,6 +38,53 @@ test('검증된 소지역 재배분 값만 500m 추정치로 표시한다', () =
   assert.match(estimate?.sourceLabel ?? '', /2026-09/)
 })
 
+test('SGIS 집계구 경계면적 추정은 인구와 가구를 함께 표시한다', () => {
+  const estimate = getPopulationEstimate({
+    radius_500m_estimated: 2_340,
+    radius_500m_households_estimated: 980,
+    metric_semantics: 'redistributed_estimate',
+    spatial_unit: 'radius_500m',
+    estimation_method: 'sgis_statsarea_areal_interpolation_v1',
+    source_as_of: '2024',
+    boundary_base_year: '2025',
+    stats_area_count: 4,
+  })
+
+  assert.equal(estimate?.value, 2_340)
+  assert.equal(estimate?.households, 980)
+  assert.match(estimate?.description ?? '', /집계구.*경계면적/)
+  assert.match(estimate?.sourceLabel ?? '', /2024/)
+  assert.match(estimate?.sourceLabel ?? '', /집계구 4개/)
+})
+
+test('센서스 가구와 주민등록 세대의 모집단 차이를 명시한다', () => {
+  const estimate = getPopulationEstimate({
+    radius_500m_estimated: 2_340,
+    radius_500m_households_estimated: 980,
+    metric_semantics: 'redistributed_estimate',
+    spatial_unit: 'radius_500m',
+    estimation_method: 'sgis_statsarea_areal_interpolation_v1',
+    source_as_of: '2024',
+    coverage_ratio: 0.97,
+  })
+
+  assert.match(estimate?.description ?? '', /주민등록 세대수와는 모집단이 다릅니다/)
+})
+
+test('커버리지가 낮은 집계구 추정값은 숫자로 보여주지 않는다', () => {
+  const estimate = getPopulationEstimate({
+    radius_500m_estimated: 1_170,
+    radius_500m_households_estimated: 480,
+    metric_semantics: 'redistributed_estimate',
+    spatial_unit: 'radius_500m',
+    estimation_method: 'sgis_statsarea_areal_interpolation_v1',
+    source_as_of: '2024',
+    coverage_ratio: 0.52,
+  })
+
+  assert.equal(estimate, null, '원의 절반만 덮은 추정값은 과소추정이므로 표시하면 안 된다')
+})
+
 test('시설 히트포인트는 이름과 좌표가 같은 장소를 한 번만 포함한다', () => {
   const points = buildFacilityHeatPoints(
     {

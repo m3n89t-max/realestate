@@ -246,8 +246,7 @@ export default function KakaoMap({
     // 배후인구 반경: 500m 고정 (업종밀집도와 같은 분석범위)
     const popRadius = 500
 
-    const density = populationData.density ?? 0
-    const color = density > 5000 ? '#ef4444' : density > 1000 ? '#f97316' : '#22c55e'
+    const color = '#2563eb'
 
     const circle = new window.kakao.maps.Circle({
       map,
@@ -263,7 +262,8 @@ export default function KakaoMap({
     circle.setMap(map)
     popCircleRef.current = circle
 
-    const labelText = `약 ${estimate.value.toLocaleString()}명(추정)`
+    const householdText = estimate.households == null ? '' : ` · 약 ${estimate.households.toLocaleString()}가구`
+    const labelText = `약 ${estimate.value.toLocaleString()}명${householdText} (추정)`
     const labelPos = new window.kakao.maps.LatLng(
       lat + (popRadius / 111_000) * 0.9,
       lng
@@ -663,11 +663,17 @@ export default function KakaoMap({
             const barrierMessage = describeBarrierStatus(populationData)
             return (
               <div className="mb-2.5">
-                <p className="text-[9px] font-semibold text-blue-600 mb-1">매물 주변 500m · 거주인구 참고값</p>
+                <p className="text-[9px] font-semibold text-blue-600 mb-1">{estimate.title}</p>
                 <div className="bg-blue-50 rounded-lg px-2.5 py-1.5 flex justify-between items-center">
                   <span className="text-[11px] text-blue-700">거주인구 추정</span>
                   <span className="text-[13px] font-bold text-blue-800">약 {estimate.value.toLocaleString()}명</span>
                 </div>
+                {estimate.households != null && (
+                  <div className="bg-emerald-50 rounded-lg px-2.5 py-1.5 flex justify-between items-center mt-1">
+                    <span className="text-[11px] text-emerald-700">센서스 가구 추정</span>
+                    <span className="text-[13px] font-bold text-emerald-800">약 {estimate.households.toLocaleString()}가구</span>
+                  </div>
+                )}
                 <p className="text-[9px] text-gray-500 mt-1">{estimate.description}</p>
                 <p className="text-[8px] text-gray-400 mt-0.5">{estimate.sourceLabel}</p>
                 {barrierMessage && <p className="text-[8px] text-orange-500 mt-0.5">{barrierMessage}</p>}
