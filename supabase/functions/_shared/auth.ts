@@ -1,14 +1,18 @@
-// deno-lint-ignore no-explicit-any
 import { createClient, type SupabaseClient as SupabaseClientGeneric } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// deno-lint-ignore no-explicit-any
-type SupabaseClient = SupabaseClientGeneric<any, any, any, any, any>
-
 /**
- * 이 리포에는 Supabase 생성 타입(Database)이 없어 createClient가 모든 테이블·RPC를
- * never로 추론한다. 런타임 동작은 정상이므로 호출 지점에서 쓰는 모양만 좁혀 둔다.
- * 생성 타입을 도입하면 아래 보조 타입은 제거한다.
+ * 이 리포에는 Supabase 생성 타입(Database)이 없어 ReturnType<typeof createClient>가
+ * 모든 테이블·RPC를 never로 추론한다(TS2345). 구조적 인터페이스로 좁히면
+ * supabase-js의 재귀 제네릭이 전개되어 TS2589가 난다. 그래서 공용 헬퍼는
+ * 호출자가 만든 클라이언트를 그대로 받고, 응답 모양은 호출 지점에서 명시하며
+ * 그 모양이 어긋나면 fail-closed로 막는다.
+ *
+ * 후속: `supabase gen types`로 Database 타입을 생성하면
+ * SupabaseClientGeneric<Database>로 교체하고 아래 보조 타입을 제거한다.
  */
+// deno-lint-ignore no-explicit-any
+export type SupabaseLike = SupabaseClientGeneric<any, any, any, any, any>
+
 interface MembershipOrgRow {
   org_id: string
 }
@@ -17,17 +21,10 @@ interface QuotaCheckResult {
   exceeded?: boolean
 }
 
-/**
- * ReturnType<typeof createClient>는 제네릭 인자가 비어 'never' 스키마로 고정되어
- * 각 함수가 실제로 만든 클라이언트를 받지 못한다(TS2345). any로 열면 호출 지점의
- * 오타까지 통과하므로, 이 헬퍼가 실제로 호출하는 메서드만 구조적으로 요구한다.
- */
-/**
- * 구조적 인터페이스로 좁히면 supabase-js의 재귀 제네릭이 전개되어
- * TS2589(타입 전개가 과도하게 깊음)가 난다. 공용 헬퍼는 호출자가 만든
- * 클라이언트 타입을 그대로 받고, 내부에서만 응답 모양을 명시한다.
- */
-export type SupabaseLike = SupabaseClient
+interface QuotaCheckResponse {
+  data: QuotaCheckResult | null
+  error: { message: string } | null
+}
 
 export async function getAuthenticatedUser(req: Request) {
   const supabaseClient = createClient(
@@ -69,13 +66,19 @@ export async function checkQuota(
   const { data, error } = await supabaseClient.rpc(
     'check_quota',
     { p_org_id: orgId, p_type: type },
-  )
+  ) as QuotaCheckResponse
 
   if (error) {
     console.error('[checkQuota] RPC 오류:', error.message)
     throw new Error('사용량 한도를 확인할 수 없습니다. 잠시 후 다시 시도해주세요.')
   }
-  if (data?.exceeded) {
+  // 응답 모양이 예상과 다르면 '한도 초과 아님'으로 넘기지 않는다. 쿼터는
+  // 과금·남용 경계이므로 판단 불가 시 막는 쪽이 맞다(fail-closed).
+  if (typeof data?.exceeded !== 'boolean') {
+    console.error('[checkQuota] 예상 밖 응답 모양')
+    throw new Error('사용량 한도를 확인할 수 없습니다. 잠시 후 다시 시도해주세요.')
+  }
+  if (data.exceeded) {
     throw new Error(`월간 ${type} 한도를 초과했습니다. 요금제를 업그레이드하세요.`)
   }
 }

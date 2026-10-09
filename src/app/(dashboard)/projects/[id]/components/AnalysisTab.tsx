@@ -737,7 +737,7 @@ function MapSection({
                 <p className="text-[9px] leading-relaxed text-gray-500">{estimate.description}</p>
                 {estimate.areaNote && (
                   <p className="rounded-md border border-sky-200 bg-sky-50 px-1.5 py-1 text-[9px] leading-relaxed text-sky-800">
-                    {estimate.areaNote}
+                    {estimate.areaNote.full}
                   </p>
                 )}
                 <div className="text-[9px] text-gray-400">{estimate.sourceLabel}</div>

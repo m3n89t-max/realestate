@@ -43,10 +43,20 @@ export interface PopulationEstimate {
   description: string
   sourceLabel: string
   /**
-   * 원 안에 사람이 살 수 없는 면적이 큰 경우의 해석 주의사항.
-   * 해당 사항이 없거나 과거 저장값처럼 판단 근거가 없으면 null이다.
+   * 원 안에서 집계되지 않은 면적에 대한 해석 주의사항.
+   * 해당 사항이 없으면 null이다. 문구를 UI가 다시 만들지 않도록
+   * 축약문과 전문을 함께 내보낸다.
    */
-  areaNote: string | null
+  areaNote: AreaNote | null
+}
+
+export interface AreaNote {
+  /** 집계되지 않은 면적 비율(%). 판단 근거가 없으면 null */
+  uncoveredPercent: number | null
+  /** 접힌 상태용 축약문 */
+  short: string
+  /** 펼친 상태용 전문 */
+  full: string
 }
 
 export interface FacilityHeatPoint {
@@ -93,6 +103,10 @@ export function getPopulationEstimate(input: PopulationEstimateInput | null | un
     // 부분 커버리지는 곧 과소추정이므로 화면에서도 다시 막는다.
     const coverage = input.coverage_ratio
     if (coverage != null && (!Number.isFinite(coverage) || coverage < 0.9)) return null
+    // land_ratio도 coverage_ratio와 같은 방어 수준을 맞춘다. 서버 게이트가
+    // 막아주지만 화면이 그 가정을 자기 책임으로 다시 확인한다.
+    const landRatio = input.land_ratio
+    if (landRatio != null && (!Number.isFinite(landRatio) || landRatio < MIN_LAND_RATIO)) return null
     const areaCount = input.stats_area_count != null && Number.isFinite(input.stats_area_count) && input.stats_area_count > 0
       ? ` · 집계구 ${Math.round(input.stats_area_count)}개`
       : ''
@@ -117,18 +131,38 @@ export function getPopulationEstimate(input: PopulationEstimateInput | null | un
   }
 }
 
-const MIN_LAND_RATIO_WITHOUT_NOTE = 0.95
+/** 이 비율 이상 덮였으면 해석에 영향이 없다고 보고 안내하지 않는다 */
+const MIN_COVERED_RATIO_WITHOUT_NOTE = 0.95
+/** Edge Function의 MIN_LAND_RATIO와 같은 값. 이보다 낮으면 추정 자체가 무의미하다 */
+const MIN_LAND_RATIO = 0.25
 
 /**
- * 원 안 비거주 면적(바다·하천)이 커서 같은 반경의 내륙 매물과 단순 비교하면
- * 안 되는 경우를 알린다. land_ratio가 없는 과거 저장값은 추측하지 않는다.
+ * 원 안에서 집계되지 않은 면적을 알린다.
+ *
+ * land_ratio는 '조회한 행정구역 경계로 덮인 면적의 비율'이다. 덮이지 않은
+ * 면적이 바다라는 보장은 없다 — 운영 실측으로 함덕(조천읍)의 45%는 바다지만
+ * 하남 초이동의 12%는 시도 범위를 넓혀도 안 덮이는 서울 강동구다. 따라서
+ * 원인을 단정하지 않고 '집계되지 않았다'는 관측 사실과 '하한값'이라는
+ * 성질만 말한다.
+ *
+ * land_ratio가 없는 과거 저장값은 '해당 없음'이 아니라 '미확인'이다. 침묵하면
+ * 같은 성질의 두 매물이 수집 시점만으로 다르게 보인다.
  */
-function buildAreaNote(landRatio: number | null | undefined): string | null {
-  if (landRatio == null || !Number.isFinite(landRatio)) return null
-  if (landRatio >= MIN_LAND_RATIO_WITHOUT_NOTE || landRatio <= 0) return null
-  const seaPercent = Math.round((1 - landRatio) * 100)
-  if (seaPercent < 5) return null
-  return `반경 500m 중 약 ${seaPercent}%는 바다·하천이라 사람이 살 수 없어요. 위 숫자는 나머지 육지 면적만 집계한 값이라, 같은 반경의 내륙 매물보다 작게 나오는 게 정상입니다.`
+function buildAreaNote(landRatio: number | null | undefined): AreaNote | null {
+  if (landRatio == null || !Number.isFinite(landRatio)) {
+    return {
+      uncoveredPercent: null,
+      short: '집계 범위 미확인 · 재수집 권장',
+      full: '이 값은 반경 500m 안에서 실제로 집계된 면적 비율이 확인되지 않은 과거 수집값입니다. 일부 면적이 빠져 있을 수 있어 다른 매물과 그대로 비교하기 어렵습니다. 재수집을 권합니다.',
+    }
+  }
+  if (landRatio >= MIN_COVERED_RATIO_WITHOUT_NOTE) return null
+  const uncoveredPercent = Math.round((1 - landRatio) * 100)
+  return {
+    uncoveredPercent,
+    short: `약 ${uncoveredPercent}%는 집계 범위 밖 · 단순 비교 불가`,
+    full: `반경 500m 중 약 ${uncoveredPercent}%는 조회된 행정구역 경계 밖(바다·하천 또는 인접 시·군·구)이라 집계되지 않았습니다. 위 숫자는 집계된 면적만의 하한값이므로, 같은 반경의 다른 매물과 그대로 비교할 수 없습니다.`,
+  }
 }
 
 function heatPointKey(name: string, lat: number, lng: number): string {
