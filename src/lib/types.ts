@@ -272,6 +272,8 @@ export interface PopulationData {
   stats_area_count?: number | null
   boundary_base_year?: string | null
   coverage_ratio?: number | null
+  /** 500m 원 중 행정구역 경계로 덮인 육지 비율. 해안 매물은 1보다 작다 */
+  land_ratio?: number | null
   coverage_note?: string | null
   barrier_status?: 'available' | 'failed' | 'not_collected'
   barrier_names?: string[]

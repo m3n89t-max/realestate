@@ -502,11 +502,12 @@ Deno.serve(async (req) => {
       boundary_base_year,
       coverage_ratio,
       land_ratio,
+      // 사용자에게 보이는 미집계 면적 문구는 화면 쪽 buildAreaNote가 land_ratio로
+      // 단독 생성한다. 여기서 같은 문구를 만들면 임계값이 두 곳에 중복 정의되어
+      // 저장값과 화면이 다른 말을 할 수 있다.
       coverage_note: radius_500m_estimated == null
         ? null
-        : land_ratio != null && land_ratio < 0.95
-          ? `집계구별 센서스 인구·가구를 500m 원과 겹친 경계면적 비율로 합산한 추정값. 원의 약 ${Math.round((1 - land_ratio) * 100)}%는 바다·하천이라 육지 면적만 집계했습니다. 주민등록 세대와 모집단이 다릅니다.`
-          : '집계구별 센서스 인구·가구를 500m 원과 겹친 경계면적 비율로 합산한 추정값. 주민등록 세대와 모집단이 다릅니다.',
+        : '집계구별 센서스 인구·가구를 500m 원과 겹친 경계면적 비율로 합산한 추정값. 주민등록 세대와 모집단이 다릅니다.',
       barrier_status,
       barrier_names,
       housing_stat,
