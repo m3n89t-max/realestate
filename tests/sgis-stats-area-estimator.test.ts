@@ -344,3 +344,77 @@ test('selectFeaturesIntersectingCircle도 먼 폴리곤을 제외한다', () => 
 
   assert.deepEqual(picked.map(f => f.admCd), ['near'])
 })
+
+test('해안 매물은 육지 면적 기준 커버리지를 함께 보고한다', () => {
+  // 운영 재현(함덕): 원의 45%가 바다라 집계구 커버리지가 0.593에 머물렀다.
+  // 바다는 조회 실패가 아니라 사람이 살 수 없는 공간이므로, 육지 대비
+  // 커버리지를 따로 내야 '자료 없음'과 '해안 매물'을 구분할 수 있다.
+  const land = {
+    admCd: 'land',
+    baseYear: '2025',
+    // 원의 동쪽 절반만 육지
+    geometry: { type: 'Polygon' as const, coordinates: [rectRing(0, -600, 600, 600)] },
+  }
+  const result = estimateStatsAreaRadius({
+    center: [0, 0],
+    radiusM: 500,
+    features: [land],
+    stats: [{ admCd: 'land', population: 1_000, households: 420 }],
+    // 행정동 경계로 덮인 육지 면적(원 면적의 절반)
+    landAreaM2: (Math.PI * 500 * 500) / 2,
+  })
+
+  // 원 전체 기준 커버리지는 절반
+  assert.ok(Math.abs(result.coverageRatio - 0.5) < CIRCLE_AREA_RATIO_TOLERANCE, `coverage=${result.coverageRatio}`)
+  // 육지 기준으로는 빈틈없이 덮었다
+  assert.ok(result.landCoverageRatio > 1 - CIRCLE_AREA_RATIO_TOLERANCE, `landCoverage=${result.landCoverageRatio}`)
+  assert.ok(Math.abs(result.landRatio - 0.5) < CIRCLE_AREA_RATIO_TOLERANCE, `landRatio=${result.landRatio}`)
+})
+
+test('landAreaM2를 주지 않으면 육지 커버리지는 원 전체 기준과 같다', () => {
+  const result = estimateStatsAreaRadius({
+    center: [0, 0],
+    radiusM: 500,
+    features: [{ admCd: 'a', baseYear: '2025', geometry: { type: 'Polygon', coordinates: [squareRing(0, 0, 1_200)] } }],
+    stats: [{ admCd: 'a', population: 500, households: 200 }],
+  })
+
+  assert.equal(result.landRatio, 1)
+  assert.equal(result.landCoverageRatio, result.coverageRatio)
+})
+
+test('한 집계구가 원 안 육지를 얼마나 차지했는지 비중으로 보고한다', () => {
+  // 절대 면적만 보면 읍면의 넓은 집계구가 전부 막힌다. 실제 위험은
+  // '한 집계구의 균일분포 가정이 결과를 지배하는가'이므로 비중으로 판단한다.
+  const result = estimateStatsAreaRadius({
+    center: [0, 0],
+    radiusM: 500,
+    features: [
+      // 원의 서쪽 절반을 덮는 아주 넓은 집계구
+      { admCd: 'wide', baseYear: '2025', geometry: { type: 'Polygon', coordinates: [rectRing(-3_000, -3_000, 0, 3_000)] } },
+      // 동쪽 절반을 덮는 집계구
+      { admCd: 'small', baseYear: '2025', geometry: { type: 'Polygon', coordinates: [rectRing(0, -600, 600, 600)] } },
+    ],
+    stats: [
+      { admCd: 'wide', population: 10_000, households: 4_000 },
+      { admCd: 'small', population: 800, households: 320 },
+    ],
+  })
+
+  // 넓은 집계구는 원 면적의 여러 배다
+  const circle = Math.PI * 500 * 500
+  assert.ok(result.maxContributingStatsAreaM2 > circle * 4, `maxArea=${result.maxContributingStatsAreaM2}`)
+  // 그러나 원 안에서 차지한 비중은 절반뿐이다
+  assert.ok(Math.abs(result.maxContributingShare - 0.5) < CIRCLE_AREA_RATIO_TOLERANCE, `share=${result.maxContributingShare}`)
+})
+
+test('원이 집계구 하나에 완전히 들어가면 기여 비중이 1이다', () => {
+  const result = estimateStatsAreaRadius({
+    center: [0, 0],
+    radiusM: 500,
+    features: [{ admCd: 'only', baseYear: '2025', geometry: { type: 'Polygon', coordinates: [squareRing(0, 0, 4_000)] } }],
+    stats: [{ admCd: 'only', population: 20_000, households: 8_000 }],
+  })
+
+  assert.ok(result.maxContributingShare > 1 - CIRCLE_AREA_RATIO_TOLERANCE, `share=${result.maxContributingShare}`)
+})

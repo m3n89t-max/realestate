@@ -21,6 +21,13 @@ interface EstimateInput {
   radiusM: number
   features: StatsAreaFeature[]
   stats: StatsAreaStat[]
+  /**
+   * 원 안에서 행정동 경계로 덮인 면적(㎡). 해안·하천 매물은 원의 상당 부분이
+   * 어떤 행정구역에도 속하지 않아 집계구 커버리지가 구조적으로 낮아진다.
+   * 이를 '조회 실패'와 구분하려면 육지 면적을 분모로 쓴 비율이 필요하다.
+   * 생략하면 원 전체를 육지로 간주한다.
+   */
+  landAreaM2?: number
 }
 
 export interface StatsAreaRadiusEstimate {
@@ -30,11 +37,20 @@ export interface StatsAreaRadiusEstimate {
   coverageRatio: number
   /** 경계는 있으나 통계가 없는 집계구가 원을 덮은 면적 비율 */
   missingStatsAreaRatio: number
+  /** 원 안에서 행정동 경계로 덮인 비율. 1 미만이면 그만큼 바다·하천이다 */
+  landRatio: number
+  /** 육지 면적만 분모로 한 커버리지. 해안 매물 판정에 쓴다 */
+  landCoverageRatio: number
   matchedStatsAreaCount: number
   missingStatsAreaCount: number
   unmatchedStatsCount: number
   /** 기여한 집계구 중 가장 넓은 경계 면적(㎡). 균일분포 가정의 위험도 지표 */
   maxContributingStatsAreaM2: number
+  /**
+   * 한 집계구가 원 안 육지 면적에서 차지한 최대 비중.
+   * 절대 면적보다 이 값이 균일분포 가정의 실제 위험도를 나타낸다.
+   */
+  maxContributingShare: number
   boundaryBaseYear: string | null
 }
 
@@ -243,11 +259,17 @@ export function estimateStatsAreaRadius({
   radiusM,
   features,
   stats,
+  landAreaM2,
 }: EstimateInput): StatsAreaRadiusEstimate {
   if (!Number.isFinite(radiusM) || radiusM <= 0) throw new Error('radiusM must be positive')
   if (!Number.isFinite(center[0]) || !Number.isFinite(center[1])) throw new Error('center must be finite')
 
   const circleArea = Math.PI * radiusM * radiusM
+  const landM2 = Number.isFinite(landAreaM2 as number) && (landAreaM2 as number) > 0
+    ? Math.min(landAreaM2 as number, circleArea)
+    : null
+  // 육지 분모. 바다뿐인 좌표에서 0 나눗셈이 되지 않게 원 면적으로 하한을 둔다.
+  const landDenominator = landM2 == null || landM2 <= 0 ? circleArea : landM2
 
   // 같은 집계구 코드가 여러 Feature로 분리되어 와도 경계 전체를 합산한다.
   // Map 덮어쓰기로 조각이 사라지면 분모가 깨져 결과가 응답 순서에 좌우된다.
@@ -286,6 +308,7 @@ export function estimateStatsAreaRadius({
   let matchedStatsAreaCount = 0
   let missingStatsAreaCount = 0
   let maxContributingStatsAreaM2 = 0
+  let maxOverlapArea = 0
   const boundaryYears = new Set<string>()
 
   for (const [admCd, entry] of grouped) {
@@ -306,6 +329,7 @@ export function estimateStatsAreaRadius({
     coveredArea += entry.overlapArea
     matchedStatsAreaCount += 1
     maxContributingStatsAreaM2 = Math.max(maxContributingStatsAreaM2, entry.totalArea)
+    maxOverlapArea = Math.max(maxOverlapArea, entry.overlapArea)
     for (const year of entry.baseYears) boundaryYears.add(year)
   }
 
@@ -319,10 +343,13 @@ export function estimateStatsAreaRadius({
     households: Math.round(households),
     coverageRatio: Math.min(1, coveredArea / circleArea),
     missingStatsAreaRatio: Math.min(1, missingArea / circleArea),
+    landRatio: landM2 == null ? 1 : Math.min(1, landM2 / circleArea),
+    landCoverageRatio: Math.min(1, coveredArea / landDenominator),
     matchedStatsAreaCount,
     missingStatsAreaCount,
     unmatchedStatsCount,
     maxContributingStatsAreaM2,
+    maxContributingShare: Math.min(1, maxOverlapArea / landDenominator),
     boundaryBaseYear: boundaryYears.size === 1 ? [...boundaryYears][0] : null,
   }
 }
