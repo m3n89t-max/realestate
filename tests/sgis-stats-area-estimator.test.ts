@@ -6,6 +6,7 @@ import {
   estimateStatsAreaRadius,
   parseStatsAreaFeatureRows,
   parseStatsAreaStatRows,
+  selectFeaturesIntersectingCircle,
 } from '../supabase/functions/collect-population/stats-area-estimator'
 
 const CIRCLE_AREA_RATIO_TOLERANCE = 0.002
@@ -188,13 +189,53 @@ test('도심 규모 집계구 수십 개도 Edge Function 예산 안에서 계�
 })
 
 test('집계구 통계의 빈 문자열과 null은 형식 오류로 막는다', () => {
-  assert.throws(() => parseStatsAreaStatRows([{ adm_cd: 'a', tot_ppltn: '', tot_family: '10' }]))
-  assert.throws(() => parseStatsAreaStatRows([{ adm_cd: 'a', tot_ppltn: null, tot_family: '10' }]))
-  assert.throws(() => parseStatsAreaStatRows([{ adm_cd: 'a', tot_ppltn: '10', tot_family: '' }]))
   assert.throws(() => parseStatsAreaStatRows([]))
+  // adm_cd 누락은 형식 오류
+  assert.throws(() => parseStatsAreaStatRows([{ tot_ppltn: '10', tot_family: '4' }]))
+  // 숫자가 아닌 쓰레기 값은 형식 오류
+  assert.throws(() => parseStatsAreaStatRows([{ adm_cd: 'a', tot_ppltn: 'abc', tot_family: '4' }]))
 
   const parsed = parseStatsAreaStatRows([{ adm_cd: 'a', tot_ppltn: '10', tot_family: '4' }])
   assert.deepEqual(parsed, [{ admCd: 'a', population: 10, households: 4 }])
+})
+
+test('SGIS 비공개 집계구(N/A, 빈 문자열)는 0이 아니라 결측으로 뺀다', () => {
+  // 운영 확인: SGIS는 비공개 집계구의 tot_ppltn/tot_family에 문자열 "N/A"를 준다.
+  // 0으로 합산하면 과소추정이고, 행정동 전체를 throw하면 커버리지가 떨어진다.
+  const parsed = parseStatsAreaStatRows([
+    { adm_cd: 'a', tot_ppltn: '120', tot_family: '50' },
+    { adm_cd: 'b', tot_ppltn: 'N/A', tot_family: 'N/A' },
+    { adm_cd: 'c', tot_ppltn: '', tot_family: '10' },
+    { adm_cd: 'd', tot_ppltn: '80', tot_family: null },
+    { adm_cd: 'e', tot_ppltn: '60', tot_family: '25' },
+  ])
+
+  assert.deepEqual(parsed.map(p => p.admCd), ['a', 'e'])
+  assert.equal(parsed.find(p => p.admCd === 'a')?.population, 120)
+
+  // 전건 비공개면 그 행정동은 통계 없음으로 취급한다
+  assert.throws(() => parseStatsAreaStatRows([{ adm_cd: 'x', tot_ppltn: 'N/A', tot_family: 'N/A' }]))
+})
+
+test('비공개 집계구가 원 안에서 넓으면 결측 비율로 드러난다', () => {
+  const result = estimateStatsAreaRadius({
+    center: [0, 0],
+    radiusM: 500,
+    features: [
+      { admCd: 'open', baseYear: '2025', geometry: { type: 'Polygon', coordinates: [rectRing(-500, -500, 0, 500)] } },
+      { admCd: 'suppressed', baseYear: '2025', geometry: { type: 'Polygon', coordinates: [rectRing(0, -500, 500, 500)] } },
+    ],
+    // suppressed는 파서가 걸러내 stats에 없다
+    stats: parseStatsAreaStatRows([
+      { adm_cd: 'open', tot_ppltn: '800', tot_family: '320' },
+      { adm_cd: 'suppressed', tot_ppltn: 'N/A', tot_family: 'N/A' },
+    ]),
+  })
+
+  assert.equal(result.missingStatsAreaCount, 1)
+  assert.ok(Math.abs(result.missingStatsAreaRatio - 0.5) < CIRCLE_AREA_RATIO_TOLERANCE)
+  // open 집계구는 원과 겹친 면적(반원) 비율 π/4 만큼만 기여한다
+  assert.ok(Math.abs(result.population - 800 * Math.PI / 4) < 2, `population=${result.population}`)
 })
 
 test('집계구 경계 응답은 Polygon·MultiPolygon만 통과시킨다', () => {
@@ -219,8 +260,6 @@ test('SGIS 수집기는 커버리지·결측·경계연도를 fail-closed로 검
   assert.match(source, /boundary\/statsarea\.geojson/)
   assert.match(source, /sgis_statsarea_areal_interpolation_v1/)
   assert.match(source, /radius_500m_households_estimated/)
-  // 경계 기준연도와 같은 연도의 집계구 통계만 사용한다
-  assert.match(source, /getPopStat\(\s*statsAreaYear/)
   // 커버리지·결측 게이트
   assert.match(source, /MIN_STATS_AREA_COVERAGE/)
   assert.match(source, /missingStatsAreaRatio/)
@@ -230,4 +269,78 @@ test('SGIS 수집기는 커버리지·결측·경계연도를 fail-closed로 검
   // 모든 SGIS 호출에 timeout을 적용한다
   assert.doesNotMatch(source, /await fetch\(url\)/)
   assert.match(source, /fetchJsonWithTimeout/)
+})
+
+test('집계구 경계와 통계의 코드 교집합이 충분해야 통과시킨다', () => {
+  // 운영 확인: 경계 기준연도는 2025지만 2025 집계구 통계는 존재하지 않는다
+  // (errCd -100). 연도 엄격 일치를 요구하면 기능이 영구 무동작한다.
+  // 실제 코드 체계는 양쪽 모두 14자리이고 56/56 전건 일치하므로,
+  // 연도 대신 코드 교집합 비율로 오매칭을 막는다.
+  const source = readFileSync(
+    resolve(process.cwd(), 'supabase/functions/collect-population/index.ts'),
+    'utf8',
+  )
+
+  assert.match(source, /MIN_STATS_AREA_CODE_MATCH_RATIO/)
+  assert.match(source, /STATS_AREA_YEARS/)
+  // 연도를 경계 기준연도로 고정하지 않는다
+  assert.doesNotMatch(source, /getPopStat\(\s*statsAreaYear\b/)
+})
+
+test('코드 교집합이 낮으면 전건 unmatched로 드러난다', () => {
+  const result = estimateStatsAreaRadius({
+    center: [0, 0],
+    radiusM: 500,
+    features: [{
+      admCd: '39010610010101',
+      baseYear: '2025',
+      geometry: { type: 'Polygon', coordinates: [squareRing(0, 0, 100)] },
+    }],
+    // 다른 코드 체계(8자리 행정동)로 온 통계
+    stats: [{ admCd: '39010610', population: 40_000, households: 20_000 }],
+  })
+
+  assert.equal(result.unmatchedStatsCount, 1)
+  assert.equal(result.matchedStatsAreaCount, 0)
+  assert.equal(result.population, 0)
+})
+
+test('원에서 멀리 떨어진 거대 폴리곤은 교차로 잡히지 않는다', () => {
+  // 운영 재현: 원과 무관한 행정동 전체 폴리곤(약 37.8㎢)이 부동소수점 잔차로
+  // 교차 판정되어 커버리지 0.886, maxArea 48배로 오염됐다.
+  const near = {
+    admCd: 'near',
+    baseYear: '2025',
+    geometry: { type: 'Polygon' as const, coordinates: [squareRing(0, 0, 600)] },
+  }
+  const far = {
+    admCd: 'far',
+    baseYear: '2025',
+    geometry: { type: 'Polygon' as const, coordinates: [rectRing(50_000, 50_000, 56_150, 56_150)] },
+  }
+  const result = estimateStatsAreaRadius({
+    center: [0, 0],
+    radiusM: 500,
+    features: [near, far],
+    stats: [
+      { admCd: 'near', population: 1_440, households: 600 },
+      { admCd: 'far', population: 40_000, households: 20_000 },
+    ],
+  })
+
+  assert.equal(result.matchedStatsAreaCount, 1, '원과 겹치는 집계구만 기여해야 한다')
+  assert.equal(result.missingStatsAreaCount, 0)
+  assert.ok(result.coverageRatio > 1 - CIRCLE_AREA_RATIO_TOLERANCE, `coverageRatio=${result.coverageRatio}`)
+  assert.equal(result.missingStatsAreaRatio, 0)
+  // near 집계구(1,440,000㎡)만 최대 면적으로 보고돼야 한다
+  assert.ok(Math.abs(result.maxContributingStatsAreaM2 - 1_440_000) < 1, `max=${result.maxContributingStatsAreaM2}`)
+})
+
+test('selectFeaturesIntersectingCircle도 먼 폴리곤을 제외한다', () => {
+  const picked = selectFeaturesIntersectingCircle([
+    { admCd: 'near', baseYear: '2025', geometry: { type: 'Polygon', coordinates: [squareRing(0, 0, 100)] } },
+    { admCd: 'far', baseYear: '2025', geometry: { type: 'Polygon', coordinates: [rectRing(50_000, 50_000, 56_150, 56_150)] } },
+  ], [0, 0], 500)
+
+  assert.deepEqual(picked.map(f => f.admCd), ['near'])
 })
