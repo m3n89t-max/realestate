@@ -16,7 +16,14 @@ import {
 // 조건을 통과하지 못하면 숫자를 내지 않는다(fail-closed).
 const MIN_STATS_AREA_COVERAGE = 0.9
 const MAX_MISSING_STATS_AREA_RATIO = 0.1
-const MAX_STATS_AREA_TO_CIRCLE_RATIO = 1.5
+// 집계구가 원보다 넓어도 '그 집계구가 원 안에서 차지한 비중'이 낮으면
+// 균일분포 오차가 결과를 지배하지 않는다. 읍면 집계구는 도심보다 넓으므로
+// 절대 면적만으로 막으면 농어촌 매물이 전부 산출 불가가 된다.
+const MAX_STATS_AREA_TO_CIRCLE_RATIO = 4
+// 한 집계구가 원 안 육지의 이 비율을 넘게 차지하면 균일분포 가정에 과의존한다.
+const MAX_SINGLE_STATS_AREA_SHARE = 0.6
+// 육지가 원의 이 비율 미만이면(절벽·방파제 등) 추정 자체가 무의미하다.
+const MIN_LAND_RATIO = 0.25
 const MIN_PLAUSIBLE_RADIUS_POPULATION = 20
 // 집계구 경계 API에는 year 파라미터가 없어 항상 최신 기준연도(운영 확인: 2025)를 준다.
 // 그런데 같은 연도의 집계구 통계는 아직 제공되지 않는다(errCd -100).
@@ -78,6 +85,10 @@ async function getPopStat(year: string, admCd: string, lowSearch = '0', token: s
 /**
  * 500m 원과 실제로 겹치는 행정동 코드만 고른다. 시군구 전체 행정동을 모두
  * 조회하면 호출이 과도하고, 매물 행정동만 조회하면 경계 밖이 0명으로 합산된다.
+ *
+ * 행정동 경계가 원을 덮은 면적(landAreaM2)도 함께 반환한다. 해안·하천 매물은
+ * 원의 상당 부분이 어떤 행정구역에도 속하지 않아(운영 확인: 함덕 45%가 바다)
+ * 집계구 커버리지가 구조적으로 낮다. 이를 조회 실패와 구분하는 데 쓴다.
  */
 async function getEmdCodesIntersectingCircle(
   sggCd: string,
@@ -86,8 +97,8 @@ async function getEmdCodesIntersectingCircle(
   center: [number, number],
   radiusM: number,
   token: string,
-): Promise<string[]> {
-  if (!sggCd || sggCd.length < 5) return [emdCd8]
+): Promise<{ codes: string[]; landAreaM2: number | null }> {
+  if (!sggCd || sggCd.length < 5) return { codes: [emdCd8], landAreaM2: null }
   try {
     const url = `https://sgisapi.kostat.go.kr/OpenAPI3/boundary/hadmarea.geojson?year=${year}&adm_cd=${sggCd}&low_search=1&accessToken=${token}`
     const { response, data } = await fetchJsonWithTimeout(url)
@@ -95,14 +106,23 @@ async function getEmdCodesIntersectingCircle(
       throw new Error('SGIS 행정동 경계 실패')
     }
     const emdFeatures = parseStatsAreaFeatureRows(data.features)
-    const hit = selectFeaturesIntersectingCircle(emdFeatures, center, radiusM)
+    const intersecting = selectFeaturesIntersectingCircle(emdFeatures, center, radiusM)
+    const hit = intersecting
       .map(feature => feature.admCd)
       .filter(cd => cd.length === 8)
     const codes = new Set<string>([emdCd8, ...hit])
-    return [...codes]
+    // 행정동 경계가 원을 덮은 면적. 집계구 재배분과 같은 클리핑을 쓴다.
+    const landEstimate = estimateStatsAreaRadius({
+      center,
+      radiusM,
+      features: intersecting,
+      stats: intersecting.map(f => ({ admCd: f.admCd, population: 1, households: 1 })),
+    })
+    const circleArea = Math.PI * radiusM * radiusM
+    return { codes: [...codes], landAreaM2: landEstimate.coverageRatio * circleArea }
   } catch {
     // 폴백해도 커버리지 게이트가 과소추정 숫자를 막는다.
-    return [emdCd8]
+    return { codes: [emdCd8], landAreaM2: null }
   }
 }
 
@@ -325,6 +345,7 @@ Deno.serve(async (req) => {
     let stats_area_count: number | null = null
     let boundary_base_year: string | null = null
     let coverage_ratio: number | null = null
+    let land_ratio: number | null = null
     let barrier_status: 'available' | 'failed' | 'not_collected' = 'not_collected'
     let barrier_names: string[] = []
 
@@ -344,7 +365,7 @@ Deno.serve(async (req) => {
 
         // 500m 원(지름 1km)은 행정동 경계를 흔히 넘는다. 매물 행정동만 조회하면
         // 넘어간 부분이 0명으로 합산되어 과거 읍면동 평균과 같은 과소추정이 된다.
-        const emdCodes = await getEmdCodesIntersectingCircle(
+        const { codes: emdCodes, landAreaM2 } = await getEmdCodesIntersectingCircle(
           `${sido}${sgg}`, emdCd8, boundaryYear, center, 500, token,
         )
 
@@ -399,21 +420,33 @@ Deno.serve(async (req) => {
           radiusM: 500,
           features: boundaries,
           stats,
+          landAreaM2: landAreaM2 ?? undefined,
         })
 
         // 원을 충분히 덮지 못했으면 숫자를 내지 않는다. 부분 커버리지는 곧 과소추정이다.
-        if (estimate.coverageRatio < MIN_STATS_AREA_COVERAGE) {
-          throw new Error(`SGIS 500m 커버리지 부족: ${estimate.coverageRatio.toFixed(3)}`)
+        // 단 해안·하천 매물은 원의 일부가 어떤 행정구역에도 속하지 않아(운영 확인:
+        // 함덕은 원의 45%가 바다) 원 전체 기준 커버리지가 구조적으로 낮다. 바다는
+        // 조회 실패가 아니라 사람이 살 수 없는 공간이므로 육지 면적을 분모로 쓴다.
+        if (estimate.landCoverageRatio < MIN_STATS_AREA_COVERAGE) {
+          throw new Error(`SGIS 500m 커버리지 부족: ${estimate.landCoverageRatio.toFixed(3)}`)
+        }
+        // 육지가 원의 극히 일부면 추정 자체가 무의미하다.
+        if (estimate.landRatio < MIN_LAND_RATIO) {
+          throw new Error(`SGIS 500m 육지 비율 부족: ${estimate.landRatio.toFixed(3)}`)
         }
         // 경계는 있으나 통계가 비공개(5명 미만 등)인 집계구가 넓으면 역시 과소추정이다.
-        if (estimate.missingStatsAreaRatio > MAX_MISSING_STATS_AREA_RATIO) {
+        if (estimate.missingStatsAreaRatio / Math.max(estimate.landRatio, 0.01) > MAX_MISSING_STATS_AREA_RATIO) {
           throw new Error(`SGIS 집계구 통계 결측 과다: ${estimate.missingStatsAreaRatio.toFixed(3)}`)
         }
         if (estimate.matchedStatsAreaCount < 1) throw new Error('SGIS 500m 교차 집계구 없음')
-        // 집계구가 원보다 훨씬 넓으면 '집계구 내부 균일분포' 가정이 깨져
-        // 과거 읍면동 평균밀도 환산과 같은 구조의 과소추정이 된다.
+        // 집계구가 원보다 훨씬 넓고 그 하나가 원 안을 지배하면 '집계구 내부
+        // 균일분포' 가정이 깨져 과거 읍면동 평균밀도 환산과 같은 구조가 된다.
+        // 읍면 집계구는 도심보다 넓으므로 절대 면적과 기여 비중을 함께 본다.
         const circleArea = Math.PI * 500 * 500
-        if (estimate.maxContributingStatsAreaM2 > circleArea * MAX_STATS_AREA_TO_CIRCLE_RATIO) {
+        if (
+          estimate.maxContributingStatsAreaM2 > circleArea * MAX_STATS_AREA_TO_CIRCLE_RATIO &&
+          estimate.maxContributingShare > MAX_SINGLE_STATS_AREA_SHARE
+        ) {
           throw new Error('SGIS 집계구가 500m 원보다 과도하게 넓어 균일분포 가정 불가')
         }
         // 거주지인데 0~수명으로 표시되는 것을 막는다.
@@ -429,7 +462,9 @@ Deno.serve(async (req) => {
         source_as_of = statsAreaYear
         stats_area_count = estimate.matchedStatsAreaCount
         boundary_base_year = estimate.boundaryBaseYear
-        coverage_ratio = Math.round(estimate.coverageRatio * 1000) / 1000
+        // 육지 기준 커버리지를 쓴다. 해안 매물은 원 전체 기준이 구조적으로 낮다.
+        coverage_ratio = Math.round(estimate.landCoverageRatio * 1000) / 1000
+        land_ratio = Math.round(estimate.landRatio * 1000) / 1000
       } catch (error) {
         console.warn('[population] 집계구 500m 추정 생략:', error instanceof Error ? error.message : 'unknown')
       }
@@ -466,9 +501,12 @@ Deno.serve(async (req) => {
       stats_area_count,
       boundary_base_year,
       coverage_ratio,
+      land_ratio,
       coverage_note: radius_500m_estimated == null
         ? null
-        : '집계구별 센서스 인구·가구를 500m 원과 겹친 경계면적 비율로 합산한 추정값. 주민등록 세대와 모집단이 다릅니다.',
+        : land_ratio != null && land_ratio < 0.95
+          ? `집계구별 센서스 인구·가구를 500m 원과 겹친 경계면적 비율로 합산한 추정값. 원의 약 ${Math.round((1 - land_ratio) * 100)}%는 바다·하천이라 육지 면적만 집계했습니다. 주민등록 세대와 모집단이 다릅니다.`
+          : '집계구별 센서스 인구·가구를 500m 원과 겹친 경계면적 비율로 합산한 추정값. 주민등록 세대와 모집단이 다릅니다.',
       barrier_status,
       barrier_names,
       housing_stat,
