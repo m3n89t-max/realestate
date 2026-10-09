@@ -710,11 +710,11 @@ function MapSection({
       {/* 지도 분석 가이드 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 text-[11px]">
 
-        {/* ① 거주인구 참고값 */}
+        {/* ① 반경 500m 인구·가구 추정 */}
         <div className="bg-white border border-blue-100 rounded-xl p-3 shadow-sm">
-          <p className="font-bold text-blue-700 mb-2 flex items-center gap-1">500m 거주인구 분석</p>
+          <p className="font-bold text-blue-700 mb-2 flex items-center gap-1">매물 주변 500m 인구·가구</p>
           <div className="bg-blue-50 rounded-lg px-2.5 py-2 text-[10px] leading-relaxed text-blue-800 mb-2">
-            읍면동 전체 평균을 원 면적에 곱한 값은 표시하지 않아요. 공식 소지역 인구와 실제 주거 분포를 함께 확인한 뒤 제공할 예정이에요.
+            읍면동 전체 평균은 쓰지 않아요. SGIS 집계구 경계와 500m 원이 겹치는 면적만 반영합니다. 원을 충분히 덮지 못하거나 집계구 통계가 비어 있으면 숫자를 내지 않습니다.
           </div>
           {/* 실제 값 표시 */}
           {(() => {
@@ -723,12 +723,23 @@ function MapSection({
               return <p className="text-[10px] font-medium text-gray-500">현재는 신뢰할 수 있는 500m 숫자가 없습니다.</p>
             }
             return (
-              <div className="text-[10px] text-gray-600 space-y-0.5">
+              <div className="text-[10px] text-gray-600 space-y-1">
+                {estimate.households != null && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">센서스 가구 추정</span>
+                    <span className="font-bold text-emerald-700">약 {estimate.households.toLocaleString()}가구</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-gray-400">거주인구 추정</span>
                   <span className="font-bold text-blue-700">약 {estimate.value.toLocaleString()}명</span>
                 </div>
+                <p className="text-[9px] leading-relaxed text-gray-500">{estimate.description}</p>
                 <div className="text-[9px] text-gray-400">{estimate.sourceLabel}</div>
+                <div className="inline-flex rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-700">추정값 · 집계구 내부는 균일 분포 가정</div>
+                <p className="text-[9px] leading-relaxed text-gray-400">
+                  센서스 가구 기준입니다. 아래 주민등록 세대수, K-apt 공동주택 세대수와는 모집단·공간범위·기준시점이 모두 달라 숫자가 서로 일치하지 않습니다.
+                </p>
               </div>
             )
           })()}

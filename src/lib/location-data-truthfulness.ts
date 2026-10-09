@@ -21,6 +21,7 @@ export interface DataProvenance {
 
 interface PopulationEstimateInput {
   radius_500m_estimated?: number | null
+  radius_500m_households_estimated?: number | null
   adm_level?: string | null
   source_year?: string | number | null
   commercial_grade?: string | null
@@ -28,10 +29,14 @@ interface PopulationEstimateInput {
   spatial_unit?: string | null
   estimation_method?: string | null
   source_as_of?: string | null
+  boundary_base_year?: string | null
+  stats_area_count?: number | null
+  coverage_ratio?: number | null
 }
 
 export interface PopulationEstimate {
   value: number
+  households: number | null
   title: string
   description: string
   sourceLabel: string
@@ -60,18 +65,43 @@ const FACILITY_WEIGHT: Record<string, number> = {
 export function getPopulationEstimate(input: PopulationEstimateInput | null | undefined): PopulationEstimate | null {
   if (!input) return null
   // 기존 값은 읍면동 전체를 균일하게 펼친 수치라 함덕 같은 넓은 읍·면에서
-  // 명백한 과소추정을 만든다. 실제 주거 분포를 사용한 새 방법만 fail-open 한다.
+  // 명백한 과소추정을 만든다. 검증된 주거 재배분 또는 SGIS 집계구 경계면적 추정만 연다.
+  const isResidentialRedistribution = input.estimation_method === 'official_residential_redistribution_v1'
+  const isStatsAreaInterpolation = input.estimation_method === 'sgis_statsarea_areal_interpolation_v1'
   if (
     input.metric_semantics !== 'redistributed_estimate' ||
     input.spatial_unit !== 'radius_500m' ||
-    input.estimation_method !== 'official_residential_redistribution_v1' ||
+    (!isResidentialRedistribution && !isStatsAreaInterpolation) ||
     !input.source_as_of
   ) return null
   const raw = input.radius_500m_estimated
   if (raw == null || !Number.isFinite(raw) || raw < 0) return null
+  const rawHouseholds = input.radius_500m_households_estimated
+  const households = rawHouseholds != null && Number.isFinite(rawHouseholds) && rawHouseholds >= 0
+    ? Math.round(rawHouseholds)
+    : null
+
+  if (isStatsAreaInterpolation) {
+    // 서버에서 이미 걸렀지만, 과거에 저장된 낮은 커버리지 값이 남아 있을 수 있다.
+    // 부분 커버리지는 곧 과소추정이므로 화면에서도 다시 막는다.
+    const coverage = input.coverage_ratio
+    if (coverage != null && (!Number.isFinite(coverage) || coverage < 0.9)) return null
+    const areaCount = input.stats_area_count != null && Number.isFinite(input.stats_area_count) && input.stats_area_count > 0
+      ? ` · 집계구 ${Math.round(input.stats_area_count)}개`
+      : ''
+    const boundaryYear = input.boundary_base_year ? ` · 경계 ${input.boundary_base_year}` : ''
+    return {
+      value: Math.round(raw),
+      households,
+      title: '매물 주변 500m 인구·가구',
+      description: 'SGIS 집계구별 센서스 인구·가구를 500m 원과 겹친 경계면적 비율로 합산한 추정값이에요. 주민등록 세대수와는 모집단이 다릅니다.',
+      sourceLabel: `SGIS 인구주택총조사 ${input.source_as_of}${areaCount}${boundaryYear} · 반경 500m`,
+    }
+  }
 
   return {
     value: Math.round(raw),
+    households,
     title: '매물 주변 500m 거주인구',
     description: '공식 인구를 실제 주거 분포에 따라 재배분한 추정값이에요.',
     sourceLabel: `${input.source_as_of} · 반경 500m`,

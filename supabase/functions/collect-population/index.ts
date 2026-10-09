@@ -1,29 +1,55 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, handleCors } from '../_shared/cors.ts'
 import { getAuthenticatedUser } from '../_shared/auth.ts'
+import {
+  estimateStatsAreaRadius,
+  parseStatsAreaFeatureRows,
+  parseStatsAreaStatRows,
+  selectFeaturesIntersectingCircle,
+  type StatsAreaFeature,
+  type StatsAreaStat,
+} from './stats-area-estimator.ts'
+
+// ── 500m 집계구 추정 게이트 ──────────────────────────────────────────────────
+// 부분 커버리지·통계 결측·과대 집계구는 모두 과소추정으로 이어진다.
+// 기존 '읍면동 평균밀도 × 원 면적'이 만든 과소추정을 라벨만 바꿔 재현하지 않도록
+// 조건을 통과하지 못하면 숫자를 내지 않는다(fail-closed).
+const MIN_STATS_AREA_COVERAGE = 0.9
+const MAX_MISSING_STATS_AREA_RATIO = 0.1
+const MAX_STATS_AREA_TO_CIRCLE_RATIO = 1.5
+const MIN_PLAUSIBLE_RADIUS_POPULATION = 20
 
 // ── SGIS 헬퍼 ────────────────────────────────────────────────────────────────
 
+async function fetchJsonWithTimeout(url: string, timeoutMs = 12_000): Promise<{ response: Response; data: any }> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const response = await fetch(url, { signal: controller.signal })
+    const data = await response.json()
+    return { response, data }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 async function getSgisToken(serviceId: string, securityKey: string): Promise<string> {
   const url = `https://sgisapi.kostat.go.kr/OpenAPI3/auth/authentication.json?consumer_key=${serviceId}&consumer_secret=${securityKey}`
-  const res = await fetch(url)
-  const data = await res.json()
+  const { data } = await fetchJsonWithTimeout(url)
   if (data.errCd !== 0) throw new Error(`SGIS 인증 실패: ${data.errMsg} (${data.errCd})`)
   return data.result.accessToken
 }
 
 async function transcoord(lng: number, lat: number, token: string): Promise<{ posX: number; posY: number }> {
   const url = `https://sgisapi.kostat.go.kr/OpenAPI3/transformation/transcoord.json?src=4326&dst=5179&posX=${lng}&posY=${lat}&accessToken=${token}`
-  const res = await fetch(url)
-  const data = await res.json()
+  const { data } = await fetchJsonWithTimeout(url)
   if (data.errCd !== 0) throw new Error(`SGIS 좌표변환 실패: ${data.errMsg}`)
   return data.result
 }
 
 async function rgeocode(posX: number, posY: number, token: string) {
   const url = `https://sgisapi.kostat.go.kr/OpenAPI3/addr/rgeocode.json?x_coor=${posX}&y_coor=${posY}&addr_type=20&accessToken=${token}`
-  const res = await fetch(url)
-  const data = await res.json()
+  const { data } = await fetchJsonWithTimeout(url)
   if (data.errCd !== 0 || !data.result?.length) throw new Error(`SGIS 역지오코딩 실패: ${data.errMsg}`)
   const r = data.result[0]
   const sido = r.sido_cd
@@ -36,32 +62,70 @@ async function rgeocode(posX: number, posY: number, token: string) {
 
 async function getPopStat(year: string, admCd: string, lowSearch = '0', token: string) {
   const url = `https://sgisapi.kostat.go.kr/OpenAPI3/stats/population.json?year=${year}&adm_cd=${admCd}&low_search=${lowSearch}&accessToken=${token}`
-  const res = await fetch(url)
-  const data = await res.json()
+  const { response, data } = await fetchJsonWithTimeout(url)
+  if (!response.ok) throw new Error(`SGIS 인구통계 HTTP ${response.status}`)
   if (data.errCd !== 0) throw new Error(`SGIS 인구통계 실패: ${data.errMsg}`)
   return data.result
 }
 
+/**
+ * 500m 원과 실제로 겹치는 행정동 코드만 고른다. 시군구 전체 행정동을 모두
+ * 조회하면 호출이 과도하고, 매물 행정동만 조회하면 경계 밖이 0명으로 합산된다.
+ */
+async function getEmdCodesIntersectingCircle(
+  sggCd: string,
+  emdCd8: string,
+  year: string,
+  center: [number, number],
+  radiusM: number,
+  token: string,
+): Promise<string[]> {
+  if (!sggCd || sggCd.length < 5) return [emdCd8]
+  try {
+    const url = `https://sgisapi.kostat.go.kr/OpenAPI3/boundary/hadmarea.geojson?year=${year}&adm_cd=${sggCd}&low_search=1&accessToken=${token}`
+    const { response, data } = await fetchJsonWithTimeout(url)
+    if (!response.ok || data.errCd !== 0 || !Array.isArray(data.features)) {
+      throw new Error('SGIS 행정동 경계 실패')
+    }
+    const emdFeatures = parseStatsAreaFeatureRows(data.features)
+    const hit = selectFeaturesIntersectingCircle(emdFeatures, center, radiusM)
+      .map(feature => feature.admCd)
+      .filter(cd => cd.length === 8)
+    const codes = new Set<string>([emdCd8, ...hit])
+    return [...codes]
+  } catch {
+    // 폴백해도 커버리지 게이트가 과소추정 숫자를 막는다.
+    return [emdCd8]
+  }
+}
+
+async function getStatsAreaBoundaries(admCd: string, token: string): Promise<StatsAreaFeature[]> {
+  const url = `https://sgisapi.kostat.go.kr/OpenAPI3/boundary/statsarea.geojson?adm_cd=${admCd}&accessToken=${token}`
+  const { response, data } = await fetchJsonWithTimeout(url)
+  if (!response.ok) throw new Error(`SGIS 집계구경계 HTTP ${response.status}`)
+  if (data.errCd !== 0 || !Array.isArray(data.features)) {
+    throw new Error(`SGIS 집계구경계 실패: ${data.errMsg ?? 'invalid response'}`)
+  }
+  return parseStatsAreaFeatureRows(data.features)
+}
+
 async function getHhStat(year: string, admCd: string, token: string) {
   const url = `https://sgisapi.kostat.go.kr/OpenAPI3/stats/household.json?year=${year}&adm_cd=${admCd}&low_search=0&household_type=A0&accessToken=${token}`
-  const res = await fetch(url)
-  const data = await res.json()
+  const { data } = await fetchJsonWithTimeout(url)
   if (data.errCd !== 0) throw new Error(`SGIS 가구통계 실패`)
   return data.result
 }
 
 async function getHousingStat(year: string, admCd: string, token: string) {
   const url = `https://sgisapi.kostat.go.kr/OpenAPI3/stats/housing.json?year=${year}&adm_cd=${admCd}&low_search=0&accessToken=${token}`
-  const res = await fetch(url)
-  const data = await res.json()
+  const { data } = await fetchJsonWithTimeout(url)
   if (data.errCd !== 0) throw new Error(`SGIS 주택통계 실패`)
   return data.result
 }
 
 async function getIndustryStat(year: string, admCd: string, token: string) {
   const url = `https://sgisapi.kostat.go.kr/OpenAPI3/stats/industry.json?year=${year}&adm_cd=${admCd}&low_search=0&accessToken=${token}`
-  const res = await fetch(url)
-  const data = await res.json()
+  const { data } = await fetchJsonWithTimeout(url)
   if (data.errCd !== 0) throw new Error(`SGIS 사업체통계 실패`)
   return data.result
 }
@@ -156,7 +220,6 @@ Deno.serve(async (req) => {
     const { lat, lng } = project
 
     // 1. SGIS 인증
-    console.log('[population] SGIS auth 시작, serviceId:', serviceId.substring(0, 6) + '...')
     const token = await getSgisToken(serviceId, securityKey)
     console.log('[population] SGIS auth 성공')
 
@@ -168,9 +231,9 @@ Deno.serve(async (req) => {
     console.log('[population] codes:', { sido, sgg, emd, adm_nm })
 
     // 4. 인구통계 (읍면동 → 시군구 → 시도 폴백)
-    const YEARS = ['2023', '2022', '2021', '2020']
+    const YEARS = ['2024', '2023', '2022', '2021', '2020']
     let popData: any = null
-    let targetYear = '2023'
+    let targetYear = '2024'
     let usedAdmCd = emd || `${sido}${sgg}`
 
     const emdCd8 = emd.length >= 8 ? emd.substring(0, 8) : emd
@@ -243,13 +306,108 @@ Deno.serve(async (req) => {
       }
     } catch { /* ignore */ }
 
-    // 6. 보행 장벽 참고정보
-    // 읍면동 평균밀도 × 원 면적은 넓은 읍·면의 주거 밀집을 반영하지 못한다.
-    // 실제 주거 분포를 확보하기 전까지 500m 인구 숫자를 생성하지 않는다.
+    // 6. SGIS 집계구 경계와 집계구별 공식 통계를 500m 원에 면적 가중한다.
+    // 법정동 주민등록 총량과는 모집단·공간단위가 다르므로 결합하지 않는다.
     const adm_level = usedAdmCd.length >= 8 ? '읍면동' : usedAdmCd.length >= 5 ? '시군구' : '시도'
-    const radius_500m_estimated: number | null = null
+    let radius_500m_estimated: number | null = null
+    let radius_500m_households_estimated: number | null = null
+    let estimation_method: string | null = null
+    let metric_semantics: string | null = null
+    let spatial_unit: string | null = null
+    let source_as_of: string | null = null
+    let stats_area_count: number | null = null
+    let boundary_base_year: string | null = null
+    let coverage_ratio: number | null = null
     let barrier_status: 'available' | 'failed' | 'not_collected' = 'not_collected'
     let barrier_names: string[] = []
+
+    if (usedAdmCd === emdCd8 && emdCd8.length === 8) {
+      try {
+        const center: [number, number] = [Number(posX), Number(posY)]
+        if (!Number.isFinite(center[0]) || !Number.isFinite(center[1])) {
+          throw new Error('SGIS 좌표변환 결과 없음')
+        }
+
+        // 집계구 경계는 year 파라미터가 없어 항상 최신 기준연도다.
+        // 재획정된 경계에 과거 연도 통계를 붙이면 오매칭이므로 같은 연도만 쓴다.
+        const ownBoundaries = await getStatsAreaBoundaries(emdCd8, token)
+        if (ownBoundaries.length === 0) throw new Error('SGIS 집계구 경계 없음')
+        const ownYears = new Set(ownBoundaries.map(f => f.baseYear).filter(Boolean) as string[])
+        if (ownYears.size !== 1) throw new Error('SGIS 집계구 경계 기준연도 불일치')
+        const statsAreaYear = [...ownYears][0]
+
+        // 500m 원(지름 1km)은 행정동 경계를 흔히 넘는다. 매물 행정동만 조회하면
+        // 넘어간 부분이 0명으로 합산되어 과거 읍면동 평균과 같은 과소추정이 된다.
+        const emdCodes = await getEmdCodesIntersectingCircle(
+          `${sido}${sgg}`, emdCd8, statsAreaYear, center, 500, token,
+        )
+
+        const extraBoundaries = await Promise.all(
+          emdCodes
+            .filter(cd => cd !== emdCd8)
+            .map(cd => getStatsAreaBoundaries(cd, token).catch(() => null)),
+        )
+        const boundaries: StatsAreaFeature[] = [...ownBoundaries]
+        for (const result of extraBoundaries) {
+          if (result) boundaries.push(...result)
+        }
+        // 경계 기준연도가 섞이면 코드 체계가 달라 오매칭이 된다.
+        const boundaryYears = new Set(boundaries.map(f => f.baseYear).filter(Boolean) as string[])
+        if (boundaryYears.size !== 1) throw new Error('SGIS 집계구 경계 기준연도 불일치')
+
+        const statResults = await Promise.all(
+          emdCodes.map(cd =>
+            getPopStat(statsAreaYear, cd, '1', token)
+              .then(rows => parseStatsAreaStatRows(rows))
+              .catch(() => null),
+          ),
+        )
+        const stats: StatsAreaStat[] = []
+        for (const result of statResults) {
+          if (result) stats.push(...result)
+        }
+        if (stats.length === 0) throw new Error('SGIS 집계구 통계 없음')
+
+        const estimate = estimateStatsAreaRadius({
+          center,
+          radiusM: 500,
+          features: boundaries,
+          stats,
+        })
+
+        // 원을 충분히 덮지 못했으면 숫자를 내지 않는다. 부분 커버리지는 곧 과소추정이다.
+        if (estimate.coverageRatio < MIN_STATS_AREA_COVERAGE) {
+          throw new Error(`SGIS 500m 커버리지 부족: ${estimate.coverageRatio.toFixed(3)}`)
+        }
+        // 경계는 있으나 통계가 비공개(5명 미만 등)인 집계구가 넓으면 역시 과소추정이다.
+        if (estimate.missingStatsAreaRatio > MAX_MISSING_STATS_AREA_RATIO) {
+          throw new Error(`SGIS 집계구 통계 결측 과다: ${estimate.missingStatsAreaRatio.toFixed(3)}`)
+        }
+        if (estimate.matchedStatsAreaCount < 1) throw new Error('SGIS 500m 교차 집계구 없음')
+        // 집계구가 원보다 훨씬 넓으면 '집계구 내부 균일분포' 가정이 깨져
+        // 과거 읍면동 평균밀도 환산과 같은 구조의 과소추정이 된다.
+        const circleArea = Math.PI * 500 * 500
+        if (estimate.maxContributingStatsAreaM2 > circleArea * MAX_STATS_AREA_TO_CIRCLE_RATIO) {
+          throw new Error('SGIS 집계구가 500m 원보다 과도하게 넓어 균일분포 가정 불가')
+        }
+        // 거주지인데 0~수명으로 표시되는 것을 막는다.
+        if (estimate.population < MIN_PLAUSIBLE_RADIUS_POPULATION) {
+          throw new Error(`SGIS 500m 추정 인구가 신뢰 하한 미달: ${estimate.population}`)
+        }
+
+        radius_500m_estimated = estimate.population
+        radius_500m_households_estimated = estimate.households
+        estimation_method = 'sgis_statsarea_areal_interpolation_v1'
+        metric_semantics = 'redistributed_estimate'
+        spatial_unit = 'radius_500m'
+        source_as_of = statsAreaYear
+        stats_area_count = estimate.matchedStatsAreaCount
+        boundary_base_year = estimate.boundaryBaseYear
+        coverage_ratio = Math.round(estimate.coverageRatio * 1000) / 1000
+      } catch (error) {
+        console.warn('[population] 집계구 500m 추정 생략:', error instanceof Error ? error.message : 'unknown')
+      }
+    }
 
     if (usedAdmCd.length >= 8) {
       try {
@@ -273,7 +431,18 @@ Deno.serve(async (req) => {
       adm_level,
       source_year: targetYear,
       radius_500m_estimated,
-      estimation_method: null,
+      radius_500m_households_estimated,
+      estimation_method,
+      metric_semantics,
+      spatial_unit,
+      source_as_of,
+      source: radius_500m_estimated == null ? null : 'SGIS 인구주택총조사 집계구',
+      stats_area_count,
+      boundary_base_year,
+      coverage_ratio,
+      coverage_note: radius_500m_estimated == null
+        ? null
+        : '집계구별 센서스 인구·가구를 500m 원과 겹친 경계면적 비율로 합산한 추정값. 주민등록 세대와 모집단이 다릅니다.',
       barrier_status,
       barrier_names,
       housing_stat,
