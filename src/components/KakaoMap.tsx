@@ -78,6 +78,8 @@ export default function KakaoMap({
   const kakaoDensityRef = useRef(kakaoDensity)
   const renderHeatmapRef = useRef<(() => void) | null>(null)
   const [activeLayer, setActiveLayer] = useState<MapDataLayerId | null>(null)
+  // 팝업이 지도를 가리지 않도록 기본은 접힌 상태로 수치만 보여준다.
+  const [populationDetailOpen, setPopulationDetailOpen] = useState(false)
   const [mapReady, setMapReady] = useState(false)
   const [mapVersion, setMapVersion] = useState(0)
   const appKey = process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY
@@ -642,45 +644,63 @@ export default function KakaoMap({
         </div>
       )}
 
-      {/* 배후 인구 분석 팝업 */}
+      {/* 배후 인구 분석 팝업. 지도를 가리지 않도록 기본은 수치만 접어서 보여준다. */}
       {activeLayer === 'population' && populationData && (
-        <div className="absolute top-4 right-4 z-10 bg-white/95 backdrop-blur-sm p-3.5 rounded-xl shadow-md border border-brand-100 min-w-[190px]">
-          <h4 className="text-xs font-bold text-gray-800 mb-2 flex items-center gap-1">
-            <span>👥</span> 배후 인구 분석
-          </h4>
+        <div className="absolute top-3 right-3 z-10 bg-white/95 backdrop-blur-sm rounded-xl shadow-md border border-brand-100 w-[172px] max-w-[52%]">
+          <button
+            type="button"
+            onClick={() => setPopulationDetailOpen(open => !open)}
+            aria-expanded={populationDetailOpen}
+            className="w-full flex items-center justify-between gap-1 px-2.5 py-1.5 text-left"
+          >
+            <span className="text-[11px] font-bold text-gray-800 flex items-center gap-1">
+              <span aria-hidden="true">👥</span> 매물 주변 500m
+            </span>
+            <span className="text-[9px] text-gray-500 shrink-0">
+              {populationDetailOpen ? '접기' : '자세히'}
+            </span>
+          </button>
 
-          {/* SGIS 수집 실패 시 에러 안내 */}
-          {populationData?.error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg px-2.5 py-2 text-[10px] text-red-600 mb-2">
-              <p className="font-semibold mb-0.5">데이터 수집 실패</p>
-              <p className="text-red-500">SGIS가 이 좌표를 찾지 못했습니다. &apos;배후 인구 분석&apos; 버튼으로 재시도하세요.</p>
-            </div>
-          )}
-
-          {/* 검증된 소지역 재배분 방식의 500m 거주인구만 표시 */}
-          {!populationData?.error && populationEstimate && (() => {
-            const estimate = populationEstimate
-            const barrierMessage = describeBarrierStatus(populationData)
-            return (
-              <div className="mb-2.5">
-                <p className="text-[9px] font-semibold text-blue-600 mb-1">{estimate.title}</p>
-                <div className="bg-blue-50 rounded-lg px-2.5 py-1.5 flex justify-between items-center">
-                  <span className="text-[11px] text-blue-700">거주인구 추정</span>
-                  <span className="text-[13px] font-bold text-blue-800">약 {estimate.value.toLocaleString()}명</span>
-                </div>
-                {estimate.households != null && (
-                  <div className="bg-emerald-50 rounded-lg px-2.5 py-1.5 flex justify-between items-center mt-1">
-                    <span className="text-[11px] text-emerald-700">센서스 가구 추정</span>
-                    <span className="text-[13px] font-bold text-emerald-800">약 {estimate.households.toLocaleString()}가구</span>
-                  </div>
+          <div className="px-2.5 pb-2">
+            {/* SGIS 수집 실패 시 에러 안내 */}
+            {populationData?.error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg px-2 py-1.5 text-[10px] text-red-600">
+                <p className="font-semibold">수집 실패</p>
+                {populationDetailOpen && (
+                  <p className="text-red-500 mt-0.5">SGIS가 이 좌표를 찾지 못했습니다. &apos;배후 인구 분석&apos; 버튼으로 재시도하세요.</p>
                 )}
-                <p className="text-[9px] text-gray-500 mt-1">{estimate.description}</p>
-                <p className="text-[8px] text-gray-400 mt-0.5">{estimate.sourceLabel}</p>
-                {barrierMessage && <p className="text-[8px] text-orange-500 mt-0.5">{barrierMessage}</p>}
               </div>
-            )
-          })()}
+            )}
 
+            {/* 검증된 소지역 재배분 방식의 500m 인구·가구만 표시 */}
+            {!populationData?.error && populationEstimate && (() => {
+              const estimate = populationEstimate
+              const barrierMessage = describeBarrierStatus(populationData)
+              return (
+                <div>
+                  <div className="bg-blue-50 rounded-lg px-2 py-1 flex justify-between items-baseline gap-1">
+                    <span className="text-[10px] text-blue-700 shrink-0">인구</span>
+                    <span className="text-[12px] font-bold text-blue-800">약 {estimate.value.toLocaleString()}명</span>
+                  </div>
+                  {estimate.households != null && (
+                    <div className="bg-emerald-50 rounded-lg px-2 py-1 flex justify-between items-baseline gap-1 mt-1">
+                      <span className="text-[10px] text-emerald-700 shrink-0">가구</span>
+                      <span className="text-[12px] font-bold text-emerald-800">약 {estimate.households.toLocaleString()}가구</span>
+                    </div>
+                  )}
+                  <p className="text-[9px] text-gray-500 mt-1">추정값</p>
+                  {populationDetailOpen && (
+                    <div className="mt-1 pt-1 border-t border-gray-100">
+                      <p className="text-[9px] font-semibold text-blue-600">{estimate.title}</p>
+                      <p className="text-[9px] text-gray-500 mt-0.5">{estimate.description}</p>
+                      <p className="text-[8px] text-gray-400 mt-0.5">{estimate.sourceLabel}</p>
+                      {barrierMessage && <p className="text-[8px] text-orange-500 mt-0.5">{barrierMessage}</p>}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
+          </div>
         </div>
       )}
     </div>
