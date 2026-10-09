@@ -71,6 +71,57 @@ test('센서스 가구와 주민등록 세대의 모집단 차이를 명시한�
   assert.match(estimate?.description ?? '', /주민등록 세대수와는 모집단이 다릅니다/)
 })
 
+test('해안 매물은 바다·하천 비율을 화면에 알린다', () => {
+  // 운영(함덕): 원의 45%가 바다다. 육지 면적만 집계했다는 사실을 알리지 않으면
+  // 사용자는 같은 반경의 도심 매물과 그대로 비교해버린다.
+  const estimate = getPopulationEstimate({
+    radius_500m_estimated: 1_380,
+    radius_500m_households_estimated: 558,
+    metric_semantics: 'redistributed_estimate',
+    spatial_unit: 'radius_500m',
+    estimation_method: 'sgis_statsarea_areal_interpolation_v1',
+    source_as_of: '2024',
+    boundary_base_year: '2025',
+    stats_area_count: 8,
+    coverage_ratio: 1,
+    land_ratio: 0.549,
+  })
+
+  assert.equal(estimate?.value, 1_380)
+  assert.match(estimate?.areaNote ?? '', /45%/)
+  assert.match(estimate?.areaNote ?? '', /바다/)
+  assert.match(estimate?.areaNote ?? '', /육지/)
+})
+
+test('육지 비율이 충분하면 바다 안내를 띄우지 않는다', () => {
+  const estimate = getPopulationEstimate({
+    radius_500m_estimated: 10_110,
+    radius_500m_households_estimated: 4_865,
+    metric_semantics: 'redistributed_estimate',
+    spatial_unit: 'radius_500m',
+    estimation_method: 'sgis_statsarea_areal_interpolation_v1',
+    source_as_of: '2024',
+    coverage_ratio: 1,
+    land_ratio: 1,
+  })
+
+  assert.equal(estimate?.areaNote, null)
+})
+
+test('land_ratio가 없는 과거 저장값은 바다 안내를 추측하지 않는다', () => {
+  const estimate = getPopulationEstimate({
+    radius_500m_estimated: 2_340,
+    radius_500m_households_estimated: 980,
+    metric_semantics: 'redistributed_estimate',
+    spatial_unit: 'radius_500m',
+    estimation_method: 'sgis_statsarea_areal_interpolation_v1',
+    source_as_of: '2024',
+    coverage_ratio: 0.97,
+  })
+
+  assert.equal(estimate?.areaNote, null)
+})
+
 test('커버리지가 낮은 집계구 추정값은 숫자로 보여주지 않는다', () => {
   const estimate = getPopulationEstimate({
     radius_500m_estimated: 1_170,

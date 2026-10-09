@@ -735,6 +735,11 @@ function MapSection({
                   <span className="font-bold text-blue-700">약 {estimate.value.toLocaleString()}명</span>
                 </div>
                 <p className="text-[9px] leading-relaxed text-gray-500">{estimate.description}</p>
+                {estimate.areaNote && (
+                  <p className="rounded-md border border-sky-200 bg-sky-50 px-1.5 py-1 text-[9px] leading-relaxed text-sky-800">
+                    {estimate.areaNote}
+                  </p>
+                )}
                 <div className="text-[9px] text-gray-400">{estimate.sourceLabel}</div>
                 <div className="inline-flex rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-700">추정값 · 집계구 내부는 균일 분포 가정</div>
                 <p className="text-[9px] leading-relaxed text-gray-400">

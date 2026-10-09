@@ -689,6 +689,12 @@ export default function KakaoMap({
                     </div>
                   )}
                   <p className="text-[9px] text-gray-500 mt-1">추정값</p>
+                  {/* 바다·하천 비율은 숫자 해석을 바꾸므로 접힌 상태에서도 알린다. */}
+                  {estimate.areaNote && (
+                    <p className="mt-1 rounded border border-sky-200 bg-sky-50 px-1.5 py-1 text-[8px] leading-relaxed text-sky-800">
+                      {populationDetailOpen ? estimate.areaNote : '원의 일부가 바다·하천이라 육지만 집계'}
+                    </p>
+                  )}
                   {populationDetailOpen && (
                     <div className="mt-1 pt-1 border-t border-gray-100">
                       <p className="text-[9px] font-semibold text-blue-600">{estimate.title}</p>

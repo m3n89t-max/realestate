@@ -32,6 +32,8 @@ interface PopulationEstimateInput {
   boundary_base_year?: string | null
   stats_area_count?: number | null
   coverage_ratio?: number | null
+  /** 500m 원 중 행정구역 경계로 덮인 육지 비율. 해안 매물은 1보다 작다 */
+  land_ratio?: number | null
 }
 
 export interface PopulationEstimate {
@@ -40,6 +42,11 @@ export interface PopulationEstimate {
   title: string
   description: string
   sourceLabel: string
+  /**
+   * 원 안에 사람이 살 수 없는 면적이 큰 경우의 해석 주의사항.
+   * 해당 사항이 없거나 과거 저장값처럼 판단 근거가 없으면 null이다.
+   */
+  areaNote: string | null
 }
 
 export interface FacilityHeatPoint {
@@ -96,6 +103,7 @@ export function getPopulationEstimate(input: PopulationEstimateInput | null | un
       title: '매물 주변 500m 인구·가구',
       description: 'SGIS 집계구별 센서스 인구·가구를 500m 원과 겹친 경계면적 비율로 합산한 추정값이에요. 주민등록 세대수와는 모집단이 다릅니다.',
       sourceLabel: `SGIS 인구주택총조사 ${input.source_as_of}${areaCount}${boundaryYear} · 반경 500m`,
+      areaNote: buildAreaNote(input.land_ratio),
     }
   }
 
@@ -105,7 +113,22 @@ export function getPopulationEstimate(input: PopulationEstimateInput | null | un
     title: '매물 주변 500m 거주인구',
     description: '공식 인구를 실제 주거 분포에 따라 재배분한 추정값이에요.',
     sourceLabel: `${input.source_as_of} · 반경 500m`,
+    areaNote: null,
   }
+}
+
+const MIN_LAND_RATIO_WITHOUT_NOTE = 0.95
+
+/**
+ * 원 안 비거주 면적(바다·하천)이 커서 같은 반경의 내륙 매물과 단순 비교하면
+ * 안 되는 경우를 알린다. land_ratio가 없는 과거 저장값은 추측하지 않는다.
+ */
+function buildAreaNote(landRatio: number | null | undefined): string | null {
+  if (landRatio == null || !Number.isFinite(landRatio)) return null
+  if (landRatio >= MIN_LAND_RATIO_WITHOUT_NOTE || landRatio <= 0) return null
+  const seaPercent = Math.round((1 - landRatio) * 100)
+  if (seaPercent < 5) return null
+  return `반경 500m 중 약 ${seaPercent}%는 바다·하천이라 사람이 살 수 없어요. 위 숫자는 나머지 육지 면적만 집계한 값이라, 같은 반경의 내륙 매물보다 작게 나오는 게 정상입니다.`
 }
 
 function heatPointKey(name: string, lat: number, lng: number): string {
