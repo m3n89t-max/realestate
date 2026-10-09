@@ -18,6 +18,13 @@ const MIN_STATS_AREA_COVERAGE = 0.9
 const MAX_MISSING_STATS_AREA_RATIO = 0.1
 const MAX_STATS_AREA_TO_CIRCLE_RATIO = 1.5
 const MIN_PLAUSIBLE_RADIUS_POPULATION = 20
+// 집계구 경계 API에는 year 파라미터가 없어 항상 최신 기준연도(운영 확인: 2025)를 준다.
+// 그런데 같은 연도의 집계구 통계는 아직 제공되지 않는다(errCd -100).
+// 따라서 연도 엄격 일치를 요구하면 기능이 영구 무동작한다. 실제 코드 체계는
+// 경계·통계 양쪽 모두 14자리이고 운영에서 56/56 전건 일치하므로,
+// 연도 대신 코드 교집합 비율로 오매칭을 막는다.
+const STATS_AREA_YEARS = ['2024', '2023', '2022', '2021', '2020']
+const MIN_STATS_AREA_CODE_MATCH_RATIO = 0.9
 
 // ── SGIS 헬퍼 ────────────────────────────────────────────────────────────────
 
@@ -329,44 +336,63 @@ Deno.serve(async (req) => {
         }
 
         // 집계구 경계는 year 파라미터가 없어 항상 최신 기준연도다.
-        // 재획정된 경계에 과거 연도 통계를 붙이면 오매칭이므로 같은 연도만 쓴다.
         const ownBoundaries = await getStatsAreaBoundaries(emdCd8, token)
         if (ownBoundaries.length === 0) throw new Error('SGIS 집계구 경계 없음')
         const ownYears = new Set(ownBoundaries.map(f => f.baseYear).filter(Boolean) as string[])
         if (ownYears.size !== 1) throw new Error('SGIS 집계구 경계 기준연도 불일치')
-        const statsAreaYear = [...ownYears][0]
+        const boundaryYear = [...ownYears][0]
 
         // 500m 원(지름 1km)은 행정동 경계를 흔히 넘는다. 매물 행정동만 조회하면
         // 넘어간 부분이 0명으로 합산되어 과거 읍면동 평균과 같은 과소추정이 된다.
         const emdCodes = await getEmdCodesIntersectingCircle(
-          `${sido}${sgg}`, emdCd8, statsAreaYear, center, 500, token,
+          `${sido}${sgg}`, emdCd8, boundaryYear, center, 500, token,
         )
 
-        const extraBoundaries = await Promise.all(
-          emdCodes
-            .filter(cd => cd !== emdCd8)
-            .map(cd => getStatsAreaBoundaries(cd, token).catch(() => null)),
-        )
+        // SGIS는 같은 토큰의 동시 요청을 거부한다(운영 확인: 병렬 호출 시 인접
+        // 행정동 응답이 누락되어 커버리지가 0.886으로 떨어졌다). 순차 호출한다.
         const boundaries: StatsAreaFeature[] = [...ownBoundaries]
-        for (const result of extraBoundaries) {
-          if (result) boundaries.push(...result)
+        for (const cd of emdCodes) {
+          if (cd === emdCd8) continue
+          try {
+            boundaries.push(...await getStatsAreaBoundaries(cd, token))
+          } catch (e) {
+            // 인접 행정동 경계를 못 받으면 그만큼 커버리지가 떨어져 게이트가 막는다.
+            console.warn('[population] 인접 집계구 경계 실패:', e instanceof Error ? e.message : 'unknown')
+          }
         }
         // 경계 기준연도가 섞이면 코드 체계가 달라 오매칭이 된다.
         const boundaryYears = new Set(boundaries.map(f => f.baseYear).filter(Boolean) as string[])
         if (boundaryYears.size !== 1) throw new Error('SGIS 집계구 경계 기준연도 불일치')
+        const boundaryCodes = new Set(boundaries.map(f => f.admCd))
 
-        const statResults = await Promise.all(
-          emdCodes.map(cd =>
-            getPopStat(statsAreaYear, cd, '1', token)
-              .then(rows => parseStatsAreaStatRows(rows))
-              .catch(() => null),
-          ),
-        )
-        const stats: StatsAreaStat[] = []
-        for (const result of statResults) {
-          if (result) stats.push(...result)
+        // 집계구 통계는 최신 제공 연도부터 폴백한다. 경계 코드와의 교집합이
+        // 충분하지 않은 연도는 코드 체계가 다른 것이므로 쓰지 않는다.
+        let stats: StatsAreaStat[] = []
+        let statsAreaYear: string | null = null
+        for (const year of STATS_AREA_YEARS) {
+          const candidate: StatsAreaStat[] = []
+          let allFetched = true
+          for (const cd of emdCodes) {
+            try {
+              candidate.push(...parseStatsAreaStatRows(await getPopStat(year, cd, '1', token)))
+            } catch {
+              allFetched = false
+            }
+          }
+          // 일부 행정동 통계가 비면 그 면적이 결측으로 잡혀 과소추정이 된다.
+          // 다음 연도로 넘어가 전건을 받을 수 있는 연도를 찾는다.
+          if (candidate.length === 0 || !allFetched) continue
+          const candidateCodes = new Set(candidate.map(s => s.admCd))
+          let matched = 0
+          for (const cd of candidateCodes) if (boundaryCodes.has(cd)) matched += 1
+          if (matched / candidateCodes.size < MIN_STATS_AREA_CODE_MATCH_RATIO) continue
+          stats = candidate
+          statsAreaYear = year
+          break
         }
-        if (stats.length === 0) throw new Error('SGIS 집계구 통계 없음')
+        if (!statsAreaYear || stats.length === 0) {
+          throw new Error('SGIS 집계구 통계와 경계 코드가 일치하는 연도 없음')
+        }
 
         const estimate = estimateStatsAreaRadius({
           center,

@@ -125,7 +125,50 @@ function polygonsOf(geometry: StatsAreaGeometry): Point[][][] {
   return geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates
 }
 
+function ringBounds(rings: Point[][]): [number, number, number, number] {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const ring of rings) {
+    for (const [x, y] of ring) {
+      if (x < minX) minX = x
+      if (y < minY) minY = y
+      if (x > maxX) maxX = x
+      if (y > maxY) maxY = y
+    }
+  }
+  return [minX, minY, maxX, maxY]
+}
+
+function circleIntersectsBounds(center: Point, r: number, b: [number, number, number, number]): boolean {
+  const nx = Math.max(b[0], Math.min(center[0], b[2]))
+  const ny = Math.max(b[1], Math.min(center[1], b[3]))
+  const dx = nx - center[0]
+  const dy = ny - center[1]
+  return dx * dx + dy * dy <= r * r
+}
+
+/**
+ * 원과 다각형의 교차 면적. bbox로 먼저 분리 여부를 판정한다.
+ * 해석적 sector 합만 쓰면 멀리 떨어진 다각형에서도 부동소수점 잔차가 남아
+ * `> 0` 비교를 통과하고, 행정동 전체 같은 거대 폴리곤이 교차로 잡혀
+ * 커버리지와 최대 집계구 면적을 오염시킨다.
+ */
+function clippedPolygonArea(rings: Point[][], center: Point, r: number): number {
+  if (!circleIntersectsBounds(center, r, ringBounds(rings))) return 0
+  const area = polygonCircleArea(rings, center, r)
+  // 원 면적의 1e-6 미만은 수치 잔차로 보고 버린다(500m 원에서 약 0.8㎡).
+  const epsilon = Math.PI * r * r * 1e-6
+  return area < epsilon ? 0 : area
+}
+
 // ── 응답 파싱 (fail-closed) ──────────────────────────────────────────────────
+
+/** SGIS가 비공개 집계구에 쓰는 값. 형식 오류가 아니라 명시적 '값 없음'이다. */
+function isSuppressedValue(raw: unknown): boolean {
+  if (raw == null) return true
+  if (typeof raw !== 'string') return false
+  const t = raw.trim().toUpperCase()
+  return t === '' || t === 'N/A' || t === 'NA' || t === '-'
+}
 
 function parseNonNegativeNumber(raw: unknown): number {
   // Number('') 과 Number(null) 은 0 이므로 먼저 문자열 형태를 검증한다.
@@ -143,15 +186,24 @@ function parseNonNegativeNumber(raw: unknown): number {
 
 export function parseStatsAreaStatRows(rows: unknown): StatsAreaStat[] {
   if (!Array.isArray(rows) || rows.length === 0) throw new Error('SGIS 집계구 통계 없음')
-  return rows.map(row => {
+  const parsed: StatsAreaStat[] = []
+  for (const row of rows) {
     const admCd = String((row as any)?.adm_cd ?? '').trim()
     if (!admCd) throw new Error('SGIS 집계구 통계 응답 형식 오류')
-    return {
+    const rawPop = (row as any)?.tot_ppltn
+    const rawHh = (row as any)?.tot_family
+    // 비공개 집계구는 건너뛴다. 0으로 합산하면 과소추정이 되고, throw하면
+    // 행정동 전체가 날아가 커버리지가 떨어진다. 둘 다 과소추정이므로
+    // 결측으로 남겨 estimator의 missingStatsAreaRatio 게이트가 판단한다.
+    if (isSuppressedValue(rawPop) || isSuppressedValue(rawHh)) continue
+    parsed.push({
       admCd,
-      population: parseNonNegativeNumber((row as any)?.tot_ppltn),
-      households: parseNonNegativeNumber((row as any)?.tot_family),
-    }
-  })
+      population: parseNonNegativeNumber(rawPop),
+      households: parseNonNegativeNumber(rawHh),
+    })
+  }
+  if (parsed.length === 0) throw new Error('SGIS 집계구 통계 전건 비공개')
+  return parsed
 }
 
 export function parseStatsAreaFeatureRows(rows: unknown): StatsAreaFeature[] {
@@ -180,7 +232,7 @@ export function selectFeaturesIntersectingCircle(
   radiusM: number,
 ): StatsAreaFeature[] {
   return features.filter(feature =>
-    polygonsOf(feature.geometry).some(rings => polygonCircleArea(rings as Point[][], center, radiusM) > 0),
+    polygonsOf(feature.geometry).some(rings => clippedPolygonArea(rings as Point[][], center, radiusM) > 0),
   )
 }
 
@@ -208,7 +260,7 @@ export function estimateStatsAreaRadius({
     }
     for (const rings of polygonsOf(feature.geometry)) {
       entry.totalArea += polygonArea(rings as Point[][])
-      entry.overlapArea += polygonCircleArea(rings as Point[][], center, radiusM)
+      entry.overlapArea += clippedPolygonArea(rings as Point[][], center, radiusM)
     }
     if (feature.baseYear) entry.baseYears.add(feature.baseYear)
   }
