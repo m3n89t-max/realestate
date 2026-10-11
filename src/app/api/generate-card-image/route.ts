@@ -107,14 +107,39 @@ export async function POST(req: NextRequest) {
     const prompt = buildCardPrompt(card.layout ?? 'cover', card)
 
     // 멀티모달 파츠 구성 (사진 + 텍스트)
-    const parts: any[] = []
-    if (photo_url) {
-      const img = await fetchImageAsBase64(photo_url)
-      if (img) {
-        parts.push({ inlineData: { mimeType: img.mimeType, data: img.data } })
-      }
+    //
+    // 사진 없이 프롬프트만 보내면 생성 모델이 매물과 무관한 건물 사진을 만들어낸다.
+    // 중개사가 그 카드를 그대로 올리면 실제 매물이 아닌 사진으로 광고하는 셈이 되므로
+    // 모델을 부르기 전에 막는다. 사진 없는 매물은 텍스트 중심 카드로 처리해야 한다.
+    if (!photo_url) {
+      return NextResponse.json(
+        {
+          error:
+            '실제 매물 사진이 없어 사진형 카드를 만들 수 없습니다. 사진을 먼저 올려주세요.',
+          reason: 'photo_required',
+        },
+        { status: 400 },
+      )
     }
-    parts.push({ text: prompt })
+
+    const img = await fetchImageAsBase64(photo_url)
+    if (!img) {
+      // 내려받기 실패를 '사진 없음'과 같게 취급한다. 그냥 진행하면
+      // 실제 매물 사진이 아닌 이미지가 생성된다.
+      return NextResponse.json(
+        {
+          error:
+            '실제 매물 사진을 불러오지 못했습니다. 사진을 다시 올리거나 잠시 후 시도해 주세요.',
+          reason: 'photo_fetch_failed',
+        },
+        { status: 400 },
+      )
+    }
+
+    const parts: unknown[] = [
+      { inlineData: { mimeType: img.mimeType, data: img.data } },
+      { text: prompt },
+    ]
 
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
