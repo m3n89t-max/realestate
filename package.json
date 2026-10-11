@@ -13,6 +13,8 @@
     "lint": "eslint .",
     "type-check": "tsc --noEmit",
     "check:migrations": "node scripts/check-migrations.js",
+    "check:functions": "deno check supabase/functions/*/index.ts",
+    "test:functions": "deno test --allow-env --allow-net supabase/functions/tests/",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "agent:start": "tsc -p tsconfig.agent.json && electron .",

@@ -23,6 +23,16 @@ export async function callGemini(
 
   const model = options.model ?? Deno.env.get('GEMINI_MODEL') ?? DEFAULT_GEMINI_MODEL
 
+  // 호출자가 이미지 배열을 텍스트 전용 경로로 넘기면 payload 의 text 가 문자열이 아니게 되고
+  // Gemini 가 INVALID_ARGUMENT 로 거절한다. 조용히 깨진 요청을 보내지 말고 여기서 멈춘다.
+  for (const m of messages) {
+    if (typeof m.content !== 'string') {
+      throw new Error(
+        'callGemini 는 문자열 content 만 받습니다. 이미지를 보내려면 callGeminiVision 을 쓰세요.',
+      )
+    }
+  }
+
   // system 메시지는 systemInstruction으로, 나머지는 contents로 매핑 (assistant → model)
   const systemMsg = messages.find(m => m.role === 'system')
   const contents = messages
@@ -105,7 +115,12 @@ async function fetchImageAsInlineData(url: string): Promise<{ mimeType: string; 
 
 export async function callGeminiVision(
   messages: VisionMessage[],
-  options: { model?: string; maxTokens?: number; temperature?: number } = {}
+  options: {
+    model?: string
+    maxTokens?: number
+    temperature?: number
+    responseFormat?: 'json' | 'text'
+  } = {}
 ): Promise<string> {
   const apiKey = Deno.env.get('GOOGLE_AI_API_KEY')
   if (!apiKey) throw new Error('Google AI(Gemini) API 키가 설정되지 않았습니다 (GOOGLE_AI_API_KEY)')
@@ -113,6 +128,8 @@ export async function callGeminiVision(
 
   const systemMsg = messages.find(m => m.role === 'system')
   const contents: Array<{ role: string; parts: unknown[] }> = []
+  let requestedImages = 0
+  let attachedImages = 0
   for (const m of messages) {
     if (m.role === 'system') continue
     const parts: unknown[] = []
@@ -123,12 +140,24 @@ export async function callGeminiVision(
         if (c.type === 'text') {
           parts.push({ text: c.text })
         } else if (c.type === 'image_url') {
+          requestedImages += 1
           const img = await fetchImageAsInlineData(c.image_url.url)
-          if (img) parts.push({ inlineData: { mimeType: img.mimeType, data: img.data } })
+          if (img) {
+            attachedImages += 1
+            parts.push({ inlineData: { mimeType: img.mimeType, data: img.data } })
+          }
         }
       }
     }
     contents.push({ role: m.role === 'assistant' ? 'model' : 'user', parts })
+  }
+
+  // 이미지를 보내려 했는데 한 장도 붙지 않았다면(만료된 서명 URL 등) 그냥 텍스트로 보내지 않는다.
+  // 호출자가 이미지 기반 결과를 기대하므로 원인을 알려야 한다.
+  if (requestedImages > 0 && attachedImages === 0) {
+    throw new Error(
+      `이미지를 ${requestedImages}장 보내려 했으나 모두 내려받지 못했습니다. 사진 URL이 만료되었는지 확인해 주세요.`,
+    )
   }
 
   const body: Record<string, unknown> = {
@@ -137,6 +166,7 @@ export async function callGeminiVision(
       temperature: options.temperature ?? 0.5,
       maxOutputTokens: options.maxTokens ?? 2048,
       thinkingConfig: { thinkingBudget: 0 },
+      ...(options.responseFormat === 'json' && { responseMimeType: 'application/json' }),
     },
   }
   if (systemMsg && typeof systemMsg.content === 'string') {
