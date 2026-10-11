@@ -15,9 +15,9 @@
     "check:migrations": "node scripts/check-migrations.js",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "agent:start": "npx tsx src/agent/worker.ts",
+    "agent:start": "tsc -p tsconfig.agent.json && electron .",
     "agent:dev": "tsc -p tsconfig.agent.json && electron .",
-    "agent:build": "tsc -p tsconfig.agent.json && node -e \"require('fs').copyFileSync('src/agent/setup.html','dist-agent/setup.html')\" && electron-builder --win"
+    "agent:build": "tsc -p tsconfig.agent.json && node -e \"require('fs').copyFileSync('src/agent/setup.html','dist-agent/setup.html')\" && node scripts/prepare-agent-bootstrap.js && electron-builder --win"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

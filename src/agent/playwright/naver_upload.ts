@@ -1,6 +1,6 @@
 import { chromium } from 'playwright';
 import { AgentConfig, getCredentials } from '../config';
-import { sendTaskProgress, getContent, getAssets, updateContent } from '../webhook-client';
+import { sendTaskProgress, getContent, getAssets } from '../webhook-client';
 import { tmpdir } from 'os';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
@@ -47,7 +47,7 @@ export async function uploadNaverBlog(
     // 2. 이미지 조회 (webhook 경유)
     const assets = await getAssets(config, projectId);
 
-    // 3. 브라우저 실행 — 에이전트 전용 Edge 프로필 (캡챠 우회)
+    // 3. 브라우저 실행 — 에이전트 전용 Edge 프로필
     // 전용 프로필 디렉토리: 사용자 Edge와 충돌 없이 로그인 세션 영속 보존
     const agentProfileDir = path.join(SESSION_DIR, 'EdgeProfile');
 
@@ -58,25 +58,8 @@ export async function uploadNaverBlog(
         // (에디터가 넓게 렌더되어 라이브러리 패널이 열려도 본문이 좁게 잘려 보이지 않음)
         viewport: null,
         permissions: ['clipboard-read', 'clipboard-write'],
-        args: [
-            '--start-maximized',
-            '--disable-blink-features=AutomationControlled',
-            '--disable-infobars',
-        ],
+        args: ['--start-maximized'],
         locale: 'ko-KR',
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0',
-        ignoreDefaultArgs: ['--enable-automation'],
-    });
-
-    // 자동화 시그니처 마스킹 (캡챠 우회)
-    await context.addInitScript(() => {
-        Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (window as any).cdc_adoQpoasnfa76pfcZLmcfl_Array;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (window as any).cdc_adoQpoasnfa76pfcZLmcfl_Promise;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (window as any).cdc_adoQpoasnfa76pfcZLmcfl_Symbol;
     });
 
     const browser = { close: async () => { try { await context.close(); } catch { } } };
@@ -763,83 +746,9 @@ export async function uploadNaverBlog(
             }
         }
 
-        await assertNotCancelled(); // 발행 전 최종 취소 확인
-
-        // 10. 발행 버튼 클릭 + 발행 설정 다이얼로그 처리
-        await progress(config, task.id, '발행 중...', 88);
-
-        // 발행 버튼 우선순위: .save_btn__bzc5B → button:has-text("발행") → .publish_btn
-        const publishSelectors = [
-            '.save_btn__bzc5B',
-            'button[class*="publish"]',
-            '.publish_btn button',
-        ];
-        let publishClicked = false;
-        for (const sel of publishSelectors) {
-            const btn = mainFrame.locator(sel).first();
-            if (await btn.count() > 0) {
-                await btn.click();
-                publishClicked = true;
-                break;
-            }
-        }
-        if (!publishClicked) {
-            // 텍스트 기반 fallback
-            const textBtn = mainFrame.locator('button').filter({ hasText: /^발행$/ }).first();
-            if (await textBtn.count() > 0) {
-                await textBtn.click();
-                publishClicked = true;
-            }
-        }
-
-        if (publishClicked) {
-            // 발행 설정 다이얼로그가 뜰 수 있음 — 최대 5초 대기 후 확인 버튼 클릭
-            await page.waitForTimeout(2000);
-
-            // 다이얼로그 내 "발행" 확인 버튼 (page 레벨에서 탐색)
-            const dialogConfirmSelectors = [
-                '.se-popup-button-primary',
-                '.se-confirm-button',
-                'button.confirm',
-                '.btn_publish',
-            ];
-            for (const sel of dialogConfirmSelectors) {
-                const confirmBtn = page.locator(sel).first();
-                if (await confirmBtn.count() > 0) {
-                    await confirmBtn.click();
-                    break;
-                }
-            }
-            // 텍스트 기반 confirm fallback
-            const confirmText = page.locator('button').filter({ hasText: /^발행$/ }).last();
-            if (await confirmText.count() > 0) {
-                await confirmText.click();
-            }
-
-            // 페이지 전환 대기 (에디터 → 발행된 포스트)
-            await page.waitForTimeout(3000);
-        }
-
-        // 11. 발행 URL 확인 & DB 업데이트
-        await progress(config, task.id, '발행 URL 확인 중...', 95);
-
-        // editor URL이 아닌 실제 블로그 포스트 URL 대기 (최대 10초)
-        let publishedUrl = page.url();
-        try {
-            await page.waitForURL(
-                url => !url.toString().includes('GoBlogWrite') && url.toString().includes('blog.naver.com'),
-                { timeout: 10_000 }
-            );
-            publishedUrl = page.url();
-        } catch {
-            // URL 전환 실패 시 현재 URL 그대로 사용
-            console.warn('[NaverUpload] 발행 후 URL 전환 미감지, 현재 URL 사용:', page.url());
-        }
-
-        await updateContent(config, contentId, { is_published: true, published_url: publishedUrl });
-
-        await progress(config, task.id, '✅ 네이버 블로그 발행 완료!', 100);
-        return { published_url: publishedUrl, content_id: contentId };
+        await assertNotCancelled();
+        await progress(config, task.id, '초안 입력 완료 — 발행은 공식 화면에서 직접 확인해 주세요.', 100);
+        return { status: 'manual_submit_required', editor_url: page.url(), content_id: contentId };
 
     } finally {
         await browser.close();

@@ -1,339 +1,113 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import {
-  ArrowRight,
-  Building2,
-  Check,
-  ChevronRight,
-  ClipboardCheck,
-  FileText,
-  Image as ImageIcon,
-  MapPin,
-  MessageSquareText,
-  PlaySquare,
-  Sparkles,
-  Upload,
-} from 'lucide-react'
-import { BRAND } from '@/lib/brand'
+import { ArrowRight, Building2, Check, FileArchive, ImageIcon, MapPin, MessageSquareText, Newspaper, ShieldCheck, Sparkles } from 'lucide-react'
 import { LandingDemoVideo } from '@/components/landing-demo-video'
+import { BRAND } from '@/lib/brand'
 
 export const metadata: Metadata = {
-  title: { absolute: `공인중개사를 위한 매물 콘텐츠 자동화 | ${BRAND.name}` },
-  description: BRAND.description,
-  openGraph: {
-    title: `공인중개사를 위한 매물 콘텐츠 자동화 | ${BRAND.name}`,
-    description: BRAND.description,
-  },
+  title: { absolute: `주소와 사진으로 매물 홍보 준비 | ${BRAND.name}` },
+  description: '주소와 사진, 매물 특징을 한 번 입력해 블로그 글·카드뉴스와 채널별 등록 자료를 준비하는 공인중개사용 서비스',
 }
 
 const signupHref = '/login?mode=signup'
+const primaryCta = '내 매물로 시작하기'
 
-const outputs = [
-  {
-    icon: MapPin,
-    label: '입지분석',
-    title: '주변의 강점을 설명하기 쉽게 정리',
-    description: '주소를 기준으로 생활·교통·교육·상권 정보를 모아 상담과 콘텐츠 작성에 참고할 내용을 정리합니다.',
-    items: ['생활 편의시설', '교통·교육 환경', '상권 및 배후 환경'],
-    sampleTitle: '입지 포인트 요약',
-    sampleLines: ['생활·교통·교육 환경을 항목별로 정리', '확인한 정보를 상담용 문장으로 구성'],
-    tone: 'bg-emerald-50 text-emerald-800',
-  },
-  {
-    icon: FileText,
-    label: '블로그 글',
-    title: '빈 화면 대신 매물 정보에서 시작',
-    description: '가격, 면적, 특징과 입지 내용을 바탕으로 제목부터 문의 안내까지 블로그 초안을 구성합니다.',
-    items: ['매물 정보 정리', '입지 장점', '자주 묻는 내용'],
-    sampleTitle: '블로그 도입부',
-    sampleLines: ['제주시 주거 매물을 찾고 계신가요?', '가격·면적·특징을 한눈에 살펴보세요.'],
-    tone: 'bg-sky-50 text-sky-800',
-  },
-  {
-    icon: ImageIcon,
-    label: '카드뉴스',
-    title: '핵심만 넘겨볼 수 있는 카드로 구성',
-    description: '매물의 주요 장점을 카드별 문구로 나누고 등록한 사진을 활용해 한눈에 확인할 수 있게 구성합니다.',
-    items: ['대표 매물 정보', '핵심 장점', '입지 포인트'],
-    sampleTitle: '3장 카드 구성',
-    sampleLines: ['1장 · 매물 한눈에 보기', '2장 · 생활환경  3장 · 핵심 장점'],
-    tone: 'bg-amber-50 text-amber-800',
-  },
-  {
-    icon: PlaySquare,
-    label: '쇼츠 스크립트',
-    title: '짧은 영상에 맞는 흐름과 문장 준비',
-    description: '첫 문장부터 매물 소개와 문의 안내까지 촬영·편집에 활용할 장면별 스크립트를 구성합니다.',
-    items: ['시작 문구', '장면별 설명', '자막 문안'],
-    sampleTitle: '장면 1 · 외관',
-    sampleLines: ['화면: 건물 외관과 진입로', '자막: 오늘 소개할 매물을 만나보세요.'],
-    tone: 'bg-rose-50 text-rose-800',
-  },
+const workflow = [
+  { number: '01', title: '한 번 입력', description: '주소와 사진, 매물 특징을 입력합니다. 가격·면적은 주소 확인 후 필요한 항목만 묻습니다.' },
+  { number: '02', title: '홍보물 생성', description: '블로그 글과 카드뉴스 초안을 함께 만듭니다.' },
+  { number: '03', title: '중개사가 최종 검토', description: '가격·면적·주소 공개 범위·광고 표현을 중개사가 직접 확인합니다.' },
+  { number: '04', title: '채널별 발행 준비', description: '각 채널이 허용한 방식에 맞춰 파일과 등록 정보를 준비합니다.' },
 ]
 
-const steps = [
-  { icon: Building2, number: '01', title: '매물 정보 입력', description: '주소, 거래 유형, 가격, 면적과 매물의 특징을 입력합니다.' },
-  { icon: Upload, number: '02', title: '사진 추가', description: '홍보에 사용할 매물 사진과 동영상을 등록합니다.' },
-  { icon: Sparkles, number: '03', title: '필요한 결과 선택', description: '입지분석, 블로그, 카드뉴스, 쇼츠 중 필요한 작업을 선택합니다.' },
-  { icon: ClipboardCheck, number: '04', title: '결과 확인 및 수정', description: '생성된 내용을 실제 매물과 중개사무소 기준에 맞게 확인하고 고칩니다.' },
+const outputs = [
+  { icon: MapPin, title: '입지분석', description: '주소를 바탕으로 생활·교통·교육·상권 정보를 정리합니다.' },
+  { icon: MessageSquareText, title: '블로그 글', description: '매물 특징과 입지 정보를 읽기 쉬운 홍보 글 초안으로 만듭니다.' },
+  { icon: ImageIcon, title: '카드뉴스', description: '핵심 장점과 사진을 모바일용 카드 흐름으로 구성합니다.' },
+  { icon: Newspaper, title: '채널 등록 자료', description: '채널별 필수 정보, 사진 묶음과 복사용 문구를 한곳에 준비합니다.' },
+]
+
+const channels = [
+  { name: '네이버부동산', status: '연동 필요', todo: '문구를 복사하고 사진을 내려받아 직접 등록', detail: '공식 제휴 정보업체 또는 승인된 경로가 확인되면 연동합니다.' },
+  { name: '직방', status: '연동 필요', todo: '문구를 복사하고 사진을 내려받아 직접 등록', detail: '공식 사업제휴 전까지는 등록 자료만 준비합니다.' },
+  { name: '다방', status: '연동 필요', todo: '문구를 복사하고 사진을 내려받아 직접 등록', detail: '다방프로 및 공식 제휴 범위 안에서 준비합니다.' },
+  { name: '지역 오일장', status: '연동 필요', todo: '등록 양식에 맞춘 사진·문구 묶음을 내려받아 직접 등록', detail: '공개 등록 API가 확인되지 않아 제휴 여부를 확인 중입니다.' },
+  { name: '교차로', status: '연동 필요', todo: '지역사 공식 등록화면에서 문구를 붙여 넣어 직접 등록', detail: '지역별 법인·상품이 달라 지역사마다 확인이 필요합니다.' },
 ]
 
 const faqs = [
-  ['컴퓨터를 잘 다루지 못해도 사용할 수 있나요?', '매물 주소와 기본 정보를 입력한 뒤 필요한 결과물을 선택하는 순서로 구성되어 있습니다. 화면에 표시되는 단계에 따라 진행하면 됩니다.'],
-  ['무엇을 입력해야 하나요?', '주소를 기본으로 거래 유형, 가격, 면적, 사진과 매물의 특징을 입력할 수 있습니다. 입력 내용이 구체적일수록 실제 매물에 맞게 결과를 다듬기 쉽습니다.'],
-  ['입지분석에서는 무엇을 볼 수 있나요?', '매물 주변의 시설과 생활·교통·교육·상권 관련 정보를 바탕으로 정리된 내용을 확인할 수 있습니다. 제공 범위는 매물 위치와 연동 데이터에 따라 달라질 수 있습니다.'],
-  ['만들어진 글과 이미지를 바로 올려도 되나요?', '생성 결과는 초안으로 확인해 주세요. 게시 전 실제 매물 정보, 가격, 면적, 주소 노출 범위, 사진 사용 권한과 광고 표현을 직접 검토해야 합니다.'],
-  ['쇼츠 영상도 완성되나요?', '현재 집포터는 영상 제작에 활용할 장면별 쇼츠 스크립트를 제공합니다. 완성된 영상 파일이 아니라 촬영과 편집 전에 이야기 흐름을 잡는 결과물입니다.'],
+  { question: '무엇만 입력하면 되나요?', answer: '주소와 사진, 매물 특징부터 입력합니다. 가격과 면적처럼 광고에 필요한 사실정보는 주소 확인 뒤 필요한 항목만 묻고, 등록 전에 중개사가 확인합니다.' },
+  { question: '여러 사이트에 한 번에 올라가나요?', answer: '아닙니다. 채널마다 정책과 제휴 방식이 다릅니다. 공개 API 또는 서면 제휴가 확인된 채널만 직접 연동하고, 그 전에는 문구 복사와 사진 다운로드로 직접 등록하시게 됩니다.' },
+  { question: 'AI가 만든 내용을 바로 게시해도 되나요?', answer: '아닙니다. 최종 등록은 중개사가 확인해야 합니다. 가격·면적·주소 공개 범위, 사진 권리와 광고 표현을 검토한 뒤 발행합니다.' },
+  { question: '외부 채널 비밀번호는 어디에 저장되나요?', answer: '웹사이트에는 저장하지 않습니다. 로컬 앱에서 운영체제 보호 저장소를 사용하고 웹에는 연결 상태만 표시하는 방향으로 제공합니다.' },
 ]
 
 const structuredData = {
   '@context': 'https://schema.org',
   '@graph': [
-    {
-      '@type': 'SoftwareApplication',
-      name: BRAND.name,
-      alternateName: BRAND.englishName,
-      applicationCategory: 'BusinessApplication',
-      operatingSystem: 'Web',
-      description: BRAND.description,
-      audience: {
-        '@type': 'Audience',
-        audienceType: '공인중개사',
-      },
-    },
-    {
-      '@type': 'FAQPage',
-      mainEntity: faqs.map(([question, answer]) => ({
-        '@type': 'Question',
-        name: question,
-        acceptedAnswer: {
-          '@type': 'Answer',
-          text: answer,
-        },
-      })),
-    },
+    { '@type': 'SoftwareApplication', name: BRAND.name, alternateName: BRAND.englishName, applicationCategory: 'BusinessApplication', operatingSystem: 'Web, Windows', description: '주소와 사진, 매물 특징을 한 번 입력해 홍보 콘텐츠와 채널별 등록 자료를 준비하는 공인중개사용 서비스', audience: { '@type': 'Audience', audienceType: '공인중개사' } },
+    { '@type': 'FAQPage', mainEntity: faqs.map((item) => ({ '@type': 'Question', name: item.question, acceptedAnswer: { '@type': 'Answer', text: item.answer } })) },
   ],
 }
 
 export default function LandingPage() {
-  return (
-    <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, '\\u003c') }}
-      />
-      <header className="sticky top-0 z-40 border-b border-black/5 bg-[#fbfaf7]/90 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link href="/" className="flex min-h-11 items-center gap-2.5" aria-label={`${BRAND.name} 홈`}>
-            <span className="grid size-9 place-items-center rounded-xl bg-brand-700 text-white shadow-sm">
-              <Building2 size={19} aria-hidden="true" />
-            </span>
-            <span className="text-lg font-bold tracking-[-0.04em]">{BRAND.name}</span>
-          </Link>
-
-          <nav aria-label="랜딩페이지 주요 메뉴" className="hidden items-center gap-8 md:flex">
-            <a href="#results" className="text-sm font-semibold text-slate-600 transition-colors hover:text-brand-700">무엇을 만들어주나요</a>
-            <a href="#how" className="text-sm font-semibold text-slate-600 transition-colors hover:text-brand-700">이용 방법</a>
-            <a href="#faq" className="text-sm font-semibold text-slate-600 transition-colors hover:text-brand-700">자주 묻는 질문</a>
-          </nav>
-
-          <div className="flex items-center gap-2">
-            <Link href="/login" className="inline-flex min-h-11 items-center px-3 text-sm font-semibold text-slate-700 hover:text-brand-700">로그인</Link>
-            <Link href={signupHref} className="hidden min-h-11 items-center gap-1.5 rounded-xl bg-brand-700 px-4 text-sm font-bold text-white shadow-sm transition-colors hover:bg-brand-800 sm:inline-flex">
-              내 매물로 결과 받아보기 <ArrowRight size={15} aria-hidden="true" />
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      <main className="min-h-screen overflow-hidden bg-[#fbfaf7] pb-24 text-[#18302d] md:pb-0">
-
-      <section className="relative">
-        <div className="absolute inset-x-0 top-0 z-0 h-[720px] bg-[radial-gradient(circle_at_80%_15%,rgba(40,125,109,0.14),transparent_36%),radial-gradient(circle_at_12%_40%,rgba(217,235,230,0.7),transparent_32%)]" />
-        <div className="relative z-10 mx-auto grid max-w-7xl gap-14 px-4 pb-20 pt-16 sm:px-6 sm:pt-24 lg:grid-cols-[0.92fr_1.08fr] lg:items-center lg:px-8 lg:pb-28 lg:pt-28">
-          <div>
-            <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-brand-200 bg-white/80 px-3 py-1.5 text-xs font-bold text-brand-800 shadow-sm">
-              <Sparkles size={14} aria-hidden="true" /> 공인중개사를 위한 매물 콘텐츠 자동화
-            </p>
-            <h1 className="max-w-3xl text-[2.65rem] font-bold leading-[1.05] tracking-[-0.055em] text-slate-950 sm:text-6xl lg:text-[4.25rem]">
-              매물 정보는<br />한 번만 입력하세요.
-              <span className="mt-2 block text-brand-700">홍보 초안까지 이어집니다.</span>
-            </h1>
-            <p className="mt-7 max-w-2xl text-base leading-7 text-slate-600 sm:text-lg sm:leading-8">
-              주소, 사진, 가격과 매물의 장점을 입력하면 입지분석, 블로그 글, 카드뉴스, 쇼츠 스크립트를 한곳에서 만들고 확인할 수 있습니다.
-            </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link href={signupHref} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-brand-700 px-6 text-base font-bold text-white shadow-[0_8px_24px_rgba(20,81,71,0.2)] transition-all hover:-translate-y-0.5 hover:bg-brand-800">
-                내 매물로 결과 받아보기 <ArrowRight size={18} aria-hidden="true" />
-              </Link>
-              <a href="#results" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white/80 px-6 text-base font-bold text-slate-700 hover:bg-white">
-                결과물 먼저 보기 <ChevronRight size={18} aria-hidden="true" />
-              </a>
-            </div>
-            <p className="mt-4 text-sm text-slate-500">계정을 만들거나 로그인한 뒤 실제 매물 정보를 입력합니다.</p>
-            <div className="mt-8 flex flex-wrap gap-2" aria-label="집포터 결과물">
-              {outputs.map(({ label }) => <span key={label} className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600">{label}</span>)}
-            </div>
-          </div>
-
-          <LandingDemoVideo />
-        </div>
-      </section>
-
-      <section id="results" className="scroll-mt-24 border-y border-black/5 bg-white py-20 sm:py-28">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <SectionHeading eyebrow="결과물 미리보기" title="매물 하나로, 필요한 홍보 자료를 한곳에서" description="먼저 어떤 결과를 받을 수 있는지 확인해 보세요." />
-          <div className="mt-12 grid gap-5 md:grid-cols-2">
-            {outputs.map(({ icon: Icon, label, title, description, items, sampleTitle, sampleLines, tone }) => (
-              <article key={label} className="group rounded-3xl border border-black/10 bg-[#fbfaf7] p-6 transition-all hover:-translate-y-1 hover:shadow-[0_18px_50px_rgba(19,34,32,0.08)] sm:p-8">
-                <div className={`grid size-12 place-items-center rounded-2xl ${tone}`}><Icon size={23} aria-hidden="true" /></div>
-                <p className="mt-6 text-sm font-bold text-brand-700">{label}</p>
-                <h3 className="mt-2 text-2xl font-bold tracking-[-0.035em] text-slate-950">{title}</h3>
-                <p className="mt-3 leading-7 text-slate-600">{description}</p>
-                <ul className="mt-6 flex flex-wrap gap-2" aria-label={`${label} 주요 구성`}>
-                  {items.map(item => <li key={item} className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600">{item}</li>)}
-                </ul>
-                <div className="mt-6 rounded-2xl border border-brand-100 bg-white p-4" aria-label={`${label} 가상 예시`}>
-                  <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-700">예시 결과</p>
-                  <p className="mt-2 text-sm font-bold text-slate-900">{sampleTitle}</p>
-                  <ul className="mt-2 space-y-1 text-sm leading-6 text-slate-600">
-                    {sampleLines.map(line => <li key={line}>{line}</li>)}
-                  </ul>
-                  <p className="mt-3 text-[11px] font-medium text-slate-600">이해를 돕기 위한 가상 예시이며, 실제 결과는 입력 정보에 따라 달라집니다.</p>
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section id="how" className="scroll-mt-24 py-20 sm:py-28">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <SectionHeading eyebrow="이용 방법" title="주소부터 넣고, 순서대로 따라가세요" description="처음 사용하는 분도 현재 단계와 다음 할 일을 알 수 있도록 매물 단위로 진행합니다." />
-          <ol className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {steps.map(({ icon: Icon, number, title, description }) => (
-              <li key={number} className="relative rounded-3xl border border-black/10 bg-white p-6 shadow-[0_4px_18px_rgba(0,0,0,0.035)]">
-                <div className="flex items-center justify-between">
-                  <span className="grid size-11 place-items-center rounded-2xl bg-brand-50 text-brand-700"><Icon size={21} aria-hidden="true" /></span>
-                  <span className="text-sm font-bold tracking-[0.12em] text-brand-700">{number}</span>
-                </div>
-                <h3 className="mt-8 text-xl font-bold tracking-[-0.03em] text-slate-950">{title}</h3>
-                <p className="mt-3 text-sm leading-6 text-slate-600">{description}</p>
-              </li>
-            ))}
-          </ol>
-          <div className="mt-8 text-center">
-            <Link href={signupHref} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-brand-700 px-6 text-base font-bold text-white hover:bg-brand-800">
-              내 매물로 결과 받아보기 <ArrowRight size={18} aria-hidden="true" />
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-brand-900 py-20 text-white sm:py-28">
-        <div className="mx-auto grid max-w-7xl gap-12 px-4 sm:px-6 lg:grid-cols-[0.8fr_1.2fr] lg:items-center lg:px-8">
-          <div>
-            <p className="text-sm font-bold text-brand-200">안심하고 검토하세요</p>
-            <h2 className="mt-3 text-3xl font-bold leading-tight tracking-[-0.04em] sm:text-5xl">AI가 초안을 만들고,<br />최종 판단은 중개사가 합니다.</h2>
-            <p className="mt-6 max-w-xl leading-7 text-brand-100">집포터는 업무를 돕기 위한 초안을 만듭니다. 고객에게 안내하거나 게시하기 전에 실제 매물 정보와 광고 관련 표현을 확인해 주세요.</p>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {[
-              '생성 결과를 화면에서 확인합니다.',
-              '실제 매물과 다른 표현은 수정합니다.',
-              '상세 주소와 개인정보 노출을 점검합니다.',
-              '게시 전 관련 기준과 표현을 확인합니다.',
-            ].map(item => (
-              <div key={item} className="flex gap-3 rounded-2xl border border-white/10 bg-white/5 p-5">
-                <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-brand-400 text-brand-900"><Check size={15} strokeWidth={3} aria-hidden="true" /></span>
-                <p className="text-sm font-semibold leading-6 text-white/90">{item}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-white py-20 sm:py-28">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-10 rounded-[2rem] bg-[#f3f0e8] p-7 sm:p-12 lg:grid-cols-2 lg:items-center">
-            <div>
-              <p className="text-sm font-bold text-brand-700">이런 중개사무소에 맞습니다</p>
-              <h2 className="mt-3 text-3xl font-bold tracking-[-0.04em] text-slate-950 sm:text-4xl">반복되는 매물 홍보를<br />한 흐름으로 정리하세요.</h2>
-            </div>
-            <ul className="space-y-4">
-              {[
-                '매물 홍보를 직접 챙기지만 글쓰기와 디자인이 부담스러운 곳',
-                '한 매물을 블로그와 SNS에 맞게 다시 정리해야 하는 곳',
-                '담당자가 바뀌어도 매물별 자료를 한곳에서 이어서 보고 싶은 곳',
-                '새로운 도구를 오래 배우기보다 실제 매물로 시작하고 싶은 곳',
-              ].map(item => <li key={item} className="flex gap-3 text-sm font-semibold leading-6 text-slate-700"><Check className="mt-0.5 shrink-0 text-brand-700" size={19} aria-hidden="true" />{item}</li>)}
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      <section id="faq" className="scroll-mt-24 py-20 sm:py-28">
-        <div className="mx-auto max-w-3xl px-4 sm:px-6">
-          <SectionHeading eyebrow="FAQ" title="자주 묻는 질문" description="시작하기 전에 궁금한 내용을 확인해 보세요." centered />
-          <div className="mt-10 divide-y divide-slate-200 border-y border-slate-200">
-            {faqs.map(([question, answer]) => (
-              <details key={question} className="group py-1">
-                <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 py-4 text-base font-bold text-slate-900 marker:content-none">
-                  {question}
-                  <span className="grid size-8 shrink-0 place-items-center rounded-full bg-white text-brand-700 transition-transform group-open:rotate-90"><ChevronRight size={18} aria-hidden="true" /></span>
-                </summary>
-                <p className="max-w-2xl pb-6 pr-10 text-sm leading-7 text-slate-600">{answer}</p>
-              </details>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="px-4 pb-20 sm:px-6 sm:pb-28 lg:px-8">
-        <div className="mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-brand-700 px-6 py-14 text-center text-white shadow-[0_24px_70px_rgba(20,81,71,0.22)] sm:px-12 sm:py-20">
-          <MessageSquareText className="mx-auto text-brand-200" size={36} aria-hidden="true" />
-          <h2 className="mx-auto mt-5 max-w-3xl text-3xl font-bold leading-tight tracking-[-0.045em] sm:text-5xl">다음 매물 홍보는,<br />빈 문서가 아니라 매물 정보에서 시작하세요.</h2>
-          <p className="mx-auto mt-5 max-w-2xl leading-7 text-brand-100">실제 매물을 등록하고 입지분석, 블로그, 카드뉴스, 쇼츠 스크립트 결과를 확인해 보세요.</p>
-          <Link href={signupHref} className="mt-8 inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-white px-6 text-base font-bold text-brand-800 hover:bg-brand-50">
-            내 매물로 결과 받아보기 <ArrowRight size={18} aria-hidden="true" />
-          </Link>
-        </div>
-      </section>
-
-      </main>
-
-      <footer className="border-t border-black/5 bg-white pb-24 text-[#18302d] md:pb-0">
-        <div className="mx-auto flex max-w-7xl flex-col gap-7 px-4 py-10 sm:px-6 md:flex-row md:items-end md:justify-between lg:px-8">
-          <div>
-            <div className="flex items-center gap-2 font-bold text-slate-950"><Building2 className="text-brand-700" size={20} aria-hidden="true" />{BRAND.name}</div>
-            <p className="mt-3 max-w-md text-sm leading-6 text-slate-500">공인중개사의 매물 분석과 홍보 콘텐츠 작성을 돕는 업무 도구</p>
-          </div>
-          <div className="flex flex-wrap gap-x-5 gap-y-3 text-sm font-semibold text-slate-600">
-            <Link href="/login" className="hover:text-brand-700">로그인</Link>
-            <Link href="/terms" className="hover:text-brand-700">이용약관</Link>
-            <Link href="/privacy" className="hover:text-brand-700">개인정보처리방침</Link>
-          </div>
-        </div>
-        <div className="border-t border-slate-100 px-4 py-5 text-center text-xs leading-5 text-slate-500">생성된 분석과 콘텐츠는 참고용 초안이며, 사용 전 실제 매물 정보와 관련 기준을 확인해야 합니다.</div>
-      </footer>
-
-      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-black/10 bg-white/95 p-3 text-[#18302d] backdrop-blur md:hidden">
-        <Link href={signupHref} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand-700 px-5 text-sm font-bold text-white shadow-lg">
-          내 매물로 결과 받아보기 <ArrowRight size={17} aria-hidden="true" />
-        </Link>
+  return <>
+    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, '\\u003c') }} />
+    <header className="sticky top-0 z-40 border-b border-black/5 bg-[#fbfaf7]/90 backdrop-blur-xl">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <Link href="/" className="flex min-h-11 items-center gap-2.5" aria-label="집포터 홈"><span className="grid size-9 place-items-center rounded-xl bg-brand-700 text-white"><Building2 size={19} /></span><span className="text-lg font-bold tracking-[-0.04em]">집포터</span></Link>
+        <nav aria-label="랜딩페이지 주요 메뉴" className="hidden items-center gap-7 md:flex"><a href="#how" className="text-sm font-semibold text-slate-600 hover:text-brand-700">이용 방법</a><a href="#channels" className="text-sm font-semibold text-slate-600 hover:text-brand-700">채널 준비</a><a href="#faq" className="text-sm font-semibold text-slate-600 hover:text-brand-700">자주 묻는 질문</a></nav>
+        <div className="flex items-center gap-2"><Link href="/login" className="inline-flex min-h-11 items-center px-3 text-sm font-semibold text-slate-700">로그인</Link><Link href={signupHref} className="hidden min-h-11 items-center gap-1.5 rounded-xl bg-brand-700 px-4 text-sm font-bold text-white sm:inline-flex">{primaryCta}<ArrowRight size={15} /></Link></div>
       </div>
-    </>
-  )
+    </header>
+
+    <main className="min-h-screen overflow-hidden bg-[#fbfaf7] pb-24 text-[#18302d] [word-break:keep-all] md:pb-0">
+      <section className="relative">
+        <div className="absolute inset-x-0 top-0 h-[680px] bg-[radial-gradient(circle_at_80%_15%,rgba(40,125,109,0.14),transparent_36%),radial-gradient(circle_at_12%_40%,rgba(217,235,230,0.7),transparent_32%)]" />
+        <div className="relative mx-auto flex max-w-7xl flex-col gap-7 px-4 pb-20 pt-10 sm:px-6 sm:pt-20 lg:grid lg:grid-cols-[0.9fr_1.1fr] lg:gap-14 lg:px-8 lg:pb-28 lg:pt-28 lg:items-center">
+          <div className="order-1 lg:order-none">
+            <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-brand-200 bg-white/80 px-3 py-1.5 text-xs font-bold text-brand-800"><Sparkles size={14} /> 공인중개사를 위한 매물 마케팅 작업실</p>
+            <h1 className="max-w-3xl text-[2.1rem] font-bold leading-[1.15] tracking-[-0.045em] text-slate-950 sm:text-5xl lg:text-[3.6rem]">주소·사진·특징만 넣으세요.<span className="mt-1.5 block text-brand-700">홍보와 등록 준비가 이어집니다.</span></h1>
+            <p className="mt-4 max-w-xl text-[0.95rem] leading-6 text-slate-600 sm:mt-7 sm:text-lg sm:leading-8">매물 정보는 한 번만 입력하세요. 블로그 글과 카드뉴스를 만들고, 중개사가 최종 검토한 뒤 채널별 발행 준비까지 한곳에서 진행합니다.</p>
+            <div className="mt-6 hidden flex-col gap-3 sm:flex sm:flex-row"><Link href={signupHref} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-brand-700 px-6 text-base font-bold text-white shadow-[0_8px_24px_rgba(20,81,71,0.2)] hover:bg-brand-800">{primaryCta}<ArrowRight size={18} /></Link><a href="#how" className="inline-flex min-h-12 items-center justify-center rounded-xl border border-slate-300 bg-white/80 px-6 text-base font-bold text-slate-700">4단계 흐름 보기</a></div>
+            <p className="mt-3 hidden text-sm font-medium text-slate-600 sm:block">회원가입 후 바로 매물 입력 화면으로 이동합니다.</p>
+            <div className="mt-6 hidden flex-wrap gap-2 sm:flex" aria-label="핵심 결과물">{['입지분석', '블로그 글', '카드뉴스', '채널 등록 자료'].map((label) => <span key={label} className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600">{label}</span>)}</div>
+          </div>
+          <div className="order-2 lg:order-none"><LandingDemoVideo /></div>
+          <div className="order-3 sm:hidden">
+            <a href="#how" className="flex min-h-12 items-center justify-center rounded-xl border border-slate-300 bg-white/80 px-6 text-base font-bold text-slate-700">4단계 흐름 보기</a>
+            <p className="mt-3 text-sm font-medium text-slate-600">아래 고정 버튼으로 가입하면 바로 매물 입력 화면으로 이동합니다.</p>
+            <div className="mt-5 flex flex-wrap gap-2" aria-label="핵심 결과물 요약">{['입지분석', '블로그 글', '카드뉴스', '채널 등록 자료'].map((label) => <span key={label} className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600">{label}</span>)}</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="how" className="scroll-mt-24 border-y border-black/5 bg-white py-20 sm:py-24">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8"><p className="text-sm font-bold text-brand-700">복잡한 메뉴 대신 한 가지 흐름</p><h2 className="mt-3 text-3xl font-bold tracking-[-0.045em] text-slate-950 sm:text-5xl">한 번 입력하고, 확인하고, 준비하세요</h2>
+          <ol className="mt-10 grid list-none gap-4 md:grid-cols-4">{workflow.map((item) => <li key={item.number} className="rounded-2xl border border-slate-200 bg-[#fbfaf7] p-6"><span className="text-sm font-black text-brand-700">{item.number}</span><h3 className="mt-4 text-xl font-bold text-slate-950">{item.title}</h3><p className="mt-2 text-sm leading-6 text-slate-600">{item.description}</p></li>)}</ol>
+        </div>
+      </section>
+
+      <section id="results" className="py-20 sm:py-24">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8"><p className="text-sm font-bold text-brand-700">한 매물에서 함께 준비되는 결과</p><h2 className="mt-3 text-3xl font-bold tracking-[-0.045em] text-slate-950 sm:text-5xl">매물 하나로, 필요한 홍보 자료를 한곳에서</h2>
+          <div className="mt-10 grid gap-5 md:grid-cols-2">{outputs.map(({ icon: Icon, title, description }) => <article key={title} className="rounded-3xl border border-black/10 bg-white p-6 sm:p-8"><div className="flex items-start justify-between gap-4"><span className="grid size-11 place-items-center rounded-xl bg-brand-50 text-brand-800"><Icon size={22} /></span><span className="text-xs font-bold text-brand-700">예시 결과</span></div><h3 className="mt-5 text-2xl font-bold text-slate-950">{title}</h3><p className="mt-3 leading-7 text-slate-600">{description}</p></article>)}</div>
+        </div>
+      </section>
+
+      <section id="channels" className="scroll-mt-24 bg-[#173b35] py-20 text-white sm:py-24">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8"><div className="grid gap-8 lg:grid-cols-[0.72fr_1.28fr]">
+          <div><p className="text-sm font-bold text-brand-200">채널 정책에 맞춘 발행 준비</p><h2 className="mt-3 text-3xl font-bold tracking-[-0.045em] sm:text-5xl">채널마다 가능한 방식으로 준비합니다</h2><p className="mt-5 leading-7 text-emerald-50/80">연동 전에는 문구를 복사하고 사진을 내려받아 공식 등록화면에서 직접 등록합니다. 공식 API 또는 서면 제휴가 확인된 채널만 직접 발행으로 전환합니다.</p><div className="mt-7 flex items-start gap-3 rounded-2xl border border-white/15 bg-white/10 p-4"><ShieldCheck className="mt-0.5 shrink-0 text-brand-200" size={21} /><p className="text-sm leading-6 text-emerald-50">최종 등록은 중개사가 확인합니다. 채널 보호조치를 우회하는 방식은 쓰지 않습니다.</p></div></div>
+          <div className="space-y-3">{channels.map((channel) => <article key={channel.name} className="flex flex-col gap-3 rounded-2xl border border-white/15 bg-white/10 p-5 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-bold">{channel.name}</h3><p className="mt-1 text-sm font-semibold leading-6 text-brand-100">오늘 할 일 · {channel.todo}</p><p className="mt-1 text-sm leading-6 text-emerald-50/70">{channel.detail}</p></div><span className="w-fit shrink-0 rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-800">{channel.status}</span></article>)}</div>
+        </div></div>
+      </section>
+
+      <section className="bg-white py-20 sm:py-24"><div className="mx-auto grid max-w-5xl gap-8 px-4 sm:px-6 lg:grid-cols-2 lg:px-8"><div className="rounded-3xl border border-slate-200 p-7"><FileArchive className="text-brand-700" /><h2 className="mt-4 text-2xl font-bold text-slate-950">채널 계정은 웹에 저장하지 않습니다</h2><p className="mt-3 leading-7 text-slate-600">로컬 앱에서 운영체제 보호 저장소를 사용하고, 웹에는 연결 여부만 보여주는 구조로 준비하고 있습니다.</p></div><div className="rounded-3xl border border-brand-200 bg-brand-50 p-7"><Check className="text-brand-700" /><h2 className="mt-4 text-2xl font-bold text-slate-950">초안과 사실을 구분합니다</h2><p className="mt-3 leading-7 text-slate-600">AI 결과는 출발점입니다. 실제 매물 조건과 법정 표시사항은 중개사가 확인한 뒤 발행합니다.</p></div></div></section>
+
+      <section id="faq" className="scroll-mt-24 py-20 sm:py-24"><div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8"><h2 className="text-3xl font-bold tracking-[-0.045em] text-slate-950 sm:text-5xl">자주 묻는 질문</h2><div className="mt-10 divide-y divide-slate-200 border-y border-slate-200">{faqs.map((item, index) => <details key={item.question} className="group py-5" open={index === 0}><summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-lg font-bold text-slate-950"><span>{item.question}</span><span aria-hidden="true" className="text-2xl font-normal text-brand-700 group-open:rotate-45">+</span></summary><p className="mt-3 max-w-3xl leading-7 text-slate-600">{item.answer}</p></details>)}</div></div></section>
+
+      <section className="mx-4 mb-12 rounded-[2rem] bg-brand-700 px-6 py-12 text-center text-white sm:mx-6 sm:py-16 lg:mx-auto lg:max-w-7xl"><h2 className="text-3xl font-bold tracking-[-0.04em] sm:text-5xl">첫 매물부터 흐름을 확인해 보세요</h2><p className="mx-auto mt-4 max-w-2xl leading-7 text-brand-100">주소와 사진, 매물 특징을 한 번 입력하는 데서 시작합니다.</p><Link href={signupHref} className="mt-7 inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-white px-6 font-bold text-brand-900">{primaryCta}<ArrowRight size={18} /></Link></section>
+    </main>
+
+    <footer className="border-t border-slate-200 bg-white pb-24 pt-8 md:py-8"><div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 text-sm text-slate-500 sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8"><p><span className="font-bold text-slate-900">집포터</span> · 공인중개사의 매물 마케팅 작업실</p><p>생성된 분석과 콘텐츠는 참고용 초안이며, 게시 전 실제 매물 정보를 확인해야 합니다.</p></div></footer>
+    <div className="fixed inset-x-0 bottom-0 z-50 border-t border-black/10 bg-white/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:hidden"><Link href={signupHref} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-brand-700 font-bold text-white">{primaryCta}<ArrowRight size={18} /></Link></div>
+  </>
 }
-
-function SectionHeading({ eyebrow, title, description, centered = false }: { eyebrow: string; title: string; description: string; centered?: boolean }) {
-  return (
-    <div className={centered ? 'text-center' : ''}>
-      <p className="text-sm font-bold text-brand-700">{eyebrow}</p>
-      <h2 className="mt-3 text-3xl font-bold leading-tight tracking-[-0.045em] text-slate-950 sm:text-5xl">{title}</h2>
-      <p className={`mt-4 text-base leading-7 text-slate-600 ${centered ? 'mx-auto max-w-2xl' : 'max-w-2xl'}`}>{description}</p>
-    </div>
-  )
-}
-
-

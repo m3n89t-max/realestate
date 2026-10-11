@@ -1,16 +1,6 @@
 @echo off
 chcp 65001 >nul
-echo ==============================================
-echo JIPPORTER - Local Agent Setup
-echo 집포터 로컬 에이전트
-echo ==============================================
-echo 1. Creating necessary local directories...
-mkdir "%APPDATA%\RealEstateAIOS" 2>nul
-
-echo 2. Installing dependencies...
-npm install
-
-echo 3. Starting Local Agent Worker...
-echo (You can close this window to stop the agent)
-npm run agent:start
-pause
+echo.
+echo [집포터] 이 설치 경로는 보안상의 이유로 폐기되었습니다.
+echo 검증된 RealEstateAgent.exe 설치파일만 사용해 주세요.
+exit /b 1

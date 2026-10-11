@@ -1,9 +1,19 @@
-import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage } from 'electron';
+import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, type IpcMainInvokeEvent } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import zlib from 'zlib';
+import { pathToFileURL } from 'url';
 import { AGENT_BRAND } from './brand';
+import {
+    deletePlatformCredential,
+    getCredentialStatus,
+    migrateLegacyCredentials,
+    saveAgentKey,
+    savePlatformCredentials,
+    type PlatformCredential,
+    type PlatformKey,
+} from './credential-store';
 
 // Node.js 내장 zlib로 16x16 파란색 PNG 버퍼 생성 (외부 파일 불필요)
 function createIconBuffer(): Buffer {
@@ -41,9 +51,39 @@ function createIconBuffer(): Buffer {
 
 let mainWindow: BrowserWindow | null;
 let tray: Tray | null;
+let agentStarted = false;
 
 const CONFIG_DIR = path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'RealEstateAIOS');
 const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
+
+interface BootstrapConfig {
+    supabase_url: string;
+    supabase_anon_key: string;
+}
+
+function loadBootstrapConfig(): BootstrapConfig {
+    const bootstrapPath = path.join(__dirname, 'bootstrap.json');
+    const raw = fs.existsSync(bootstrapPath)
+        ? JSON.parse(fs.readFileSync(bootstrapPath, 'utf8'))
+        : {
+            supabase_url: process.env.AGENT_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL,
+            supabase_anon_key: process.env.AGENT_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+        };
+    const url = typeof raw.supabase_url === 'string' ? raw.supabase_url : '';
+    const anonKey = typeof raw.supabase_anon_key === 'string' ? raw.supabase_anon_key : '';
+    if (!url || !anonKey || anonKey.length < 20 || anonKey.includes('...')) {
+        throw new Error('설치파일의 서버 연결 설정이 유효하지 않습니다.');
+    }
+    if (new URL(url).protocol !== 'https:') throw new Error('서버 주소는 HTTPS만 사용할 수 있습니다.');
+    return { supabase_url: url, supabase_anon_key: anonKey };
+}
+
+function assertTrustedSender(event: IpcMainInvokeEvent): void {
+    const expectedUrl = pathToFileURL(path.join(__dirname, 'setup.html')).toString();
+    if (!mainWindow || event.sender !== mainWindow.webContents || event.senderFrame !== event.sender.mainFrame || event.senderFrame?.url !== expectedUrl) {
+        throw new Error('허용되지 않은 설정 화면 요청입니다.');
+    }
+}
 
 function hasConfig(): boolean {
     if (!fs.existsSync(CONFIG_PATH)) return false;
@@ -56,64 +96,78 @@ function hasConfig(): boolean {
 }
 
 // ─── IPC: 설정 저장 ───────────────────────────────────────────
-ipcMain.handle('save-config', (_event, data: { url: string; anon_key: string; agent_name: string; agent_key: string }) => {
+ipcMain.handle('save-config', (event, data: { agent_name: string; agent_key: string }) => {
     try {
+        assertTrustedSender(event);
+        if (!data.agent_key?.trim()) throw new Error('연결 정보가 필요합니다.');
+        const bootstrap = loadBootstrapConfig();
         if (!fs.existsSync(CONFIG_DIR)) fs.mkdirSync(CONFIG_DIR, { recursive: true });
         const config = {
-            supabase_url: data.url,
-            supabase_anon_key: data.anon_key,
-            agent_key: data.agent_key,
-            webhook_url: `${data.url}/functions/v1/webhook-agent`,
+            supabase_url: bootstrap.supabase_url,
+            supabase_anon_key: bootstrap.supabase_anon_key,
+            webhook_url: `${bootstrap.supabase_url}/functions/v1/webhook-agent`,
             agent_name: data.agent_name || `Agent-${os.hostname()}`,
             version: '1.0.0',
         };
-        fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+        saveAgentKey(data.agent_key);
+        fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), { encoding: 'utf8', mode: 0o600 });
         return { ok: true };
     } catch (e: any) {
         return { ok: false, error: e.message };
     }
 });
 
-// ─── IPC: SNS 자격증명 저장 ──────────────────────────────────
-ipcMain.handle('save-credentials', (_event, data: {
-    naver?: { id?: string; pw?: string };
-    google?: { email?: string; pw?: string };
-    instagram?: { id?: string; pw?: string };
-}) => {
+// ─── IPC: OS 암호화 자격증명 저장 ─────────────────────────────
+ipcMain.handle('save-credentials', (event, data: Partial<Record<PlatformKey, PlatformCredential>>) => {
     try {
-        if (!fs.existsSync(CONFIG_DIR)) fs.mkdirSync(CONFIG_DIR, { recursive: true });
-        const credPath = path.join(CONFIG_DIR, 'credentials.json');
-        // 기존 데이터 유지하며 병합
-        let existing: Record<string, any> = {};
-        if (fs.existsSync(credPath)) {
-            try { existing = JSON.parse(fs.readFileSync(credPath, 'utf-8')); } catch { }
-        }
-        const merged = { ...existing };
-        if (data.naver?.id || data.naver?.pw) merged.naver = data.naver;
-        if (data.google?.email || data.google?.pw) merged.google = data.google;
-        if (data.instagram?.id || data.instagram?.pw) merged.instagram = data.instagram;
-        fs.writeFileSync(credPath, JSON.stringify(merged, null, 2));
+        assertTrustedSender(event);
+        savePlatformCredentials(data);
         return { ok: true };
     } catch (e: any) {
         return { ok: false, error: e.message };
+    }
+});
+
+ipcMain.handle('credential-status', (event) => {
+    assertTrustedSender(event);
+    return getCredentialStatus();
+});
+ipcMain.handle('delete-credential', (event, platform: PlatformKey) => {
+    try {
+        assertTrustedSender(event);
+        deletePlatformCredential(platform);
+        return { ok: true };
+    } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : '삭제에 실패했습니다.' };
     }
 });
 
 // ─── IPC: 설정 완료 → 에이전트 시작 ─────────────────────────
-ipcMain.handle('config-saved', async () => {
-    mainWindow?.close();
-    await startAgent();
-    createTray();
-    // UI 서버 기동 대기 후 메인 창 오픈
-    setTimeout(() => showMainUI(), 2000);
+ipcMain.handle('config-saved', async (event) => {
+    try {
+        assertTrustedSender(event);
+        if (!agentStarted) {
+            const started = await startAgent();
+            if (!started.ok) return started;
+        }
+        if (!tray) createTray();
+        mainWindow?.close();
+        return { ok: true };
+    } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : '에이전트를 시작하지 못했습니다.' };
+    }
 });
 
-async function startAgent() {
+async function startAgent(): Promise<{ ok: boolean; error?: string }> {
+    if (agentStarted) return { ok: true };
     try {
         const { agent } = await import('./worker');
         await agent.start();
+        agentStarted = true;
+        return { ok: true };
     } catch (err) {
         console.error('[Agent] 치명적 오류:', err);
+        return { ok: false, error: err instanceof Error ? err.message : '에이전트 시작에 실패했습니다.' };
     }
 }
 
@@ -135,7 +189,7 @@ const createTray = () => {
                 if (mainWindow) {
                     mainWindow.show();
                 } else {
-                    showMainUI();
+                    showSetupWindow();
                 }
             }
         },
@@ -155,30 +209,20 @@ const showSetupWindow = () => {
         height: 620,
         resizable: false,
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false,
+            nodeIntegration: false,
+            contextIsolation: true,
+            sandbox: true,
+            preload: path.join(__dirname, 'preload.js'),
         },
         title: `${AGENT_BRAND.localAgentName} 초기 설정`,
     });
     mainWindow.loadFile(path.join(__dirname, 'setup.html'));
-    mainWindow.on('closed', () => { mainWindow = null; });
-};
-
-const showMainUI = () => {
-    mainWindow = new BrowserWindow({
-        width: 650,
-        height: 800,
-        webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false,
-        },
+    mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    mainWindow.webContents.on('will-navigate', (event, url) => {
+        const expectedUrl = pathToFileURL(path.join(__dirname, 'setup.html')).toString();
+        if (url !== expectedUrl) event.preventDefault();
     });
-    mainWindow.loadURL('http://localhost:3005');
     mainWindow.on('closed', () => { mainWindow = null; });
-    ; (mainWindow as any).on('minimize', (event: any) => {
-        event.preventDefault();
-        mainWindow?.hide();
-    });
 };
 
 // exe 중복 실행 시 기존 창 포커스
@@ -188,19 +232,42 @@ if (!gotLock) {
 } else {
     app.on('second-instance', () => {
         if (mainWindow) { mainWindow.show(); mainWindow.focus(); }
-        else showMainUI();
+        else showSetupWindow();
     });
 }
 
+function migrateLegacySecrets() {
+    if (fs.existsSync(CONFIG_PATH)) {
+        const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
+        if (typeof config.agent_key === 'string' && config.agent_key) {
+            saveAgentKey(config.agent_key);
+            delete config.agent_key;
+            fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), { encoding: 'utf8', mode: 0o600 });
+        }
+    }
+    migrateLegacyCredentials();
+}
+
 app.on('ready', async () => {
+    try {
+        migrateLegacySecrets();
+    } catch {
+        console.error('[Security] 기존 로그인정보를 안전하게 이전하지 못했습니다. 설정 화면에서 다시 저장해 주세요.');
+        showSetupWindow();
+        return;
+    }
     if (!hasConfig()) {
         // 최초 실행: 설정 화면 표시
         showSetupWindow();
     } else {
-        // 설정 있음: 바로 시작
-        await startAgent();
-        createTray();
-        setTimeout(() => showMainUI(), 2000);
+        // 설정 있음: 시작 성공 시에만 트레이로 전환하고, 실패하면 설정 화면으로 복귀
+        const started = await startAgent();
+        if (started.ok) {
+            createTray();
+        } else {
+            console.error('[Agent] 시작 실패:', started.error);
+            showSetupWindow();
+        }
     }
 });
 

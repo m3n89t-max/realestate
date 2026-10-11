@@ -1,9 +1,9 @@
 const { createClient } = require('@supabase/supabase-js');
 
-const agentKey = 'agent-3b89b0c7-a170-4ea8-b8f9-27add6a50770';
+const agentKey = process.env.AGENT_KEY || '';
 const supabase = createClient(
     "https://mlluhuiwtsjndkztomjx.supabase.co",
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1sbHVodWl3dHNqbmRrenRvbWp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkxMjUxMzcsImV4cCI6MjA4NDcwMTEzN30.zExaSeZL3TnlBHfE6TnWQm-Za3VVjkHqYLKAGfQlTog",
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
     {
         global: {
             headers: {

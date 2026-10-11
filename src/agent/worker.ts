@@ -10,10 +10,8 @@ import {
 } from './webhook-client';
 import { downloadBuildingRegister } from './playwright/building_register';
 import { downloadCadastralMap } from './playwright/cadastral_map';
-import { uploadNaverBlog } from './playwright/naver_upload';
-import { uploadYoutube } from './playwright/youtube_upload';
-import { uploadInstagram } from './playwright/instagram_upload';
-import { startUIServer } from './ui/server';
+
+
 import { AGENT_BRAND } from './brand';
 import fs from 'fs';
 import path from 'path';
@@ -37,12 +35,7 @@ const AGENT_TASK_TYPES = [
     'building_register',
     'download_building_register',
     'download_cadastral_map',
-    'naver_upload',
-    'upload_naver_blog',
-    'youtube_upload',
-    'upload_youtube',
-    'instagram_upload',
-    'upload_instagram',
+
     'poi_analysis',
     'location_analysis',
     'commercial_analysis',
@@ -114,9 +107,6 @@ class LocalAgent {
         // 5. 정기 폴링 시작 (Realtime과 병행하여 안전성 확보)
         this.startFallbackPolling();
 
-        // 6. 로컬 UI 설정 서버 시작
-        startUIServer();
-
         console.log('[Agent] 에이전트가 정상 가동되었습니다. 작업 대기 중...');
     }
 
@@ -127,33 +117,21 @@ class LocalAgent {
         console.log('[Agent] agent_key 검증 중...');
 
         if (!this.config.agent_key) {
-            console.warn('[Agent] agent_key 미설정. DB 직접 폴링 모드로 동작합니다.');
-            // agent_key 없는 경우 service role key로 직접 DB 접근 (개발 모드)
-            this.startFallbackPolling();
-            return;
+            throw new Error('에이전트 연결키가 없습니다. 설정 화면에서 연결키를 다시 입력해 주세요.');
         }
 
-        try {
-            const res = await sendHeartbeat(this.config, 'online');
-            if (res?.error) {
-                throw new Error(res.error);
-            }
-            log('[Agent] ✅ agent_key 검증 완료');
-
-            // org_id & agent_id는 heartbeat 응답에서 직접 추출 (RLS 우회)
-            if (res?.org_id) {
-                this.orgId = res.org_id;
-                this.agentConnectionId = res.agent_id ?? '';
-                log(`[Agent] org_id: ${this.orgId}`);
-            } else {
-                log('[Agent] heartbeat 응답에 org_id 없음. 폴백 폴링 모드.');
-                this.startFallbackPolling();
-            }
-        } catch (err: any) {
-            log(`[Agent] 검증 실패: ${err.message}`);
-            log('[Agent] 폴백 폴링 모드로 전환합니다.');
-            this.startFallbackPolling();
+        const res = await sendHeartbeat(this.config, 'online');
+        if (res?.error) {
+            throw new Error(`연결키 검증 실패: ${res.error}`);
         }
+        if (!res?.org_id) {
+            throw new Error('연결키 검증 응답에 조직 정보가 없습니다. 연결키를 다시 확인해 주세요.');
+        }
+
+        this.orgId = res.org_id;
+        this.agentConnectionId = res.agent_id ?? '';
+        log('[Agent] ✅ agent_key 검증 완료');
+        log(`[Agent] org_id: ${this.orgId}`);
     }
 
     // ============================================================
@@ -347,26 +325,6 @@ class LocalAgent {
                     result = await downloadCadastralMap(task, this.config);
                     break;
 
-                case 'naver_upload':
-                case 'upload_naver_blog': {
-                    const checkCancelled = async () => {
-                        const { data } = await this.supabase
-                            .from('tasks').select('status').eq('id', task.id).single();
-                        return data?.status === 'cancelled';
-                    };
-                    result = await uploadNaverBlog(task, this.config, checkCancelled);
-                    break;
-                }
-
-                case 'youtube_upload':
-                case 'upload_youtube':
-                    result = await uploadYoutube(task, this.config);
-                    break;
-
-                case 'instagram_upload':
-                case 'upload_instagram':
-                    result = await uploadInstagram(task, this.config);
-                    break;
 
                 // TEAM 4: Content Engine & Automation Skeleton
                 case 'poi_analysis':
