@@ -19,6 +19,7 @@ import ProjectActions from './components/ProjectActions'
 import PhotoGallery from './components/PhotoGallery'
 import AnalysisTab from './components/AnalysisTab'
 import PackageTab from './components/PackageTab'
+import ChannelsTab from './components/ChannelsTab'
 import ProjectEditForm from './components/ProjectEditForm'
 
 interface Params {
@@ -33,6 +34,7 @@ const TABS = [
   { id: 'blog', label: '블로그 글' },
   { id: 'shorts', label: '쇼츠' },
   { id: 'package', label: '패키지' },
+  { id: 'channels', label: '채널 준비' },
   { id: 'tasks', label: '작업 현황' },
 ]
 
@@ -84,6 +86,35 @@ export default async function ProjectDetailPage({
   const blogContents = contents?.filter(c => c.type === 'blog') ?? []
   const cardNewsContents = contents?.filter(c => c.type === 'card_news') ?? []
   const shortsContents = contents?.filter(c => c.type === 'video_script') ?? []
+
+  // 채널 준비 탭에 넘길 사실값. 없는 값은 빈 문자열로 두고 formatPrice 의
+  // '미입력' 표기를 등록 문구에 섞지 않는다(채널 등록화면에 그 글자가 들어가면 안 된다).
+  const channelPriceText = project.transaction_type === 'rent'
+    ? (project.deposit && project.monthly_rent ? `보증금 ${formatPrice(project.deposit)} / 월 ${formatPrice(project.monthly_rent)}` : '')
+    : project.transaction_type === 'lease'
+      ? (project.deposit ? formatPrice(project.deposit) : '')
+      : (project.price ? formatPrice(project.price) : '')
+
+  // 검토를 마친(is_published) 콘텐츠만 채널 등록 문구에 쓴다.
+  const approvedBlog = blogContents.find(c => c.is_published)
+  const approvedCard = cardNewsContents.find(c => c.is_published)
+
+  const photoUrls = (assets ?? [])
+    .filter(a => a.type !== 'video' && typeof a.file_url === 'string')
+    .map(a => a.file_url as string)
+
+  const channelListing = {
+    address: project.address ?? '',
+    propertyTypeLabel: getPropertyTypeLabel(project.property_type ?? ''),
+    transactionTypeLabel: project.transaction_type === 'rent' ? '월세'
+      : project.transaction_type === 'lease' ? '전세' : '매매',
+    priceText: channelPriceText,
+    areaText: project.area ? formatArea(project.area) : '',
+    features: (project.features ?? []) as string[],
+    photoCount: photoUrls.length,
+    blogBody: approvedBlog?.content ?? '',
+    cardNewsTitle: approvedCard?.title ?? '',
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -292,6 +323,10 @@ export default async function ProjectDetailPage({
 
       {tab === 'shorts' && (
         <ShortsTab projectId={id} project={project} assets={assets ?? []} contents={shortsContents} />
+      )}
+
+      {tab === 'channels' && (
+        <ChannelsTab listing={channelListing} photoUrls={photoUrls} />
       )}
 
       {tab === 'tasks' && (
