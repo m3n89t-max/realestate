@@ -114,6 +114,24 @@ export function validateManInput(value: string | null | undefined, label: string
   return undefined
 }
 
+export interface MinimalEntry {
+  address: string
+  features: string[]
+}
+
+/**
+ * 최소 입력 검증. 주소만 필수다.
+ *
+ * 사진과 특징은 비워 두고 나중에 채울 수 있다. 가격·면적·매물종류는
+ * 광고에 필요한 사실정보이므로 첫 입력이 아니라 검토 전 단계에서 묻는다
+ * (모르는 값을 0이나 임의값으로 저장하지 않기 위함).
+ */
+export function validateMinimalEntry(values: MinimalEntry): Record<string, string> {
+  const errors: Record<string, string> = {}
+  if (!values.address.trim()) errors.address = '주소를 입력해 주세요.'
+  return errors
+}
+
 export function validatePropertyBasics(values: PropertyBasics): Record<string, string> {
   const errors: Record<string, string> = {}
   if (!values.address.trim()) errors.address = '주소를 입력해 주세요.'
