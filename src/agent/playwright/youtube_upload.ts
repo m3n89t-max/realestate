@@ -172,54 +172,13 @@ export async function uploadYoutube(
             }
         }
 
-        // ---- 공개 설정 → 공개 선택 ----
-        const publicRadio = page.locator('tp-yt-paper-radio-button[name="PUBLIC"], #public-button').first();
-        if (await publicRadio.count() > 0) {
-            await publicRadio.click();
-        }
-
-        await progress(config, task.id, '업로드 처리 완료 대기...', 85);
-
-        // 업로드 처리 완료 대기 (최대 5분)
-        await page.waitForTimeout(10_000);
-
-        // ---- 게시 버튼 ----
-        await progress(config, task.id, '동영상 게시 중...', 90);
-
-        const publishBtn = page.locator('#done-button, button:has-text("게시"), ytcp-button:has-text("게시")').first();
-        if (await publishBtn.count() > 0) {
-            await publishBtn.click();
-            await page.waitForTimeout(5000);
-        }
-
-        // ---- 게시 URL 확보 ----
-        await progress(config, task.id, '게시 URL 확인 중...', 95);
-
-        // 게시 완료 다이얼로그에서 URL 추출
-        const videoLink = page.locator('a[href*="youtu.be"], a[href*="youtube.com/video"], .video-url-text').first();
-        let publishedUrl = '';
-        if (await videoLink.count() > 0) {
-            publishedUrl = await videoLink.getAttribute('href') || '';
-        }
-
-        // generated_contents 업데이트
-        if (contentId) {
-            await supabase
-                .from('generated_contents')
-                .update({
-                    is_published: true,
-                    published_url: publishedUrl,
-                })
-                .eq('id', contentId);
-        }
-
-        await progress(config, task.id, '유튜브 업로드 완료! ✅', 100);
+        await progress(config, task.id, '업로드 초안 준비 완료 — 공개 범위와 게시는 공식 화면에서 직접 확인해 주세요.', 100);
 
         // 임시 파일 정리
         try { fs.unlinkSync(localVideoPath); } catch { /* ignore */ }
 
         return {
-            published_url: publishedUrl,
+            status: 'manual_submit_required',
             video_url: videoUrl,
         };
 

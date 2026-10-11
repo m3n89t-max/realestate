@@ -2,16 +2,11 @@ import * as dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
+import { getAgentKey, getBuildingApiKey, getPlatformCredential, type PlatformCredential, type PlatformKey } from './credential-store';
 
 // .env.local 로드
 dotenv.config({ path: path.resolve(__dirname, '../../.env.local') });
 
-// ============================================================
-// 서비스 기본값 (하드코딩) - 사용자가 입력할 필요 없음
-// ============================================================
-const DEFAULT_SUPABASE_URL = 'https://mlluhuiwtsjndkztomjx.supabase.co';
-const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1sbHVodWl3dHNqbmRrenRvbWp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkxMjUxMzcsImV4cCI6MjA4NDcwMTEzN30.zExaSeZL3TnlBHfE6TnWQm-Za3VVjkHqYLKAGfQlTog';
-const DEFAULT_WEBHOOK_URL = 'https://mlluhuiwtsjndkztomjx.supabase.co/functions/v1/webhook-agent';
 
 // ============================================================
 // 에이전트 설정 타입
@@ -44,40 +39,28 @@ function loadConfigFromFile(): Partial<AgentConfig> | null {
     return null;
 }
 
-function loadBuildingApiKeyFromCreds(): string {
-    const appDataPath = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
-    const credPath = path.join(appDataPath, 'RealEstateAIOS', 'credentials.json');
-    if (!fs.existsSync(credPath)) return '';
-    try {
-        const store = JSON.parse(fs.readFileSync(credPath, 'utf-8'));
-        return store.building_api_key || '';
-    } catch { return ''; }
-}
-
 export function getConfig(): AgentConfig {
     const fileConfig = loadConfigFromFile();
 
-    const supabaseUrl = fileConfig?.supabase_url
-        || process.env.NEXT_PUBLIC_SUPABASE_URL
-        || DEFAULT_SUPABASE_URL;
-    const supabaseAnonKey = fileConfig?.supabase_anon_key
-        || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-        || DEFAULT_SUPABASE_ANON_KEY;
+    const supabaseUrl = fileConfig?.supabase_url || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const supabaseAnonKey = fileConfig?.supabase_anon_key || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    if (!supabaseUrl || !supabaseAnonKey || supabaseAnonKey.includes('...')) {
+        throw new Error('검증된 에이전트 서버 설정이 없습니다. 공식 설치파일로 다시 설치해 주세요.');
+    }
 
     const config: AgentConfig = {
-        agent_key: fileConfig?.agent_key
+        agent_key: getAgentKey()
             || process.env.AGENT_KEY || '',
         supabase_url: supabaseUrl,
         supabase_anon_key: supabaseAnonKey,
         webhook_url: fileConfig?.webhook_url
             || process.env.WEBHOOK_URL
-            || DEFAULT_WEBHOOK_URL,
+            || `${supabaseUrl}/functions/v1/webhook-agent`,
         agent_name: fileConfig?.agent_name
             || process.env.AGENT_NAME || `Agent-${os.hostname()}`,
         version: fileConfig?.version || '1.0.0',
-        building_api_key: (fileConfig as any)?.building_api_key
-            || loadBuildingApiKeyFromCreds()
-            || process.env.BUILDING_API_KEY || '',
+        building_api_key: getBuildingApiKey()
+            || (process.env.NODE_ENV === 'production' ? '' : process.env.BUILDING_API_KEY || ''),
     };
 
     // supabase_url은 항상 기본값이 있으므로 에러 발생 안 함
@@ -86,54 +69,10 @@ export function getConfig(): AgentConfig {
 
 // ============================================================
 // 플랫폼별 자격증명 로드
-// %APPDATA%/RealEstateAIOS/credentials.json → .env 폴백
+// OS 암호화 저장소 전용
 // ============================================================
 
-export interface PlatformCredential {
-    id?: string;
-    email?: string;
-    pw: string;
-}
-
-export function getCredentials(platform: 'naver' | 'google' | 'instagram' | 'kakao'): PlatformCredential | null {
-    const appDataPath = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
-    const credPath = path.join(appDataPath, 'RealEstateAIOS', 'credentials.json');
-
-    // credentials.json에서 로드 시도
-    if (fs.existsSync(credPath)) {
-        try {
-            const store = JSON.parse(fs.readFileSync(credPath, 'utf-8'));
-            if (store[platform]?.pw) {
-                return store[platform];
-            }
-        } catch {
-            console.warn(`[Config] credentials.json 파싱 실패`);
-        }
-    }
-
-    // .env 폴백
-    switch (platform) {
-        case 'naver':
-            if (process.env.NAVER_ID && process.env.NAVER_PW) {
-                return { id: process.env.NAVER_ID, pw: process.env.NAVER_PW };
-            }
-            break;
-        case 'google':
-            if (process.env.GOOGLE_EMAIL && process.env.GOOGLE_PW) {
-                return { email: process.env.GOOGLE_EMAIL, pw: process.env.GOOGLE_PW };
-            }
-            break;
-        case 'instagram':
-            if (process.env.INSTAGRAM_ID && process.env.INSTAGRAM_PW) {
-                return { id: process.env.INSTAGRAM_ID, pw: process.env.INSTAGRAM_PW };
-            }
-            break;
-        case 'kakao':
-            if (process.env.KAKAO_EMAIL && process.env.KAKAO_PW) {
-                return { email: process.env.KAKAO_EMAIL, pw: process.env.KAKAO_PW };
-            }
-            break;
-    }
-
-    return null;
+export function getCredentials(platform: PlatformKey): PlatformCredential | null {
+    const storedCredential = getPlatformCredential(platform);
+    return storedCredential?.pw ? storedCredential : null;
 }

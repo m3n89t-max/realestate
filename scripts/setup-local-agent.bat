@@ -1,35 +1,6 @@
 @echo off
 chcp 65001 >nul
-setlocal
-echo ==================================================
-echo   JIPPORTER - Local Agent Setup
-echo   집포터 로컬 에이전트
-echo ==================================================
 echo.
-
-:: 1. Node.js check
-node -v >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [Error] Node.js is not installed.
-    echo Please install Node.js (v20 or higher) from https://nodejs.org/
-    pause
-    exit /b 1
-)
-
-:: 2. Install dependencies
-echo [1/2] Installing dependencies...
-call npm install --omit=dev --no-audit --no-fund
-if %errorlevel% neq 0 (
-    echo [Error] Failed to install dependencies.
-    pause
-    exit /b 1
-)
-
-:: 3. Run Agent
-echo [2/2] Starting Agent...
-echo.
-echo * Note: First-time users will see a setup window.
-echo * Keep this window open while the agent is running.
-echo.
-call npm start
-pause
+echo [집포터] Node 기반 레거시 설치 방식은 더 이상 지원하지 않습니다.
+echo 운영체제 보안 저장소를 사용하는 공식 Electron 설치파일을 이용해 주세요.
+exit /b 1

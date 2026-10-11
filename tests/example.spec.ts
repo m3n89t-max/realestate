@@ -14,17 +14,16 @@ const contrastRatio = (foreground: number[], background: number[]) => {
   return (lighter + 0.05) / (darker + 0.05)
 }
 
-const hexToRgb = (hex: string) => [1, 3, 5].map(index => Number.parseInt(hex.slice(index, index + 2), 16))
-
 test('공개 첫 화면은 집포터의 결과와 이용 방법을 설명한다', async ({ page }) => {
   await page.goto('/', { waitUntil: 'domcontentloaded' })
 
   expect(new URL(page.url()).pathname).toBe('/')
   await expect(page).toHaveTitle(/집포터/)
-  await expect(page.getByRole('heading', { level: 1, name: /매물 정보는 한 번만 입력하세요/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: /주소와 사진만 넣으세요/ })).toBeVisible()
   await expect(page.getByRole('navigation', { name: '랜딩페이지 주요 메뉴' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '한 번 입력하고, 확인하고, 준비하세요' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '매물 하나로, 필요한 홍보 자료를 한곳에서' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: '주소부터 넣고, 순서대로 따라가세요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '채널마다 가능한 방식으로 준비합니다' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '자주 묻는 질문' })).toBeVisible()
   await expect(page.getByRole('banner')).toBeVisible()
   await expect(page.getByRole('contentinfo')).toBeVisible()
@@ -32,7 +31,7 @@ test('공개 첫 화면은 집포터의 결과와 이용 방법을 설명한다'
   await expect(page.locator('main footer')).toHaveCount(0)
   await expect(page.getByText('예시 결과', { exact: true })).toHaveCount(4)
 
-  const primaryCta = page.getByRole('link', { name: '내 매물로 결과 받아보기' }).first()
+  const primaryCta = page.getByRole('link', { name: '내 매물로 시작하기' }).first()
   await expect(primaryCta).toHaveAttribute('href', '/login?mode=signup')
   await expect(page.getByRole('link', { name: '로그인', exact: true }).first()).toHaveAttribute('href', '/login')
 
@@ -48,33 +47,19 @@ test('공개 첫 화면은 집포터의 결과와 이용 방법을 설명한다'
   expect(structuredTypes).toContain('FAQPage')
   const graph = parsedStructuredData.flatMap(parsed => parsed['@graph'] ?? [])
   expect(graph.find(item => item['@type'] === 'SoftwareApplication')?.name).toBe('집포터')
-  expect(graph.find(item => item['@type'] === 'FAQPage')?.mainEntity).toHaveLength(5)
+  expect(graph.find(item => item['@type'] === 'FAQPage')?.mainEntity).toHaveLength(4)
 
-  for (const label of ['01', '02', '03', '04', '집포터 업무 공간 · 예시 화면']) {
+  for (const label of ['01', '02', '03', '04']) {
     const foreground = await page.getByText(label, { exact: true }).evaluate(element => (
       getComputedStyle(element).color.match(/\d+/g)?.slice(0, 3).map(Number) ?? [0, 0, 0]
     ))
-    expect(contrastRatio(foreground, [255, 255, 255])).toBeGreaterThanOrEqual(4.5)
-  }
-
-  for (const { label, backgrounds } of [
-    { label: '사진 8장 · 매매 · 예시', backgrounds: ['#d9ebe6', '#86bfb1'] },
-    { label: '주소와 가격', backgrounds: ['#f8f7f3'] },
-    { label: '사진과 특징', backgrounds: ['#f8f7f3'] },
-    { label: '거래 정보', backgrounds: ['#f8f7f3'] },
-  ]) {
-    const foreground = await page.getByText(label, { exact: true }).evaluate(element => (
-      getComputedStyle(element).color.match(/\d+/g)?.slice(0, 3).map(Number) ?? [0, 0, 0]
-    ))
-    for (const background of backgrounds) {
-      expect(contrastRatio(foreground, hexToRgb(background))).toBeGreaterThanOrEqual(4.5)
-    }
+    expect(contrastRatio(foreground, [251, 250, 247])).toBeGreaterThanOrEqual(4.5)
   }
 })
 
 test('랜딩페이지 CTA는 회원가입 화면으로 바로 연결한다', async ({ page }) => {
   await page.goto('/', { waitUntil: 'domcontentloaded' })
-  await page.getByRole('link', { name: '내 매물로 결과 받아보기' }).first().click()
+  await page.getByRole('link', { name: '내 매물로 시작하기' }).first().click()
 
   await expect(page).toHaveURL(/\/login\?mode=signup$/)
   await expect(page.getByRole('heading', { name: '계정 만들기' })).toBeVisible()
@@ -93,7 +78,7 @@ test('모바일 랜딩페이지는 가로 넘침 없이 고정 CTA와 콘텐츠�
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth)
 
   await page.getByRole('contentinfo').scrollIntoViewIfNeeded()
-  const stickyCta = page.locator('div.fixed').getByRole('link', { name: '내 매물로 결과 받아보기' })
+  const stickyCta = page.locator('div.fixed').getByRole('link', { name: '내 매물로 시작하기' })
   const disclaimer = page.getByText(/생성된 분석과 콘텐츠는 참고용 초안/)
   await expect(stickyCta).toBeVisible()
   await expect(disclaimer).toBeVisible()

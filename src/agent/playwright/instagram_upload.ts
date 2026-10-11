@@ -160,19 +160,7 @@ export async function uploadInstagram(
             await captionArea.fill(fullCaption.substring(0, 2200));
         }
 
-        // ---- 공유 ----
-        await progress(config, task.id, '게시물 공유 중...', 85);
-
-        const shareBtn = page.locator('button:has-text("공유"), button:has-text("Share")').first();
-        if (await shareBtn.count() > 0) {
-            await shareBtn.click();
-            await page.waitForTimeout(5000);
-        }
-
-        // 게시 완료 감지
-        await page.waitForSelector('._acan, [aria-label*="게시"]', { timeout: 15_000 }).catch(() => { });
-
-        await progress(config, task.id, 'Instagram 업로드 완료! ✅', 100);
+        await progress(config, task.id, '게시물 초안 준비 완료 — 공유는 공식 화면에서 직접 확인해 주세요.', 100);
 
         // 임시 파일 정리
         for (const p of localPaths) {
@@ -181,6 +169,7 @@ export async function uploadInstagram(
 
         return {
             platform: 'instagram',
+            status: 'manual_submit_required',
             image_count: localPaths.length,
         };
 

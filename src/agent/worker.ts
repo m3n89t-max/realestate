@@ -10,10 +10,8 @@ import {
 } from './webhook-client';
 import { downloadBuildingRegister } from './playwright/building_register';
 import { downloadCadastralMap } from './playwright/cadastral_map';
-import { uploadNaverBlog } from './playwright/naver_upload';
-import { uploadYoutube } from './playwright/youtube_upload';
-import { uploadInstagram } from './playwright/instagram_upload';
-import { startUIServer } from './ui/server';
+
+
 import { AGENT_BRAND } from './brand';
 import fs from 'fs';
 import path from 'path';
@@ -37,12 +35,7 @@ const AGENT_TASK_TYPES = [
     'building_register',
     'download_building_register',
     'download_cadastral_map',
-    'naver_upload',
-    'upload_naver_blog',
-    'youtube_upload',
-    'upload_youtube',
-    'instagram_upload',
-    'upload_instagram',
+
     'poi_analysis',
     'location_analysis',
     'commercial_analysis',
@@ -113,9 +106,6 @@ class LocalAgent {
 
         // 5. 정기 폴링 시작 (Realtime과 병행하여 안전성 확보)
         this.startFallbackPolling();
-
-        // 6. 로컬 UI 설정 서버 시작
-        startUIServer();
 
         console.log('[Agent] 에이전트가 정상 가동되었습니다. 작업 대기 중...');
     }
@@ -347,26 +337,6 @@ class LocalAgent {
                     result = await downloadCadastralMap(task, this.config);
                     break;
 
-                case 'naver_upload':
-                case 'upload_naver_blog': {
-                    const checkCancelled = async () => {
-                        const { data } = await this.supabase
-                            .from('tasks').select('status').eq('id', task.id).single();
-                        return data?.status === 'cancelled';
-                    };
-                    result = await uploadNaverBlog(task, this.config, checkCancelled);
-                    break;
-                }
-
-                case 'youtube_upload':
-                case 'upload_youtube':
-                    result = await uploadYoutube(task, this.config);
-                    break;
-
-                case 'instagram_upload':
-                case 'upload_instagram':
-                    result = await uploadInstagram(task, this.config);
-                    break;
 
                 // TEAM 4: Content Engine & Automation Skeleton
                 case 'poi_analysis':

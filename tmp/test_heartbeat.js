@@ -1,5 +1,5 @@
 async function testHeartbeat() {
-    const agent_key = 'agent-3b89b0c7-a170-4ea8-b8f9-27add6a50770';
+    const agent_key = process.env.AGENT_KEY || '';
     const url = 'https://mlluhuiwtsjndkztomjx.supabase.co/functions/v1/webhook-agent';
 
     const payload = {

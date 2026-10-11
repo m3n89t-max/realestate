@@ -200,6 +200,15 @@
       border-bottom: 1px solid #f1f5f9;
     }
 
+    .credential-action {
+      float: right;
+      border: 0;
+      background: none;
+      color: #64748b;
+      cursor: pointer;
+      font-size: 11px;
+    }
+
     .btn-row {
       display: flex;
       gap: 10px;
@@ -354,7 +363,7 @@
           외부 서버로 전송되지 않습니다. 나중에 언제든 변경할 수 있습니다.
         </div>
 
-        <div class="section-title">🟢 네이버 블로그 계정</div>
+        <div class="section-title">🟢 네이버 블로그 계정 <button type="button" class="credential-action" id="naverCredentialAction" onclick="deleteSavedCredential('naver')">미저장</button></div>
         <div class="input-row field">
           <div>
             <label>아이디</label>
@@ -366,7 +375,7 @@
           </div>
         </div>
 
-        <div class="section-title">▶️ 유튜브 계정 <span style="font-weight:400;color:#94a3b8;font-size:11px">선택</span></div>
+        <div class="section-title">▶️ 유튜브 계정 <button type="button" class="credential-action" id="googleCredentialAction" onclick="deleteSavedCredential('google')">미저장</button></div>
         <div class="input-row field">
           <div>
             <label>구글 이메일</label>
@@ -375,6 +384,18 @@
           <div>
             <label>비밀번호</label>
             <input type="password" id="google_pw" placeholder="비밀번호" autocomplete="off" />
+          </div>
+        </div>
+
+        <div class="section-title">📷 인스타그램 계정 <button type="button" class="credential-action" id="instagramCredentialAction" onclick="deleteSavedCredential('instagram')">미저장</button></div>
+        <div class="input-row field">
+          <div>
+            <label>아이디</label>
+            <input type="text" id="instagram_id" placeholder="인스타그램 아이디" autocomplete="off" />
+          </div>
+          <div>
+            <label>비밀번호</label>
+            <input type="password" id="instagram_pw" placeholder="비밀번호" autocomplete="off" />
           </div>
         </div>
 
@@ -404,7 +425,31 @@
   </div>
 
   <script>
-    const { ipcRenderer } = require('electron');
+    const jipporter = window.jipporter;
+
+    async function refreshCredentialStatus() {
+      try {
+        const status = await jipporter.credentialStatus();
+        for (const platform of ['naver', 'google', 'instagram']) {
+          const button = document.getElementById(platform + 'CredentialAction');
+          button.textContent = status[platform] ? '저장됨 · 삭제' : '미저장';
+          button.disabled = !status[platform];
+        }
+      } catch {
+        showError('err2', '보안 저장소 상태를 확인할 수 없습니다.');
+      }
+    }
+
+    async function deleteSavedCredential(platform) {
+      const result = await jipporter.deleteCredential(platform);
+      if (!result.ok) {
+        showError('err2', result.error || '저장된 계정을 삭제하지 못했습니다.');
+        return;
+      }
+      await refreshCredentialStatus();
+    }
+
+    window.addEventListener('DOMContentLoaded', refreshCredentialStatus);
 
     function goPanel(n) {
       document.querySelectorAll('.panel').forEach((p, i) => {
@@ -452,10 +497,8 @@
         const agent_key = document.getElementById('agent_key').value.trim();
         const agent_name = document.getElementById('agent_name').value.trim();
 
-        // 1. 서버 설정 저장 (URL/Key는 하드코딩됨)
-        const cfgResult = await ipcRenderer.invoke('save-config', {
-          url: 'https://mlluhuiwtsjndkztomjx.supabase.co',
-          anon_key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1sbHVodWl3dHNqbmRrenRvbWp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkxMjUxMzcsImV4cCI6MjA4NDcwMTEzN30.zExaSeZL3TnlBHfE6TnWQm-Za3VVjkHqYLKAGfQlTog',
+        // 1. 설치파일에 포함된 검증된 서버 설정과 연결키 저장
+        const cfgResult = await jipporter.saveConfig({
           agent_key,
           agent_name
         });
@@ -465,18 +508,24 @@
         if (!skipSns) {
           const naver_id = document.getElementById('naver_id').value.trim();
           const naver_pw = document.getElementById('naver_pw').value.trim();
-          if (naver_id && !naver_pw) {
-            showError('err2', '네이버 비밀번호를 입력해 주세요.');
+          const google_email = document.getElementById('google_email').value.trim();
+          const google_pw = document.getElementById('google_pw').value.trim();
+          const instagram_id = document.getElementById('instagram_id').value.trim();
+          const instagram_pw = document.getElementById('instagram_pw').value.trim();
+          if ((naver_id && !naver_pw) || (google_email && !google_pw) || (instagram_id && !instagram_pw)) {
+            showError('err2', '아이디 또는 이메일을 입력한 계정은 비밀번호도 입력해 주세요.');
             if (btn) { btn.disabled = false; btn.textContent = '시작하기! 🚀'; }
             return;
           }
-          await ipcRenderer.invoke('save-credentials', {
+          const credentialResult = await jipporter.saveCredentials({
             naver: { id: naver_id, pw: naver_pw },
             google: {
-              email: document.getElementById('google_email').value.trim(),
-              pw: document.getElementById('google_pw').value.trim()
+              email: google_email,
+              pw: google_pw
             },
+            instagram: { id: instagram_id, pw: instagram_pw },
           });
+          if (!credentialResult.ok) throw new Error(credentialResult.error);
           const hasNaver = naver_id && naver_pw;
           document.getElementById('naverStatus').textContent = hasNaver ? '✓' : '○';
           document.getElementById('naverStatusText').textContent = hasNaver ? '저장됨' : '미입력 (나중에 가능)';
@@ -488,7 +537,7 @@
         }
 
         goPanel(3);
-        setTimeout(() => ipcRenderer.invoke('config-saved'), 1500);
+        setTimeout(() => jipporter.finishSetup(), 1500);
 
       } catch (e) {
         showError('err2', '저장 실패: ' + e.message);

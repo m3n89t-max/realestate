@@ -362,38 +362,16 @@ export default function BlogTab({ projectId, orgId, project, contents, assets }:
 
   const handleNaverUpload = async () => {
     if (!selectedId || !selected) {
-      toast.error('업로드할 블로그 글을 먼저 생성해주세요')
-      return
-    }
-    if (uploadTasks.length > 0) {
-      toast.error('이미 대기 중인 업로드 작업이 있습니다. 작업을 취소한 후 다시 시도하세요.')
+      toast.error('등록할 블로그 글을 먼저 생성해주세요')
       return
     }
     setUploading(true)
     try {
-      const { data: newTask, error } = await supabase.from('tasks').insert({
-        org_id: orgId,
-        project_id: projectId,
-        type: 'upload_naver_blog',
-        status: 'queued',
-        scheduled_at: new Date().toISOString(),
-        payload: {
-          content_id: selectedId,
-          project_id: projectId,
-          content_title: selectedTitle ?? selected.title,
-          content_body: buildFullContent(),
-          content_tags: selected.tags ?? [],
-          photo_layout: photoLayout,
-          photo_position: photoPosition,
-          cover_image_url: coverImageUrl || undefined,
-        },
-      }).select('id, status, created_at').single()
-      if (error) throw error
-      // Realtime 업데이트 전에 즉시 로컬 상태 반영 → 중복 클릭 방지
-      if (newTask) setUploadTasks(prev => [...prev, newTask])
-      toast.success('네이버 블로그 업로드 작업이 등록되었습니다. 에이전트가 실행하면 자동 업로드됩니다.')
+      await navigator.clipboard.writeText(buildFullContent())
+      window.open('https://blog.naver.com/GoBlogWrite.naver', '_blank', 'noopener,noreferrer')
+      toast.success('본문을 복사했습니다. 열린 네이버 공식 화면에서 확인 후 발행해 주세요.')
     } catch (err) {
-      toast.error('작업 등록에 실패했습니다')
+      toast.error('본문 복사 또는 공식 화면 열기에 실패했습니다')
       console.error(err)
     } finally {
       setUploading(false)
@@ -751,16 +729,16 @@ export default function BlogTab({ projectId, orgId, project, contents, assets }:
 
             <button
               onClick={handleNaverUpload}
-              disabled={uploading || uploadTasks.length > 0}
+              disabled={uploading}
               className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
             >
               {uploading
-                ? <><Loader2 size={15} className="animate-spin" /> 업로드 등록 중…</>
-                : <><Upload size={15} /> 📤 네이버 블로그 자동 업로드</>
+                ? <><Loader2 size={15} className="animate-spin" /> 등록 자료 준비 중…</>
+                : <><Upload size={15} /> 본문 복사 후 네이버 열기</>
               }
             </button>
             {!uploading && uploadTasks.length === 0 && (
-              <p className="text-[11px] text-gray-400 text-center mt-1">로컬 에이전트가 자동으로 업로드합니다</p>
+              <p className="text-[11px] text-gray-400 text-center mt-1">최종 발행은 네이버 공식 화면에서 직접 확인합니다</p>
             )}
 
             {/* 진행 중인 업로드 작업 목록 */}

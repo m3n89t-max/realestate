@@ -14,11 +14,15 @@ const config = {
     webhook_url: ''
 };
 
-// Hardcoded credentials for testing
+// 테스트 계정은 실행 시점의 환경변수에서만 받습니다.
 const credentials = {
-    id: 'm3n89t',
-    pw: 'm3n89t1141'
+    id: process.env.NAVER_TEST_ID || '',
+    pw: process.env.NAVER_TEST_PW || '',
 };
+
+if (!credentials.id || !credentials.pw) {
+    throw new Error('NAVER_TEST_ID와 NAVER_TEST_PW 환경변수가 필요합니다.');
+}
 
 const SESSION_DIR = path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'RealEstateAIOS');
 const NAVER_SESSION_PATH = path.join(SESSION_DIR, 'naver-session-test.json');
