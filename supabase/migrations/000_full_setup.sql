@@ -387,6 +387,58 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
 
+-- check_quota
+-- 생성 요청마다 호출된다. 이 함수가 없으면 쿼터 판정이 불가해지고
+-- fail-closed 설계상 모든 생성이 막힌다(과거 장애 원인).
+CREATE OR REPLACE FUNCTION check_quota(
+    p_org_id uuid,
+    p_type   text DEFAULT 'project'
+)
+RETURNS jsonb AS $$
+DECLARE
+    v_org               organizations%ROWTYPE;
+    v_year              integer := EXTRACT(YEAR FROM now())::integer;
+    v_month             integer := EXTRACT(MONTH FROM now())::integer;
+    v_usage             usage_logs%ROWTYPE;
+    v_limit             integer;
+    v_current           integer;
+    v_plan_limits       jsonb;
+BEGIN
+    SELECT * INTO v_org FROM organizations WHERE id = p_org_id;
+    IF NOT FOUND THEN RAISE EXCEPTION 'Organization not found: %', p_org_id; END IF;
+
+    v_plan_limits := CASE v_org.plan_type
+        WHEN 'free'    THEN '{"project":20,"generation":50,"token":500000,"video_render":5,"doc_download":20}'::jsonb
+        WHEN 'pro'     THEN '{"project":100,"generation":500,"token":5000000,"video_render":50,"doc_download":200}'::jsonb
+        WHEN 'premium' THEN '{"project":-1,"generation":-1,"token":-1,"video_render":-1,"doc_download":-1}'::jsonb
+        ELSE '{"project":0,"generation":0,"token":0,"video_render":0,"doc_download":0}'::jsonb
+    END;
+
+    SELECT * INTO v_usage FROM usage_logs
+    WHERE org_id = p_org_id AND year = v_year AND month = v_month;
+
+    v_limit := (v_plan_limits ->> p_type)::integer;
+    v_current := CASE p_type
+        WHEN 'project'      THEN COALESCE(v_usage.project_count, 0)
+        WHEN 'generation'   THEN COALESCE(v_usage.generation_count, 0)
+        WHEN 'token'        THEN COALESCE(v_usage.token_usage, 0)::integer
+        WHEN 'video_render' THEN COALESCE(v_usage.video_render_count, 0)
+        WHEN 'doc_download' THEN COALESCE(v_usage.doc_download_count, 0)
+        ELSE 0
+    END;
+
+    RETURN jsonb_build_object(
+        'org_id',     p_org_id,
+        'plan_type',  v_org.plan_type,
+        'type',       p_type,
+        'current',    v_current,
+        'limit',      v_limit,
+        'exceeded',   CASE WHEN v_limit = -1 THEN false ELSE v_current >= v_limit END,
+        'remaining',  CASE WHEN v_limit = -1 THEN -1 ELSE GREATEST(0, v_limit - v_current) END
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 CREATE OR REPLACE FUNCTION trigger_set_updated_at()
 RETURNS trigger AS $$
 BEGIN
