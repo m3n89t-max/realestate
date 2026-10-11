@@ -144,20 +144,30 @@ ipcMain.handle('delete-credential', (event, platform: PlatformKey) => {
 
 // ─── IPC: 설정 완료 → 에이전트 시작 ─────────────────────────
 ipcMain.handle('config-saved', async (event) => {
-    assertTrustedSender(event);
-    mainWindow?.close();
-    if (!agentStarted) await startAgent();
-    if (!tray) createTray();
+    try {
+        assertTrustedSender(event);
+        if (!agentStarted) {
+            const started = await startAgent();
+            if (!started.ok) return started;
+        }
+        if (!tray) createTray();
+        mainWindow?.close();
+        return { ok: true };
+    } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : '에이전트를 시작하지 못했습니다.' };
+    }
 });
 
-async function startAgent() {
-    if (agentStarted) return;
+async function startAgent(): Promise<{ ok: boolean; error?: string }> {
+    if (agentStarted) return { ok: true };
     try {
         const { agent } = await import('./worker');
         await agent.start();
         agentStarted = true;
+        return { ok: true };
     } catch (err) {
         console.error('[Agent] 치명적 오류:', err);
+        return { ok: false, error: err instanceof Error ? err.message : '에이전트 시작에 실패했습니다.' };
     }
 }
 
@@ -250,9 +260,14 @@ app.on('ready', async () => {
         // 최초 실행: 설정 화면 표시
         showSetupWindow();
     } else {
-        // 설정 있음: 바로 시작
-        await startAgent();
-        createTray();
+        // 설정 있음: 시작 성공 시에만 트레이로 전환하고, 실패하면 설정 화면으로 복귀
+        const started = await startAgent();
+        if (started.ok) {
+            createTray();
+        } else {
+            console.error('[Agent] 시작 실패:', started.error);
+            showSetupWindow();
+        }
     }
 });
 

@@ -148,7 +148,14 @@ export function migrateLegacyCredentials(): boolean {
   const accepted: Partial<Record<PlatformKey, PlatformCredential>> = {}
   for (const platform of PLATFORMS) {
     const credential = legacy[platform] as PlatformCredential | undefined
-    if (credential?.pw && (credential.id || credential.email)) accepted[platform] = credential
+    if (!credential) continue
+    if (credential.pw && (credential.id || credential.email)) {
+      accepted[platform] = credential
+      continue
+    }
+    if (credential.pw || credential.id || credential.email) {
+      throw new Error(`${platform} 레거시 로그인정보가 불완전해 원본을 보존했습니다. 설정 화면에서 다시 저장해 주세요.`)
+    }
   }
   if (Object.keys(accepted).length > 0) savePlatformCredentials(accepted)
   if (typeof legacy.building_api_key === 'string' && legacy.building_api_key.trim()) {

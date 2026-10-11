@@ -416,7 +416,7 @@
           이제 웹사이트에서 자동화를 시작하세요!
         </div>
         <div class="done-list">
-          <span>✓</span> 서버 연결 완료<br>
+          <span>✓</span> 연결 설정 저장 완료<br>
           <span id="naverStatus">✓</span> 네이버 계정 <span id="naverStatusText">저장됨</span><br>
           <span>✓</span> 에이전트 자동 시작
         </div>
@@ -536,9 +536,11 @@
           document.getElementById('naverStatus').style.color = '#94a3b8';
         }
 
+        const startResult = await jipporter.finishSetup();
+        if (startResult && startResult.ok === false) {
+          throw new Error(startResult.error || '에이전트를 시작하지 못했습니다.');
+        }
         goPanel(3);
-        setTimeout(() => jipporter.finishSetup(), 1500);
-
       } catch (e) {
         showError('err2', '저장 실패: ' + e.message);
         if (btn) { btn.disabled = false; btn.textContent = '시작하기! 🚀'; }

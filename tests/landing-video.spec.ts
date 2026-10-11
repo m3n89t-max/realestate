@@ -10,8 +10,8 @@ test('무음 데모는 설명문과 연결되고 실제 재생 상태를 버튼�
   const pauseButton = page.getByRole('button', { name: '영상 일시정지' })
 
   await expect(video).toHaveAttribute('aria-describedby', 'demo-video-description')
-  await expect(transcript).toContainText('가상 매물의 주소, 아파트 종류, 가격을 입력하고 역세권·남향·주차가능 특징을 선택합니다')
-  await expect(transcript).toContainText('입지분석, 블로그 글, 카드뉴스, 쇼츠 스크립트')
+  await expect(transcript).toContainText('가상 매물의 주소를 입력하고 사진을 추가한 뒤 역세권·남향·주차가능 특징을 선택합니다')
+  await expect(transcript).toContainText('입지분석, 블로그 글, 카드뉴스')
   await expect(video).toHaveJSProperty('paused', false)
 
   await pauseButton.click()

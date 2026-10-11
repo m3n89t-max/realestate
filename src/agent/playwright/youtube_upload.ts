@@ -95,7 +95,7 @@ export async function uploadYoutube(
             // Google 자격증명 — credentials.json 우선, .env 폴백
             const creds = getCredentials('google');
             if (!creds?.email || !creds?.pw) {
-                throw new Error('[LOGIN_FAILED] 구글 자격증명이 없습니다. /settings/credentials 에서 저장해주세요.');
+                throw new Error('[LOGIN_FAILED] 구글 로그인정보가 없습니다. 로컬 AI OS 트레이 아이콘 → 설정 열기에서 저장해 주세요.');
             }
             const googleEmail = creds.email;
             const googlePw = creds.pw;

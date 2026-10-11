@@ -14,12 +14,28 @@ const contrastRatio = (foreground: number[], background: number[]) => {
   return (lighter + 0.05) / (darker + 0.05)
 }
 
+const resolveBackgroundColor = async (locator: import('@playwright/test').Locator) => locator.evaluate(element => {
+  let node: Element | null = element
+  while (node) {
+    const color = getComputedStyle(node).backgroundColor
+    const channels = color.match(/[\d.]+/g)?.map(Number) ?? []
+    const alpha = channels.length === 4 ? channels[3] : 1
+    if (channels.length >= 3 && alpha >= 0.95) return channels.slice(0, 3)
+    node = node.parentElement
+  }
+  return [255, 255, 255]
+})
+
+const readColor = async (locator: import('@playwright/test').Locator) => locator.evaluate(element => (
+  getComputedStyle(element).color.match(/\d+/g)?.slice(0, 3).map(Number) ?? [0, 0, 0]
+))
+
 test('공개 첫 화면은 집포터의 결과와 이용 방법을 설명한다', async ({ page }) => {
   await page.goto('/', { waitUntil: 'domcontentloaded' })
 
   expect(new URL(page.url()).pathname).toBe('/')
   await expect(page).toHaveTitle(/집포터/)
-  await expect(page.getByRole('heading', { level: 1, name: /주소와 사진만 넣으세요/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: /주소·사진·특징만 넣으세요/ })).toBeVisible()
   await expect(page.getByRole('navigation', { name: '랜딩페이지 주요 메뉴' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '한 번 입력하고, 확인하고, 준비하세요' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '매물 하나로, 필요한 홍보 자료를 한곳에서' })).toBeVisible()
@@ -49,11 +65,17 @@ test('공개 첫 화면은 집포터의 결과와 이용 방법을 설명한다'
   expect(graph.find(item => item['@type'] === 'SoftwareApplication')?.name).toBe('집포터')
   expect(graph.find(item => item['@type'] === 'FAQPage')?.mainEntity).toHaveLength(4)
 
-  for (const label of ['01', '02', '03', '04']) {
-    const foreground = await page.getByText(label, { exact: true }).evaluate(element => (
-      getComputedStyle(element).color.match(/\d+/g)?.slice(0, 3).map(Number) ?? [0, 0, 0]
-    ))
-    expect(contrastRatio(foreground, [251, 250, 247])).toBeGreaterThanOrEqual(4.5)
+  const contrastTargets = [
+    ...['01', '02', '03', '04'].map(label => page.getByText(label, { exact: true })),
+    primaryCta,
+    page.getByRole('heading', { level: 1 }),
+    page.getByText(/생성된 분석과 콘텐츠는 참고용 초안/),
+    page.getByText('연동 필요').first(),
+    page.getByText(/최종 등록은 중개사가 확인합니다/),
+  ]
+  for (const target of contrastTargets) {
+    const [foreground, background] = await Promise.all([readColor(target), resolveBackgroundColor(target)])
+    expect(contrastRatio(foreground, background)).toBeGreaterThanOrEqual(4.5)
   }
 })
 
@@ -85,6 +107,21 @@ test('모바일 랜딩페이지는 가로 넘침 없이 고정 CTA와 콘텐츠�
   const stickyBox = await stickyCta.boundingBox()
   const disclaimerBox = await disclaimer.boundingBox()
   expect(disclaimerBox && stickyBox && disclaimerBox.y + disclaimerBox.height <= stickyBox.y).toBe(true)
+})
+
+test('모바일 첫 화면에서 고정 CTA가 데모 영상을 완전히 가리지 않는다', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+
+  const videoBox = await page.locator('video').boundingBox()
+  const stickyBox = await page.locator('div.fixed').boundingBox()
+  expect(videoBox).not.toBeNull()
+  expect(stickyBox).not.toBeNull()
+  if (!videoBox || !stickyBox) return
+
+  const visibleTop = Math.max(videoBox.y, 0)
+  const visibleBottom = Math.min(videoBox.y + videoBox.height, stickyBox.y)
+  expect(visibleBottom - visibleTop).toBeGreaterThan(0)
 })
 
 test('비로그인 사용자는 대시보드에서 로그인 화면으로 이동한다', async ({ page }) => {
