@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { handleCors } from '../_shared/cors.ts'
 import { checkQuota, getAuthenticatedUser, getOrgId } from '../_shared/auth.ts'
-import { callGemini } from '../_shared/gemini.ts'
+import { callGemini, callGeminiVision, type VisionContent } from '../_shared/gemini.ts'
 import { maskPersonalInfo } from '../_shared/masking.ts'
 import { ok, err } from '../_shared/response.ts'
 import { buildShortsSystemPrompt } from '../_shared/shorts-prompt.ts'
@@ -108,27 +108,54 @@ ${priceSourceBlock}
 3. visual_description에 업로드된 사진/동영상 활용 방법을 구체적으로 지시할 것
 4. 해시태그 15개 이상 (지역명, 매물유형, 투자 키워드 포함)${custom_instructions ? `\n\n[공인중개사 추가 지시사항 - 반드시 최우선으로 반영]\n${custom_instructions}` : ''}`
 
-    // 업로드된 사진이 있으면 vision 분석 포함
-    const messages: { role: string; content: string | { type: string; text?: string; image_url?: { url: string } }[] }[] = [
-      { role: 'system', content: buildShortsSystemPrompt() },
-    ]
+    // 업로드된 사진이 있으면 vision 분석 포함.
+    // 사진이 있을 때는 비전 클라이언트(callGeminiVision)를 써야 한다.
+    // 텍스트 전용 callGemini 에 배열 content 를 넘기면 payload 의 text 가 배열이 되어
+    // Gemini 가 INVALID_ARGUMENT 로 거절한다(과거 장애 원인).
+    const systemPrompt = buildShortsSystemPrompt()
+    const textOnlyRequest = () =>
+      callGemini(
+        [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        { responseFormat: 'json', maxTokens: 8192, temperature: 0.8 }
+      )
+
+    let responseText: string
 
     if (imageAssets.length > 0) {
-      const contentParts: { type: string; text?: string; image_url?: { url: string } }[] = [
+      const contentParts: VisionContent[] = [
         { type: 'text', text: userPrompt },
-        ...imageAssets.map(a => ({ type: 'image_url', image_url: { url: a.file_url } })),
+        ...imageAssets.map(a => ({ type: 'image_url' as const, image_url: { url: a.file_url } })),
       ]
-      messages.push({ role: 'user', content: contentParts as never })
+      try {
+        responseText = await callGeminiVision(
+          [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: contentParts },
+          ],
+          { responseFormat: 'json', maxTokens: 8192, temperature: 0.8 }
+        )
+      } catch (visionError) {
+        // 사진을 못 읽어도 매물 정보만으로 스크립트는 만들 수 있다.
+        // 여기서 그대로 실패시키면 사용자는 결과를 전혀 받지 못한다.
+        console.warn('[generate-shorts-script] 사진 분석 실패, 텍스트로 생성:', visionError)
+        responseText = await textOnlyRequest()
+      }
     } else {
-      messages.push({ role: 'user', content: userPrompt })
+      responseText = await textOnlyRequest()
     }
 
-    const responseText = await callGemini(
-      messages as never,
-      { responseFormat: 'json', maxTokens: 8192, temperature: 0.8 }
-    )
-
-    const script = JSON.parse(responseText)
+    // 모델이 JSON 이 아닌 응답을 주면 JSON.parse 가 터져 사용자에게는 원인 모를 오류만 남는다.
+    let script: { hashtags?: string[]; [key: string]: unknown }
+    try {
+      script = JSON.parse(responseText)
+    } catch {
+      throw new Error(
+        '쇼츠 스크립트 생성 결과를 해석할 수 없습니다. 잠시 후 다시 시도해 주세요.',
+      )
+    }
 
     const { data: latestVersion } = await supabaseClient
       .from('generated_contents')
