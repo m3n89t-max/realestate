@@ -387,7 +387,13 @@ ${analysisInstructions}
       { responseFormat: 'json', maxTokens: 8192, temperature: 0.5 }
     )
 
-    const analysis = JSON.parse(responseText)
+    // 파싱 실패가 그대로 올라가면 사용자에게 파서 원문 메시지가 전달된다.
+    let analysis: Record<string, unknown>
+    try {
+      analysis = JSON.parse(responseText)
+    } catch {
+      throw new Error('입지 분석 결과를 해석할 수 없습니다. 잠시 후 다시 시도해 주세요.')
+    }
 
     const { error: upsertError } = await supabaseClient
       .from('location_analyses')

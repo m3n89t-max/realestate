@@ -70,7 +70,12 @@ Deno.serve(async (req) => {
         [{ role: 'user', content: titlesPrompt }],
         { responseFormat: 'json', maxTokens: 800, temperature: 0.9 }
       )
-      const result = JSON.parse(responseText)
+      let result: { titles?: string[] }
+      try {
+        result = JSON.parse(responseText)
+      } catch {
+        throw new Error('제목 생성 결과를 해석할 수 없습니다. 잠시 후 다시 시도해 주세요.')
+      }
       const newTitles: string[] = result.titles ?? []
 
       // DB 업데이트
@@ -219,7 +224,20 @@ Deno.serve(async (req) => {
     )
 
     // JSON 파싱
-    const result = JSON.parse(responseText)
+    // 파싱 실패가 그대로 올라가면 사용자에게 파서 원문 메시지가 전달된다.
+    let result: {
+      titles?: string[]
+      content?: string
+      meta_description?: string
+      tags?: string[]
+      seo_score?: number
+      faq?: unknown
+    }
+    try {
+      result = JSON.parse(responseText)
+    } catch {
+      throw new Error('블로그 생성 결과를 해석할 수 없습니다. 잠시 후 다시 시도해 주세요.')
+    }
 
     // 동영상 에셋 조회 후 블로그 본문 마지막에 삽입
     const { data: videoAssets } = await supabaseClient
