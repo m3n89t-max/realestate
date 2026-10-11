@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { ArrowRight, Building2, Check, FileArchive, ImageIcon, MapPin, MessageSquareText, Newspaper, ShieldCheck, Sparkles } from 'lucide-react'
 import { LandingDemoVideo } from '@/components/landing-demo-video'
 import { BRAND } from '@/lib/brand'
+import { FLOW_STAGES } from '@/lib/jipporter-flow'
 
 export const metadata: Metadata = {
   title: { absolute: `주소와 사진으로 매물 홍보 준비 | ${BRAND.name}` },
@@ -12,12 +13,7 @@ export const metadata: Metadata = {
 const signupHref = '/login?mode=signup'
 const primaryCta = '내 매물로 시작하기'
 
-const workflow = [
-  { number: '01', title: '한 번 입력', description: '주소와 사진, 매물 특징을 입력합니다. 가격·면적은 주소 확인 후 필요한 항목만 묻습니다.' },
-  { number: '02', title: '홍보물 생성', description: '블로그 글과 카드뉴스 초안을 함께 만듭니다.' },
-  { number: '03', title: '중개사가 최종 검토', description: '가격·면적·주소 공개 범위·광고 표현을 중개사가 직접 확인합니다.' },
-  { number: '04', title: '채널별 발행 준비', description: '각 채널이 허용한 방식에 맞춰 파일과 등록 정보를 준비합니다.' },
-]
+const workflow = FLOW_STAGES
 
 const outputs = [
   { icon: MapPin, title: '입지분석', description: '주소를 바탕으로 생활·교통·교육·상권 정보를 정리합니다.' },
