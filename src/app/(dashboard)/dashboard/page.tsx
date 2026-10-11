@@ -13,6 +13,7 @@ import {
   summarizeFlow,
   type ProjectFlowSnapshot,
 } from '@/lib/jipporter-flow'
+import { summarizeChannelReadiness } from '@/lib/channel-publishing'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -23,7 +24,7 @@ export default async function DashboardPage() {
 
   const { data: projectRows } = await supabase
     .from('projects')
-    .select('id, address, property_type, features, status, created_at')
+    .select('id, address, property_type, features, status, created_at, transaction_type, price, deposit, monthly_rent, area')
     .eq('org_id', orgId)
     .neq('status', 'archived')
     .order('created_at', { ascending: false })
@@ -37,8 +38,8 @@ export default async function DashboardPage() {
       ? supabase.from('assets').select('project_id').in('project_id', projectIds)
       : Promise.resolve({ data: [] as { project_id: string }[] }),
     projectIds.length
-      ? supabase.from('generated_contents').select('project_id, is_published').in('project_id', projectIds)
-      : Promise.resolve({ data: [] as { project_id: string; is_published: boolean }[] }),
+      ? supabase.from('generated_contents').select('project_id, is_published, type, content, title').in('project_id', projectIds)
+      : Promise.resolve({ data: [] as { project_id: string; is_published: boolean; type: string; content: string | null; title: string | null }[] }),
     supabase.from('agent_connections').select('status, last_seen_at').eq('org_id', orgId).limit(1).single(),
   ])
 
@@ -49,11 +50,39 @@ export default async function DashboardPage() {
 
   const contentCounts = new Map<string, number>()
   const approvedCounts = new Map<string, number>()
+  const approvedBlog = new Map<string, string>()
+  const approvedCardTitle = new Map<string, string>()
   for (const content of contentsResult.data ?? []) {
     contentCounts.set(content.project_id, (contentCounts.get(content.project_id) ?? 0) + 1)
     if (content.is_published) {
       approvedCounts.set(content.project_id, (approvedCounts.get(content.project_id) ?? 0) + 1)
+      if (content.type === 'blog' && content.content) approvedBlog.set(content.project_id, content.content)
+      if (content.type === 'card_news' && content.title) approvedCardTitle.set(content.project_id, content.title)
     }
+  }
+
+  // 채널 준비 수는 매물 상세의 채널 탭과 같은 판정 함수로 센다.
+  // 두 화면이 다른 숫자를 보이지 않도록 집계 로직을 공유한다.
+  const preparedChannelCounts = new Map<string, number>()
+  for (const project of projects) {
+    const priceText = project.transaction_type === 'rent'
+      ? (project.deposit && project.monthly_rent ? `${project.deposit}/${project.monthly_rent}` : '')
+      : project.transaction_type === 'lease'
+        ? (project.deposit ? String(project.deposit) : '')
+        : (project.price ? String(project.price) : '')
+
+    const { ready } = summarizeChannelReadiness({
+      address: project.address ?? '',
+      propertyTypeLabel: project.property_type ?? '',
+      transactionTypeLabel: project.transaction_type ?? '',
+      priceText,
+      areaText: project.area ? String(project.area) : '',
+      features: (project.features ?? []) as string[],
+      photoCount: photoCounts.get(project.id) ?? 0,
+      blogBody: approvedBlog.get(project.id) ?? '',
+      cardNewsTitle: approvedCardTitle.get(project.id) ?? '',
+    })
+    preparedChannelCounts.set(project.id, ready)
   }
 
   const snapshotOf = (project: typeof projects[number]): ProjectFlowSnapshot => ({
@@ -62,8 +91,7 @@ export default async function DashboardPage() {
     featureCount: (project.features ?? []).length,
     contentCount: contentCounts.get(project.id) ?? 0,
     approvedContentCount: approvedCounts.get(project.id) ?? 0,
-    // 채널 등록 자료 준비 집계는 채널 연동 단계에서 들어온다. 아직 사실값이 없으므로 0을 쓴다.
-    preparedChannelCount: 0,
+    preparedChannelCount: preparedChannelCounts.get(project.id) ?? 0,
   })
 
   const tracked = projects.map((project) => ({ project, stage: resolveProjectStage(snapshotOf(project)) }))
