@@ -70,13 +70,22 @@ export async function checkQuota(
 
   if (error) {
     console.error('[checkQuota] RPC 오류:', error.message)
-    throw new Error('사용량 한도를 확인할 수 없습니다. 잠시 후 다시 시도해주세요.')
+    // 함수 자체가 없으면 재시도로 해결되지 않는다. 설정 문제임을 알려야
+    // 사용자가 같은 요청을 반복하지 않는다.
+    const missingFunction =
+      /function .*does not exist|could not find the function|PGRST202/i.test(error.message)
+    if (missingFunction) {
+      throw new Error(
+        '사용량 확인 기능이 서버에 설정되어 있지 않습니다. 관리자에게 문의해 주세요.',
+      )
+    }
+    throw new Error('사용량 한도를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.')
   }
   // 응답 모양이 예상과 다르면 '한도 초과 아님'으로 넘기지 않는다. 쿼터는
   // 과금·남용 경계이므로 판단 불가 시 막는 쪽이 맞다(fail-closed).
   if (typeof data?.exceeded !== 'boolean') {
     console.error('[checkQuota] 예상 밖 응답 모양')
-    throw new Error('사용량 한도를 확인할 수 없습니다. 잠시 후 다시 시도해주세요.')
+    throw new Error('사용량 확인 응답이 올바르지 않습니다. 관리자에게 문의해 주세요.')
   }
   if (data.exceeded) {
     throw new Error(`월간 ${type} 한도를 초과했습니다. 요금제를 업그레이드하세요.`)
