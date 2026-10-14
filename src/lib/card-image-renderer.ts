@@ -8,7 +8,7 @@ import {
 } from './price-source'
 import type { CardPlatform, CardSlideData, SpecGridItem } from './card-news-contract'
 
-const COLOR = {
+export const COLOR = {
   INK: '#141a36',
   PAPER: '#faf8f4',
   WHITE: '#ffffff',
@@ -170,15 +170,69 @@ function drawCoverPhoto(ctx: SKRSContext2D, image: Awaited<ReturnType<typeof loa
 
 function priceText(card: CardRenderInput['card']): string {
   const value = normalizeText(card.price_badge)
-  return value === PRICE_UNKNOWN_TEXT ? '' : value
+  // 완전일치로 비교하면 프롬프트 규칙이 지시한 '미입력 (중개사에게 문의)' 가
+  // 금액으로 오인된다. 접두 비교로 맞춘다.
+  return value.startsWith(PRICE_UNKNOWN_TEXT) ? '' : value
 }
 
-function cardContainsAmount(card: CardRenderInput['card']): boolean {
-  if (priceText(card)) return true
-  const text = [card.title, card.subtitle, card.body, card.highlight, ...(card.checkpoints ?? []), ...(card.points ?? [])]
+// 탐지 전용 정규화. 렌더용 normalizeText 는 공백을 1개로 줄일 뿐 지우지 않으므로
+// '3,000 만원' 처럼 숫자와 단위 사이에 공백만 넣어도 탐지를 빠져나갔다.
+// 비교 직전에 모든 공백을 지우고 전각 문자를 반각으로 접는다.
+const amountProbe = (value: string): string =>
+  value.normalize('NFKC').replace(/[\s\u00a0]/g, '')
+
+const SINO_NUM = '[일이삼사오육칠팔구십]'
+
+const AMOUNT_PATTERNS: RegExp[] = [
+  // 숫자 + 억 (3억, 2.5억, 12억원)
+  /\d[\d,]*(?:\.\d+)?억/,
+  // 숫자 + 만/천/백만 단위 (3000만원, 5천만원, 3백만원)
+  /\d[\d,]*(?:\.\d+)?(?:천만|백만|천|만)원/,
+  // 한글 수사 금액 (삼천만원, 오천만원)
+  new RegExp(`${SINO_NUM}+(?:천만|백만|천|만)원`),
+  new RegExp(`${SINO_NUM}+억`),
+  // 통화 기호·코드 (₩3000, KRW 3000)
+  /(?:₩|KRW)\d/i,
+  // 쉼표 3묶음 이상 또는 7자리 이상 숫자 (30,000,000)
+  /\d{1,3}(?:,\d{3}){2,}/,
+  /\d{7,}/,
+  // 가격 키워드 바로 뒤의 숫자 (보증금 3천/월 250)
+  /(?:보증금|월세|매매|전세|권리금|임대료|분양가|관리비|시세|가격|호가)\D{0,4}\d/,
+  // 보증금/월세 슬래시 표기 (3000/250)
+  /\d{3,}\/\d{2,}/,
+  // 숫자 + 원. 뒤에 한글이 붙으면 '원칙·원색·원룸' 이므로 제외한다.
+  /\d[\d,]*원(?![가-힣])/,
+]
+
+const hasAmount = (value: string): boolean => {
+  const probe = amountProbe(value)
+  return AMOUNT_PATTERNS.some(pattern => pattern.test(probe))
+}
+
+export function cardContainsAmount(input: CardRenderInput): boolean {
+  const { card, platform } = input
+  const badge = priceText(card)
+  if (badge && hasAmount(badge)) return true
+  // 실제로 그려지는 문자열만 검사한다. 그려지지 않는 필드로 차단하면
+  // 이미지에 없는 금액 때문에 정상 카드 생성이 막힌다.
+  // highlight 는 현재 어떤 draw* 도 읽지 않아 제외한다. 렌더에 추가하면 여기도 되살려야 한다.
+  const drawn = [
+    card.title,
+    card.subtitle,
+    card.body,
+    card.address,
+    card.cta,
+    input.region,
+    input.contact?.officeName,
+    ...(card.checkpoints ?? []),
+    ...(card.points ?? []),
+    ...(card.spec_grid ?? []).flatMap(item => [item.label, item.value]),
+    // 해시태그는 instagram 에서만 그려진다.
+    ...(platform === 'instagram' ? (card.hashtags ?? []) : []),
+  ]
     .map(normalizeText)
     .join(' ')
-  return /\d[\d,]*(?:억(?:\s*\d[\d,]*만)?원?|만원|원)/.test(text)
+  return hasAmount(drawn)
 }
 
 function drawCaption(ctx: SKRSContext2D, label: string, platform: CardPlatform, y: number): void {
@@ -365,11 +419,18 @@ export async function renderCardImage(input: CardRenderInput): Promise<CardRende
   const ctx = canvas.getContext('2d')
   ctx.textBaseline = 'top'
 
-  const amount = cardContainsAmount(safeInput.card)
+  // 금액 탐지는 sanitize '이전' 원본으로 한다. sanitizeCardClaims 가 금지문구를
+  // 통째로 빈 문자열로 지우면 그 안의 금액도 함께 사라져 출처 게이트를 빠져나갔다.
+  const amount = cardContainsAmount(input)
   let priceSourceLabel = ''
   if (amount) {
     assertRenderablePriceSource(input.priceSource, 'card_news')
     priceSourceLabel = formatPriceSourceLabel(input.priceSource)
+  }
+
+  // 금지문구 때문에 제목이 통째로 지워졌다면 제목 없는 깨진 카드가 발행되지 않도록 거부한다.
+  if (normalizeText(input.card.title) && !safeInput.card.title) {
+    throw new Error('카드 제목에 사용할 수 없는 문구가 있어 이미지를 만들지 않았습니다. 제목을 수정해 주세요.')
   }
 
   let image: Awaited<ReturnType<typeof loadImage>> | undefined
