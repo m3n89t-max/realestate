@@ -6,12 +6,14 @@ import test from 'node:test'
 
 // tsx는 이 테스트를 CJS로 변환하므로 require 캐시에 electron 스텁을 심어
 // 실제 Electron 런타임 없이 safeStorage 계약을 그대로 검증한다.
-const state = { available: true }
+const state = { available: true, corruptEncryption: false }
 
 const electronStub = {
   safeStorage: {
     isEncryptionAvailable: () => state.available,
-    encryptString: (plain: string) => Buffer.concat([Buffer.from('ENC:'), Buffer.from(plain, 'utf8')]),
+    encryptString: (plain: string) => state.corruptEncryption
+      ? Buffer.from('BROKEN')
+      : Buffer.concat([Buffer.from('ENC:'), Buffer.from(plain, 'utf8')]),
     decryptString: (buffer: Buffer) => {
       const raw = buffer.toString('utf8')
       if (!raw.startsWith('ENC:')) throw new Error('암호문 형식이 아닙니다.')
@@ -36,6 +38,7 @@ function freshStore(): { store: Store; configDir: string } {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'jipporter-credential-'))
   process.env.APPDATA = root
   state.available = true
+  state.corruptEncryption = false
   delete require.cache[require.resolve(storePath)]
   const store = require(storePath) as Store
   return { store, configDir: path.join(root, 'RealEstateAIOS') }
@@ -134,4 +137,45 @@ test('손상된 보안 저장소는 연결 안 됨으로 보고하고 덮어쓰�
   assert.equal(store.getPlatformCredential('naver'), null)
   assert.equal(store.getCredentialStatus().naver, false)
   assert.throws(() => store.savePlatformCredentials({ naver: { id: 'a', pw: 'b' } }))
+})
+
+const invalidLegacyCases: Array<[string, unknown, RegExp]> = [
+  ['배열 루트', [], /형식/],
+  ['null 루트', null, /형식/],
+  ['빈 플랫폼 객체', { naver: {} }, /불완전/],
+  ['문자열 플랫폼 값', { google: 'not-an-object' }, /불완전/],
+  ['플랫폼 내부 알 수 없는 필드', { instagram: { id: 'id', pw: 'pw', token: 'x' } }, /알 수 없는/],
+  ['빈 건축물 API 키', { building_api_key: '' }, /불완전/],
+  ['문자열이 아닌 건축물 API 키', { building_api_key: 123 }, /불완전/],
+  ['문자열이 아닌 migrated 표식', { migrated: 'yes' }, /불완전/],
+]
+
+for (const [name, legacy, expected] of invalidLegacyCases) {
+  test(`레거시 ${name}은 실행을 차단하고 원본을 보존한다`, () => {
+    const { store, configDir } = freshStore()
+    fs.mkdirSync(configDir, { recursive: true })
+    const legacyPath = path.join(configDir, 'credentials.json')
+    fs.writeFileSync(legacyPath, JSON.stringify(legacy))
+    assert.throws(() => store.migrateLegacyCredentials(), expected)
+    assert.equal(fs.existsSync(legacyPath), true)
+  })
+}
+
+test('레거시 암호화 후 복호화 검증 실패 시 원본을 보존한다', () => {
+  const { store, configDir } = freshStore()
+  fs.mkdirSync(configDir, { recursive: true })
+  const legacyPath = path.join(configDir, 'credentials.json')
+  fs.writeFileSync(legacyPath, JSON.stringify({ naver: { id: 'id', pw: 'pw' } }))
+  state.corruptEncryption = true
+  assert.throws(() => store.migrateLegacyCredentials(), /검증|암호문/)
+  assert.equal(fs.existsSync(legacyPath), true)
+})
+
+test('빈 레거시 객체는 비밀값이 없으므로 안전하게 제거한다', () => {
+  const { store, configDir } = freshStore()
+  fs.mkdirSync(configDir, { recursive: true })
+  const legacyPath = path.join(configDir, 'credentials.json')
+  fs.writeFileSync(legacyPath, '{}')
+  assert.equal(store.migrateLegacyCredentials(), false)
+  assert.equal(fs.existsSync(legacyPath), false)
 })

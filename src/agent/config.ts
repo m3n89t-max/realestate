@@ -1,78 +1,63 @@
-import * as dotenv from 'dotenv';
-import path from 'path';
-import fs from 'fs';
-import os from 'os';
-import { getAgentKey, getBuildingApiKey, getPlatformCredential, type PlatformCredential, type PlatformKey } from './credential-store';
+import { app } from 'electron'
+import fs from 'fs'
+import os from 'os'
+import path from 'path'
+import { getAgentKey, getBuildingApiKey } from './credential-store'
+import { validateSupabaseProjectUrl, validateWebhookUrl } from './endpoint-policy'
 
-// .env.local 로드
-dotenv.config({ path: path.resolve(__dirname, '../../.env.local') });
-
-
-// ============================================================
-// 에이전트 설정 타입
-// ============================================================
 export interface AgentConfig {
-    agent_key: string;
-    supabase_url: string;
-    supabase_anon_key: string;
-    webhook_url: string;
-    agent_name: string;
-    version: string;
-    building_api_key: string;
+  agent_key: string
+  supabase_url: string
+  supabase_anon_key: string
+  webhook_url: string
+  agent_name: string
+  version: string
+  building_api_key: string
 }
 
-// ============================================================
-// 설정 로드: %APPDATA% config.json → .env.local 폴백
-// ============================================================
-function loadConfigFromFile(): Partial<AgentConfig> | null {
-    const appDataPath = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
-    const configPath = path.join(appDataPath, 'RealEstateAIOS', 'config.json');
+export interface BootstrapConfig {
+  supabase_url: string
+  supabase_anon_key: string
+  webhook_url: string
+}
 
-    if (fs.existsSync(configPath)) {
-        try {
-            const raw = fs.readFileSync(configPath, 'utf-8');
-            return JSON.parse(raw);
-        } catch {
-            console.warn(`[Config] config.json 파싱 실패: ${configPath}`);
-        }
-    }
-    return null;
+function configPath(): string {
+  const appDataPath = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming')
+  return path.join(appDataPath, 'RealEstateAIOS', 'config.json')
+}
+
+function loadLocalPreferences(): { agent_name?: string } {
+  const filePath = configPath()
+  if (!fs.existsSync(filePath)) return {}
+  const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8')) as Record<string, unknown>
+  return typeof parsed.agent_name === 'string' ? { agent_name: parsed.agent_name } : {}
+}
+
+export function loadBootstrapConfig(): BootstrapConfig {
+  const bootstrapPath = path.join(__dirname, 'bootstrap.json')
+  if (!fs.existsSync(bootstrapPath)) {
+    throw new Error('설치파일의 서버 연결 설정이 없습니다. 공식 설치파일로 다시 설치해 주세요.')
+  }
+  const raw = JSON.parse(fs.readFileSync(bootstrapPath, 'utf8')) as Record<string, unknown>
+  const supabaseUrl = validateSupabaseProjectUrl(typeof raw.supabase_url === 'string' ? raw.supabase_url : '')
+  const anonKey = typeof raw.supabase_anon_key === 'string' ? raw.supabase_anon_key : ''
+  if (anonKey.length < 20 || anonKey.includes('...')) {
+    throw new Error('설치파일의 서버 연결 키가 유효하지 않습니다.')
+  }
+  const webhookUrl = validateWebhookUrl(typeof raw.webhook_url === 'string' ? raw.webhook_url : '', supabaseUrl)
+  return { supabase_url: supabaseUrl, supabase_anon_key: anonKey, webhook_url: webhookUrl }
 }
 
 export function getConfig(): AgentConfig {
-    const fileConfig = loadConfigFromFile();
-
-    const supabaseUrl = fileConfig?.supabase_url || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-    const supabaseAnonKey = fileConfig?.supabase_anon_key || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-    if (!supabaseUrl || !supabaseAnonKey || supabaseAnonKey.includes('...')) {
-        throw new Error('검증된 에이전트 서버 설정이 없습니다. 공식 설치파일로 다시 설치해 주세요.');
-    }
-
-    const config: AgentConfig = {
-        agent_key: getAgentKey()
-            || process.env.AGENT_KEY || '',
-        supabase_url: supabaseUrl,
-        supabase_anon_key: supabaseAnonKey,
-        webhook_url: fileConfig?.webhook_url
-            || process.env.WEBHOOK_URL
-            || `${supabaseUrl}/functions/v1/webhook-agent`,
-        agent_name: fileConfig?.agent_name
-            || process.env.AGENT_NAME || `Agent-${os.hostname()}`,
-        version: fileConfig?.version || '1.0.0',
-        building_api_key: getBuildingApiKey()
-            || (process.env.NODE_ENV === 'production' ? '' : process.env.BUILDING_API_KEY || ''),
-    };
-
-    // supabase_url은 항상 기본값이 있으므로 에러 발생 안 함
-    return config;
-}
-
-// ============================================================
-// 플랫폼별 자격증명 로드
-// OS 암호화 저장소 전용
-// ============================================================
-
-export function getCredentials(platform: PlatformKey): PlatformCredential | null {
-    const storedCredential = getPlatformCredential(platform);
-    return storedCredential?.pw ? storedCredential : null;
+  const bootstrap = loadBootstrapConfig()
+  const preferences = loadLocalPreferences()
+  return {
+    agent_key: getAgentKey(),
+    supabase_url: bootstrap.supabase_url,
+    supabase_anon_key: bootstrap.supabase_anon_key,
+    webhook_url: bootstrap.webhook_url,
+    agent_name: preferences.agent_name || `Agent-${os.hostname()}`,
+    version: app.getVersion(),
+    building_api_key: getBuildingApiKey(),
+  }
 }
