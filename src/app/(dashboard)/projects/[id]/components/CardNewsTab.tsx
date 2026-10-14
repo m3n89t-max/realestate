@@ -8,6 +8,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import type { GeneratedContent, Project } from '@/lib/types'
 import { checkPriceSource } from '@/lib/price-source'
+import { normalizeCardSlide, type CardPlatform, type CardSlideData } from '@/lib/card-news-contract'
 import toast from 'react-hot-toast'
 import { cn } from '@/lib/utils'
 
@@ -18,27 +19,9 @@ interface CardNewsTabProps {
   assets: any[]
 }
 
-interface CardSlide {
-  order: number
-  layout: string
-  title: string
-  subtitle?: string
-  body?: string
-  highlight?: string
-  price_badge?: string
-  address?: string
-  checkpoints?: string[]
-  points?: string[]
-  hashtags?: string[]
-  cta?: string
-  image_prompt?: string
-}
+type CardSlide = CardSlideData
 
 const SLIDE_LABELS = ['커버', '입지', '구성', '투자', '내부', 'CTA']
-
-function layoutFromOrder(order: number): string {
-  return ({ 1: 'cover', 2: 'location', 3: 'composition', 4: 'investment', 5: 'interior', 6: 'cta' } as Record<number, string>)[order] ?? 'cover'
-}
 
 function assignPhoto(order: number, assets: any[]): string | undefined {
   if (!assets.length) return undefined
@@ -49,19 +32,21 @@ function assignPhoto(order: number, assets: any[]): string | undefined {
   const interior = find(['interior', 'inside', 'room', 'living', '내부', '거실', '방']) ?? rest[0] ?? cover
   const pool: Record<number, string | undefined> = {
     1: cover?.file_url, 2: exterior?.file_url, 3: interior?.file_url,
-    4: (rest[1] ?? interior)?.file_url, 5: (rest[rest.length - 1] ?? cover)?.file_url, 6: cover?.file_url,
+    4: (rest[1] ?? interior)?.file_url, 5: (rest[rest.length - 1] ?? cover)?.file_url, 6: undefined,
   }
+  if (order === 6) return undefined
   return pool[order] ?? assets[(order - 1) % assets.length]?.file_url
 }
 
 /* ── 이미지 미리보기 (생성 전 플레이스홀더 / 생성 후 결과) ── */
 function CardImageDisplay({
-  card, photo, aiPhoto, loading, onGenerate,
+  card, photo, aiPhoto, loading, fallbackReason, onGenerate,
 }: {
   card: CardSlide
   photo?: string
   aiPhoto?: string
   loading?: boolean
+  fallbackReason?: string
   onGenerate: () => void
 }) {
   const hasAI = !!aiPhoto
@@ -111,7 +96,13 @@ function CardImageDisplay({
       {/* 생성 완료 배지 */}
       {hasAI && (
         <div className="absolute top-3 right-3 flex items-center gap-1 bg-yellow-400/90 text-yellow-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
-          🍌 생성됨
+          생성됨
+        </div>
+      )}
+
+      {hasAI && fallbackReason && (
+        <div className="absolute inset-x-3 bottom-3 rounded-lg bg-white/95 px-3 py-2 text-[10px] font-medium text-gray-700 shadow">
+          사진 없이 생성됨 — 매물 사진을 추가하면 사진 카드로 만들 수 있습니다
         </div>
       )}
 
@@ -135,7 +126,7 @@ function CardImageDisplay({
         )}>
           {loading
             ? <><Loader2 size={15} className="animate-spin" /> 생성 중…</>
-            : <><span>🍌</span> {hasAI ? '재생성' : 'Nano Banana 생성'}</>
+            : <>{hasAI ? '재생성' : '카드 이미지 생성'}</>
           }
         </div>
       </button>
@@ -187,6 +178,43 @@ function TextEditor({ card, onUpdate, onReset, hasEdits }: {
     )
   }
 
+  const gridInp = () => {
+    const items = card.spec_grid ?? []
+    return (
+      <div className="col-span-2">
+        <label className="text-[10px] text-gray-400 mb-0.5 block">구성 스펙 (2칸)</label>
+        <div className="grid grid-cols-2 gap-2">
+          {Array.from({ length: 2 }, (_, index) => (
+            <div key={index} className="space-y-1 rounded-lg border border-gray-100 p-2">
+              <input
+                type="text"
+                value={items[index]?.label ?? ''}
+                placeholder="라벨"
+                onChange={event => {
+                  const next = Array.from({ length: 2 }, (_, i) => items[i] ?? { label: '', value: '' })
+                  next[index] = { ...next[index], label: event.target.value }
+                  onUpdate('spec_grid', next)
+                }}
+                className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5"
+              />
+              <textarea
+                value={items[index]?.value ?? ''}
+                placeholder="값"
+                rows={2}
+                onChange={event => {
+                  const next = Array.from({ length: 2 }, (_, i) => items[i] ?? { label: '', value: '' })
+                  next[index] = { ...next[index], value: event.target.value }
+                  onUpdate('spec_grid', next)
+                }}
+                className="w-full resize-none text-xs border border-gray-200 rounded-lg px-2.5 py-1.5"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   const { layout } = card
   let fields: React.ReactNode = null
   if (layout === 'cover') {
@@ -194,13 +222,13 @@ function TextEditor({ card, onUpdate, onReset, hasEdits }: {
   } else if (layout === 'location') {
     fields = <><div className="col-span-2">{inp('제목', 'title')}</div>{inp('주소', 'address')}{inp('본문', 'body')}{listInp('입지 포인트 (4개)', 'checkpoints', 4)}</>
   } else if (layout === 'composition') {
-    fields = <><div className="col-span-2">{inp('제목', 'title')}</div>{listInp('구성 항목 (4개)', 'points', 4)}</>
+    fields = <><div className="col-span-2">{inp('제목', 'title')}</div>{gridInp()}{listInp('추가 포인트 (2개)', 'points', 2)}</>
   } else if (layout === 'investment') {
     fields = <><div className="col-span-2">{inp('제목', 'title')}</div>{inp('강조 문구', 'highlight')}{inp('본문', 'body')}{listInp('투자 포인트 (2개)', 'points', 2)}</>
   } else if (layout === 'interior') {
     fields = <><div className="col-span-2">{inp('제목', 'title')}</div>{listInp('내부 특징 (4개)', 'checkpoints', 4)}</>
   } else if (layout === 'cta') {
-    fields = <><div className="col-span-2">{inp('제목', 'title')}</div>{inp('가격 배지', 'price_badge')}{inp('CTA 버튼', 'cta')}{listInp('해시태그 (# 포함, 5개)', 'hashtags', 5)}</>
+    fields = <><div className="col-span-2">{inp('제목', 'title')}</div>{inp('가격 배지', 'price_badge')}{inp('CTA 버튼', 'cta')}{listInp('해시태그 (# 포함, 8개)', 'hashtags', 8)}</>
   }
 
   return (
@@ -244,10 +272,24 @@ export default function CardNewsTab({ projectId, project, contents, assets }: Ca
     } catch { return {} }
   }
 
+  const extractSavedPlatform = (contentId: string | null): CardPlatform => {
+    const content = contents.find(item => item.id === contentId)?.content
+    if (!content) return 'instagram'
+    try { return JSON.parse(content)?.platform === 'kakao' ? 'kakao' : 'instagram' }
+    catch { return 'instagram' }
+  }
+
   const [generating, setGenerating] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(contents[0]?.id ?? null)
+  const [platform, setPlatform] = useState<CardPlatform>(() => {
+    try {
+      const initial = contents[0]?.content ? JSON.parse(contents[0].content)?.platform : undefined
+      return initial === 'kakao' ? 'kakao' : 'instagram'
+    } catch { return 'instagram' }
+  })
   const [editedCards, setEditedCards] = useState<Record<number, Partial<CardSlide>>>({})
   const [aiPhotos, setAiPhotos] = useState<Record<number, string>>(() => extractSavedImages(contents[0]?.id ?? null))
+  const [photoFallbacks, setPhotoFallbacks] = useState<Record<number, string>>({})
   const [aiLoading, setAiLoading] = useState<Record<number, boolean>>({})
   const [cardPhotos, setCardPhotos] = useState<Record<number, string>>({})
   const [activeSlide, setActiveSlide] = useState(0)
@@ -283,24 +325,12 @@ export default function CardNewsTab({ projectId, project, contents, assets }: Ca
   const saveImageUrl = (cardOrder: number, imageUrl: string) =>
     persistImages({ [cardOrder]: imageUrl })
 
-  const slides: CardSlide[] = rawCards.map((c: any, i: number) => {
-    const order = c.order ?? c.card_number ?? (i + 1)
-    return {
-      order,
-      layout: c.layout ?? layoutFromOrder(order),
-      title: c.title ?? c.headline ?? `카드 ${i + 1}`,
-      subtitle: c.subtitle,
-      body: c.body ?? '',
-      highlight: c.highlight ?? c.price ?? undefined,
-      price_badge: c.price_badge,
-      address: c.address,
-      checkpoints: Array.isArray(c.checkpoints) ? c.checkpoints : undefined,
-      points: Array.isArray(c.points) ? c.points : undefined,
-      hashtags: Array.isArray(c.hashtags) ? c.hashtags : undefined,
-      cta: c.cta,
-      image_prompt: c.image_prompt,
-    }
-  })
+  // 플랫폼 선택은 기존 콘텐츠에 저장된 값을 초기값으로만 사용한다.
+  // 사용자가 드롭다운에서 바꾼 이후까지 rawContent.platform 이 덮어쓰면
+  // 카카오를 선택해도 계속 Instagram 카드가 생성된다.
+  const contentPlatform: CardPlatform = platform
+  const slides: CardSlide[] = rawCards.map((card: Record<string, unknown>, index: number) =>
+    normalizeCardSlide(card, index, contentPlatform))
 
   const mergeCard = (card: CardSlide): CardSlide => ({ ...card, ...(editedCards[card.order] ?? {}) })
   const updateCard = (order: number, updates: Partial<CardSlide>) => {
@@ -326,11 +356,11 @@ export default function CardNewsTab({ projectId, project, contents, assets }: Ca
           'Authorization': `Bearer ${session.access_token}`,
           'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
         },
-        body: JSON.stringify({ project_id: projectId, asset_urls, platform: 'instagram' }),
+        body: JSON.stringify({ project_id: projectId, asset_urls, platform }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? `생성 실패 (${res.status})`)
-      toast.success('카드뉴스 텍스트가 생성되었습니다! 이제 Nano Banana로 이미지를 생성하세요.')
+      toast.success('카드뉴스 텍스트가 생성되었습니다. 이제 카드 이미지를 생성하세요.')
       window.location.reload()
     } catch (err: any) {
       toast.error(err.message ?? '생성에 실패했습니다')
@@ -339,7 +369,7 @@ export default function CardNewsTab({ projectId, project, contents, assets }: Ca
     }
   }
 
-  /* ── Nano Banana 단일 카드 생성 ── */
+  /* ── 단일 카드 이미지 생성 ── */
   const handleGenerateAI = async (card: CardSlide) => {
     setAiLoading(prev => ({ ...prev, [card.order]: true }))
     try {
@@ -347,11 +377,12 @@ export default function CardNewsTab({ projectId, project, contents, assets }: Ca
       const res = await fetch('/api/generate-card-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ card: mergeCard(card), photo_url, project_id: projectId }),
+        body: JSON.stringify({ card: mergeCard(card), photo_url, project_id: projectId, platform: contentPlatform }),
       })
       const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Nano Banana 생성 실패')
+      if (!res.ok) throw new Error(json.error ?? '카드 이미지 생성 실패')
       setAiPhotos(prev => ({ ...prev, [card.order]: json.image_url }))
+      setPhotoFallbacks(prev => ({ ...prev, [card.order]: json.photo_fallback_reason ?? '' }))
       try {
         await saveImageUrl(card.order, json.image_url)
         toast.success(`카드 ${card.order} 생성 및 저장 완료`)
@@ -359,18 +390,18 @@ export default function CardNewsTab({ projectId, project, contents, assets }: Ca
         toast.error(`카드 ${card.order} 생성됐지만 저장 실패: ${saveErr.message ?? saveErr}`)
       }
     } catch (err: any) {
-      toast.error(err.message ?? 'Nano Banana 생성 실패')
+      toast.error(err.message ?? '카드 이미지 생성 실패')
     } finally {
       setAiLoading(prev => ({ ...prev, [card.order]: false }))
     }
   }
 
-  /* ── Nano Banana 전체 생성 ── */
+  /* ── 전체 카드 이미지 생성 ── */
   const handleGenerateAllAI = async () => {
     if (!slides.length) { toast.error('텍스트 구조를 먼저 생성하세요'); return }
     setNanoBananaLoading(true)
     setNanoBananaProgress(0)
-    const toastId = toast.loading('Nano Banana 이미지 생성 시작…')
+    const toastId = toast.loading('카드 이미지 생성 시작…')
     const newImages: Record<number, string> = {}
     try {
       for (let i = 0; i < slides.length; i++) {
@@ -383,11 +414,12 @@ export default function CardNewsTab({ projectId, project, contents, assets }: Ca
           const res = await fetch('/api/generate-card-image', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ card: mergeCard(card), photo_url, project_id: projectId }),
+            body: JSON.stringify({ card: mergeCard(card), photo_url, project_id: projectId, platform: contentPlatform }),
           })
           const json = await res.json()
           if (res.ok && json.image_url) {
             setAiPhotos(prev => ({ ...prev, [card.order]: json.image_url }))
+            setPhotoFallbacks(prev => ({ ...prev, [card.order]: json.photo_fallback_reason ?? '' }))
             newImages[card.order] = json.image_url
           } else {
             console.warn(`카드 ${card.order} 실패:`, json.error)
@@ -405,13 +437,13 @@ export default function CardNewsTab({ projectId, project, contents, assets }: Ca
       } else {
         try {
           await persistImages(newImages)
-          toast.success(`🍌 ${savedCount}장 생성 및 저장 완료!`, { id: toastId })
+          toast.success(`${savedCount}장 생성 및 저장 완료!`, { id: toastId })
         } catch (saveErr: any) {
           toast.error(`이미지는 생성됐으나 저장 실패: ${saveErr.message ?? saveErr}`, { id: toastId })
         }
       }
     } catch (err: any) {
-      toast.error(err.message ?? 'Nano Banana 생성 실패', { id: toastId })
+      toast.error(err.message ?? '카드 이미지 생성 실패', { id: toastId })
     } finally {
       setNanoBananaLoading(false)
     }
@@ -424,7 +456,7 @@ export default function CardNewsTab({ projectId, project, contents, assets }: Ca
     if (!url) { toast.error('먼저 이미지를 생성하세요'); return }
     const a = document.createElement('a')
     a.href = url
-    a.download = `card-${activeSlide + 1}-${SLIDE_LABELS[activeSlide] ?? ''}.jpg`
+    a.download = `card-${activeSlide + 1}-${SLIDE_LABELS[activeSlide] ?? ''}.png`
     a.click()
     toast.success('다운로드 완료')
   }
@@ -435,7 +467,7 @@ export default function CardNewsTab({ projectId, project, contents, assets }: Ca
     for (const k of keys) {
       const a = document.createElement('a')
       a.href = aiPhotos[+k]
-      a.download = `card-${k}-${SLIDE_LABELS[+k - 1] ?? ''}.jpg`
+      a.download = `card-${k}-${SLIDE_LABELS[+k - 1] ?? ''}.png`
       a.click()
       await new Promise(r => setTimeout(r, 300))
     }
@@ -464,12 +496,22 @@ export default function CardNewsTab({ projectId, project, contents, assets }: Ca
       <div className="card p-4">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-yellow-400 flex items-center justify-center text-base">🍌</div>
+            <div className="w-7 h-7 rounded-full bg-brand-600 flex items-center justify-center text-sm text-white">C</div>
             <div>
-              <p className="text-sm font-bold text-gray-800">Nano Banana 카드뉴스</p>
-              <p className="text-[11px] text-gray-400">Google Gemini 3.1 Flash Image Preview</p>
+              <p className="text-sm font-bold text-gray-800">결정적 카드뉴스 렌더러</p>
+              <p className="text-[11px] text-gray-400">실제 매물 사진과 입력 문구만 사용</p>
             </div>
           </div>
+
+          <select
+            aria-label="카드뉴스 플랫폼"
+            value={platform}
+            onChange={event => setPlatform(event.target.value as CardPlatform)}
+            className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-600 bg-white"
+          >
+            <option value="instagram">인스타그램</option>
+            <option value="kakao">카카오톡</option>
+          </select>
 
           <div className="flex-1" />
 
@@ -505,6 +547,7 @@ export default function CardNewsTab({ projectId, project, contents, assets }: Ca
                 setActiveSlide(0)
                 setEditedCards({})
                 setAiPhotos(extractSavedImages(id))
+                setPlatform(extractSavedPlatform(id))
               }}
               className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-600 bg-white"
             >
@@ -524,10 +567,10 @@ export default function CardNewsTab({ projectId, project, contents, assets }: Ca
       {/* ── 빈 상태 ── */}
       {slides.length === 0 ? (
         <div className="card p-16 text-center">
-          <div className="text-5xl mb-4">🍌</div>
+          <ImageIcon size={48} className="mx-auto mb-4 text-brand-600" />
           <p className="text-gray-700 font-bold text-lg mb-1">카드뉴스를 시작하세요</p>
           <p className="text-sm text-gray-400 mb-6">
-            먼저 AI가 카드 텍스트 구조를 생성한 후 Nano Banana로 이미지를 만듭니다
+            먼저 AI가 카드 텍스트 구조를 생성한 후 캔버스로 이미지를 만듭니다
           </p>
           <button onClick={handleGenerate} disabled={generating} className="btn-primary mx-auto">
             {generating
@@ -542,13 +585,13 @@ export default function CardNewsTab({ projectId, project, contents, assets }: Ca
           {/* ══ 좌측 패널 ══ */}
           <div className="space-y-4">
 
-            {/* Nano Banana 전체 생성 */}
+            {/* 전체 카드 이미지 생성 */}
             <div className="card p-4 bg-gradient-to-br from-yellow-50 to-amber-50 border border-yellow-200">
               <div className="flex items-center gap-2 mb-3">
-                <span className="text-2xl">🍌</span>
+                <ImageIcon size={24} className="text-brand-600" />
                 <div>
-                  <p className="font-bold text-yellow-900 text-sm">Nano Banana 이미지 생성</p>
-                  <p className="text-[10px] text-yellow-700">매물 사진 + 텍스트 → AI 카드 이미지</p>
+                  <p className="font-bold text-yellow-900 text-sm">카드 이미지 생성</p>
+                  <p className="text-[10px] text-yellow-700">매물 사진 + 텍스트 → 캔버스 이미지</p>
                 </div>
               </div>
 
@@ -628,7 +671,7 @@ export default function CardNewsTab({ projectId, project, contents, assets }: Ca
                             <span className="text-[8px] font-bold text-white">{SLIDE_LABELS[idx]}</span>
                           </div>
                           {hasAI && (
-                            <div className="absolute top-1 right-1 text-[8px] bg-yellow-400 rounded-full w-3.5 h-3.5 flex items-center justify-center">🍌</div>
+                            <div className="absolute top-1 right-1 text-[8px] bg-brand-500 text-white rounded-full w-3.5 h-3.5 flex items-center justify-center">✓</div>
                           )}
                         </button>
                       </div>
@@ -682,6 +725,7 @@ export default function CardNewsTab({ projectId, project, contents, assets }: Ca
                         setActiveSlide(0)
                         setEditedCards({})
                         setAiPhotos(extractSavedImages(c.id))
+                        setPlatform(extractSavedPlatform(c.id))
                       }}
                       className={cn(
                         'w-full text-left p-2 rounded-lg border text-xs transition-colors',
@@ -710,7 +754,7 @@ export default function CardNewsTab({ projectId, project, contents, assets }: Ca
                     activeSlide === i ? 'bg-brand-600 text-white border-brand-600' : 'border-gray-200 text-gray-500 hover:border-gray-400'
                   )}
                 >
-                  {aiPhotos[s.order] && <span className="text-[10px]">🍌</span>}
+                  {aiPhotos[s.order] && <span className="text-[10px]">✓</span>}
                   {SLIDE_LABELS[i] ?? `카드 ${i + 1}`}
                 </button>
               ))}
@@ -734,6 +778,7 @@ export default function CardNewsTab({ projectId, project, contents, assets }: Ca
                     photo={cardPhotos[slides[activeSlide].order] ?? assignPhoto(slides[activeSlide].order, assets)}
                     aiPhoto={aiPhotos[slides[activeSlide].order]}
                     loading={aiLoading[slides[activeSlide].order]}
+                    fallbackReason={photoFallbacks[slides[activeSlide].order]}
                     onGenerate={() => handleGenerateAI(slides[activeSlide])}
                   />
                 )}
