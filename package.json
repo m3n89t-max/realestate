@@ -1,6 +1,6 @@
 {
   "name": "realestate-ai-os",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "main": "dist-agent/main.js",
   "engines": {
@@ -17,9 +17,15 @@
     "test:functions": "deno test --allow-env --allow-net supabase/functions/tests/",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "agent:start": "tsc -p tsconfig.agent.json && electron .",
-    "agent:dev": "tsc -p tsconfig.agent.json && electron .",
-    "agent:build": "tsc -p tsconfig.agent.json && node -e \"require('fs').copyFileSync('src/agent/setup.html','dist-agent/setup.html')\" && node scripts/prepare-agent-bootstrap.js && electron-builder --win"
+    "agent:start": "npm run agent:stage && electron .",
+    "agent:dev": "npm run agent:stage && electron .",
+    "agent:test": "tsx --test tests/agent-endpoint-policy.test.ts tests/agent-release-policy.test.ts tests/credential-store-runtime.test.ts tests/credential-security.test.ts",
+    "agent:stage": "node scripts/clean-agent-dist.js && tsc -p tsconfig.agent.json && node scripts/stage-agent-assets.js && node scripts/prepare-agent-bootstrap.js",
+    "agent:verify-artifact": "node scripts/verify-agent-artifact.js",
+    "agent:prebuild": "npm run agent:test && npm run agent:stage && npm run agent:verify-artifact",
+    "agent:release-check": "node scripts/check-agent-release.js",
+    "agent:sha256": "node scripts/generate-agent-sha256.js",
+    "agent:build": "npm run agent:prebuild && node scripts/check-agent-build-env.js && electron-builder --win --x64 && npm run agent:verify-artifact && npm run agent:release-check && npm run agent:sha256"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -54,6 +60,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@electron/asar": "^4.3.1",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/forms": "^0.5.7",
     "@tailwindcss/typography": "^0.5.13",
@@ -85,7 +92,7 @@
       "output": "dist"
     },
     "compression": "store",
-    "artifactName": "RealEstateAgent.exe",
+    "artifactName": "RealEstateAgent-${version}-portable-${arch}.${ext}",
     "win": {
       "icon": "public/favicon.ico",
       "target": [

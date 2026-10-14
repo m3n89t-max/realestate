@@ -20,12 +20,20 @@ import os from 'os';
 const LOG_DIR = path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'RealEstateAIOS');
 const LOG_FILE = path.join(LOG_DIR, 'agent.log');
 
+function sanitizeLogMessage(message: string): string {
+    return message
+        .replace(/([?&][^\s=]+)=([^\s&]+)/g, '$1=[REDACTED]')
+        .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi, '[ID]')
+        .replace(/(agent[_-]?key\s*[:=]\s*)\S+/gi, '$1[REDACTED]');
+}
+
 function log(msg: string) {
+    const safeMessage = sanitizeLogMessage(msg);
     const timestamp = new Date().toISOString();
-    const line = `[${timestamp}] ${msg}\n`;
-    console.log(msg);
+    const line = `[${timestamp}] ${safeMessage}\n`;
+    console.log(safeMessage);
     if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true });
-    fs.appendFileSync(LOG_FILE, line);
+    fs.appendFileSync(LOG_FILE, line, { encoding: 'utf8', mode: 0o600 });
 }
 
 // ============================================================
@@ -131,7 +139,7 @@ class LocalAgent {
         this.orgId = res.org_id;
         this.agentConnectionId = res.agent_id ?? '';
         log('[Agent] ✅ agent_key 검증 완료');
-        log(`[Agent] org_id: ${this.orgId}`);
+        log('[Agent] 조직 연결 확인 완료');
     }
 
     // ============================================================

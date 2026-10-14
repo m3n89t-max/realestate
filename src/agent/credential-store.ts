@@ -22,6 +22,7 @@ interface SecurePayload {
 const STORE_NAME = 'credentials.secure'
 const LEGACY_NAME = 'credentials.json'
 const PLATFORMS: PlatformKey[] = ['naver', 'google', 'instagram', 'kakao']
+const CREDENTIAL_FIELDS = new Set(['id', 'email', 'pw', 'saved_at'])
 
 function configDir(): string {
   return path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'RealEstateAIOS')
@@ -29,6 +30,10 @@ function configDir(): string {
 
 function securePath(): string {
   return path.join(configDir(), STORE_NAME)
+}
+
+export function getLegacyCredentialPath(): string {
+  return path.join(configDir(), LEGACY_NAME)
 }
 
 function blankPayload(): SecurePayload {
@@ -60,9 +65,42 @@ function writeSecurePayload(payload: SecurePayload): void {
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 })
   const filePath = securePath()
   const temporaryPath = `${filePath}.tmp`
-  const encrypted = safeStorage.encryptString(JSON.stringify(payload)).toString('base64')
-  fs.writeFileSync(temporaryPath, encrypted, { encoding: 'utf8', mode: 0o600 })
-  fs.renameSync(temporaryPath, filePath)
+  try {
+    const encrypted = safeStorage.encryptString(JSON.stringify(payload)).toString('base64')
+    fs.writeFileSync(temporaryPath, encrypted, { encoding: 'utf8', mode: 0o600 })
+    fs.renameSync(temporaryPath, filePath)
+    const verified = readSecurePayload()
+    if (JSON.stringify(verified) !== JSON.stringify(payload)) {
+      throw new Error('보안 저장소 저장 후 복호화 검증에 실패했습니다.')
+    }
+  } finally {
+    fs.rmSync(temporaryPath, { force: true })
+  }
+}
+
+function assertCompleteLegacyCredential(platform: PlatformKey, value: unknown): PlatformCredential {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${platform} 레거시 로그인정보가 불완전해 원본을 보존했습니다.`)
+  }
+  const record = value as Record<string, unknown>
+  if (Object.keys(record).some(key => !CREDENTIAL_FIELDS.has(key))) {
+    throw new Error(`${platform} 레거시 로그인정보에 알 수 없는 항목이 있어 원본을 보존했습니다.`)
+  }
+  if (Object.values(record).some(item => item !== undefined && typeof item !== 'string')) {
+    throw new Error(`${platform} 레거시 로그인정보가 불완전해 원본을 보존했습니다.`)
+  }
+  const pw = typeof record.pw === 'string' ? record.pw : ''
+  const id = typeof record.id === 'string' ? record.id.trim() : ''
+  const email = typeof record.email === 'string' ? record.email.trim() : ''
+  if (!pw || (!id && !email)) {
+    throw new Error(`${platform} 레거시 로그인정보가 불완전해 원본을 보존했습니다.`)
+  }
+  return {
+    ...(id ? { id } : {}),
+    ...(email ? { email } : {}),
+    pw,
+    ...(typeof record.saved_at === 'string' ? { saved_at: record.saved_at } : {}),
+  }
 }
 
 export function savePlatformCredentials(input: Partial<Record<PlatformKey, PlatformCredential>>): void {
@@ -135,32 +173,38 @@ export function getBuildingApiKey(): string {
 }
 
 export function migrateLegacyCredentials(): boolean {
-  const legacyPath = path.join(configDir(), LEGACY_NAME)
+  const legacyPath = getLegacyCredentialPath()
   if (!fs.existsSync(legacyPath)) return false
 
-  const legacy = JSON.parse(fs.readFileSync(legacyPath, 'utf8')) as Record<string, unknown>
+  const parsed = JSON.parse(fs.readFileSync(legacyPath, 'utf8')) as unknown
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('레거시 로그인정보 형식이 올바르지 않아 원본을 보존했습니다.')
+  }
+  const legacy = parsed as Record<string, unknown>
   const knownKeys = new Set([...PLATFORMS, 'building_api_key', 'migrated'])
-  const unknownKeys = Object.keys(legacy).filter(key => !knownKeys.has(key))
-  if (unknownKeys.length > 0) {
+  if (Object.keys(legacy).some(key => !knownKeys.has(key))) {
     throw new Error('알 수 없는 레거시 로그인정보 항목이 있어 원본을 보존했습니다.')
   }
+  if ('migrated' in legacy && typeof legacy.migrated !== 'boolean') {
+    throw new Error('레거시 migrated 항목이 불완전해 원본을 보존했습니다.')
+  }
 
-  const accepted: Partial<Record<PlatformKey, PlatformCredential>> = {}
+  const payload = readSecurePayload()
+  let migrated = false
   for (const platform of PLATFORMS) {
-    const credential = legacy[platform] as PlatformCredential | undefined
-    if (!credential) continue
-    if (credential.pw && (credential.id || credential.email)) {
-      accepted[platform] = credential
-      continue
-    }
-    if (credential.pw || credential.id || credential.email) {
-      throw new Error(`${platform} 레거시 로그인정보가 불완전해 원본을 보존했습니다. 설정 화면에서 다시 저장해 주세요.`)
-    }
+    if (!(platform in legacy)) continue
+    payload.platforms[platform] = assertCompleteLegacyCredential(platform, legacy[platform])
+    migrated = true
   }
-  if (Object.keys(accepted).length > 0) savePlatformCredentials(accepted)
-  if (typeof legacy.building_api_key === 'string' && legacy.building_api_key.trim()) {
-    saveBuildingApiKey(legacy.building_api_key)
+  if ('building_api_key' in legacy) {
+    if (typeof legacy.building_api_key !== 'string' || !legacy.building_api_key.trim()) {
+      throw new Error('레거시 building_api_key가 불완전해 원본을 보존했습니다.')
+    }
+    payload.building_api_key = legacy.building_api_key.trim()
+    migrated = true
   }
+
+  if (migrated) writeSecurePayload(payload)
   fs.rmSync(legacyPath, { force: true })
-  return Object.keys(accepted).length > 0 || Boolean(legacy.building_api_key)
+  return migrated
 }

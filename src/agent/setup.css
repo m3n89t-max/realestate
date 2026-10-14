@@ -1,0 +1,35 @@
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  color: #1e293b;
+  background: linear-gradient(135deg, #f0f4f8, #e8f4fd);
+  font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+}
+.card { width: min(460px, 100%); overflow: hidden; border-radius: 20px; background: #fff; box-shadow: 0 8px 40px rgba(0,0,0,.12); }
+.card-header { padding: 26px 32px 22px; color: #fff; background: linear-gradient(135deg, #0ea5e9, #0284c7); }
+h1 { margin: 0 0 5px; font-size: 24px; }
+.card-header p { margin: 0; opacity: .88; font-size: 13px; }
+.card-body { padding: 28px 32px 32px; }
+.info-box, .manual-box { margin-bottom: 20px; padding: 12px 14px; border-radius: 10px; font-size: 12px; line-height: 1.7; }
+.info-box { color: #0369a1; border: 1px solid #bae6fd; background: #f0f9ff; }
+.manual-box { color: #475569; border: 1px solid #cbd5e1; background: #f8fafc; }
+.field { margin-bottom: 17px; }
+label { display: block; margin-bottom: 7px; color: #374151; font-size: 13px; font-weight: 700; }
+label span { color: #94a3b8; font-size: 11px; font-weight: 400; }
+input { width: 100%; padding: 11px 13px; border: 1.5px solid #e2e8f0; border-radius: 10px; outline: none; background: #fafafa; font-size: 14px; }
+input:focus { border-color: #0ea5e9; background: #fff; }
+.secret-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.toggle { min-width: 54px; border: 1px solid #cbd5e1; border-radius: 10px; color: #475569; background: #f8fafc; cursor: pointer; }
+.hint { margin: 5px 0 0; color: #94a3b8; font-size: 11px; }
+.primary { width: 100%; padding: 12px; border: 0; border-radius: 10px; color: #fff; background: #0ea5e9; font-size: 14px; font-weight: 700; cursor: pointer; }
+.primary:disabled { background: #94a3b8; cursor: not-allowed; }
+.error { display: none; margin: 0 0 12px; color: #dc2626; font-size: 12px; white-space: pre-wrap; }
+.error.visible { display: block; }
+.hidden { display: none; }
+.done-icon { width: 54px; height: 54px; margin: 0 auto 14px; display: grid; place-items: center; border-radius: 50%; color: #fff; background: #10b981; font-size: 30px; }
+h2, #donePanel p { text-align: center; }
+#donePanel p { color: #64748b; font-size: 13px; line-height: 1.7; }

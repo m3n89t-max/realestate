@@ -8,15 +8,23 @@ const MAX_RETRIES = 3;
 const BACKOFF_MS = [1000, 2000, 4000];
 
 async function sendWebhook(config: AgentConfig, payload: Record<string, unknown>): Promise<any> {
+    // 서버가 Authorization 전환을 완료할 때까지 body agent_key도 유지한다.
     const body = { ...payload, agent_key: config.agent_key };
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
         try {
             const res = await fetch(config.webhook_url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${config.agent_key}`,
+                },
                 body: JSON.stringify(body),
+                redirect: 'manual',
             });
+            if (res.status >= 300 && res.status < 400) {
+                throw new Error('[HTTP_REDIRECT] 웹훅 redirect를 거부했습니다.');
+            }
 
             if (!res.ok && res.status >= 500 && attempt < MAX_RETRIES) {
                 console.warn(`[Webhook] 서버 오류 ${res.status}, ${attempt + 1}차 재시도...`);
