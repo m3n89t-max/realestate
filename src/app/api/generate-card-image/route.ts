@@ -1,88 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { renderCardImage, type PhotoFallbackReason } from '@/lib/card-image-renderer'
+import { normalizeCardSlide, type CardPlatform } from '@/lib/card-news-contract'
+import { PriceSourceError, type PriceSourceMeta } from '@/lib/price-source'
 
-const GEMINI_MODEL = 'gemini-3.1-flash-image-preview'
+export const runtime = 'nodejs'
 
-const CARD_LAYOUT_GUIDE: Record<string, { zone: string; overlay: string; style: string }> = {
-  cover: {
-    zone:    '사진이 화면 상단 60~70%를 선명하게 채우고, 하단 30~40%에만 반투명 그라디언트(아래→위 검정 그라디언트, opacity 75%) 적용. 텍스트는 하단 영역에만 배치.',
-    overlay: '상단 사진 영역은 밝고 선명하게 유지. 오버레이 금지.',
-    style:   '제목은 크고 굵은 흰색(또는 금색). 가격 배지는 반투명 흰색 박스.',
-  },
-  location: {
-    zone:    '사진이 상단 45~55%를 선명하게 차지. 하단 절반은 어두운 네이비/차콜 배경. 텍스트는 하단 영역.',
-    overlay: '상단 사진 영역 오버레이 없음. 사진 색상/밝기 그대로.',
-    style:   '체크포인트는 아이콘(원형 불릿) + 흰색 텍스트 리스트.',
-  },
-  composition: {
-    zone:    '사진이 우측 또는 상단 45%를 선명하게 차지. 나머지 영역은 진한 네이비 또는 차콜 배경. 텍스트는 사진과 겹치지 않는 배경 영역에.',
-    overlay: '사진 영역은 필터 없이 원본 그대로.',
-    style:   '깔끔한 그리드 레이아웃. 금색 액센트 포인트.',
-  },
-  investment: {
-    zone:    '사진이 하단 40~50%를 선명하게 차지. 상단은 진한 배경(차콜/네이비). 텍스트와 수치는 상단 영역에.',
-    overlay: '하단 사진 영역은 약한 그라디언트만 (상→하, opacity 30% 이하). 사진이 뚜렷하게 보여야 함.',
-    style:   '임팩트 있는 굵은 숫자/수치. 강조 키워드는 금색.',
-  },
-  interior: {
-    zone:    '사진이 화면 전체를 채움. 하단 35~40%에만 그라디언트 오버레이(opacity 80%). 텍스트는 하단.',
-    overlay: '상단 65% 사진 영역은 밝고 선명하게. 오버레이 없음.',
-    style:   '고급스러운 흰색 타이포그래피. 특장점 리스트.',
-  },
-  cta: {
-    zone:    '사진이 상단 55%를 선명하게 차지. 하단 45%는 진한 배경. CTA 버튼은 하단 중앙.',
-    overlay: '사진은 선명하게. 하단 배경 영역에 텍스트와 버튼 배치.',
-    style:   '해시태그는 작은 크기로 줄바꿈. CTA 버튼은 흰색 또는 브랜드 색상 박스.',
-  },
+interface CardImageRequest {
+  card: Record<string, unknown>
+  photo_url?: string
+  project_id: string
+  platform?: CardPlatform
+  region?: string
 }
 
-function buildCardPrompt(layout: string, card: Record<string, any>): string {
-  const guide = CARD_LAYOUT_GUIDE[layout] ?? CARD_LAYOUT_GUIDE.cover
+const MAX_PHOTO_BYTES = 15 * 1024 * 1024
 
-  const textLines: string[] = []
-  if (card.title)       textLines.push(`제목(크게): ${card.title}`)
-  if (card.subtitle)    textLines.push(`부제목: ${card.subtitle}`)
-  if (card.price_badge) textLines.push(`가격 배지: ${card.price_badge}`)
-  if (card.address)     textLines.push(`주소(작게): ${card.address}`)
-  if (card.highlight)   textLines.push(`강조 문구(금색 굵게): ${card.highlight}`)
-  if (card.body)        textLines.push(`본문: ${card.body}`)
-  if (Array.isArray(card.checkpoints) && card.checkpoints.filter(Boolean).length)
-    textLines.push(`체크포인트 리스트: ${card.checkpoints.filter(Boolean).join(' | ')}`)
-  if (Array.isArray(card.points) && card.points.filter(Boolean).length)
-    textLines.push(`포인트 리스트: ${card.points.filter(Boolean).join(' | ')}`)
-  if (Array.isArray(card.hashtags) && card.hashtags.filter(Boolean).length)
-    textLines.push(`해시태그(작게): ${card.hashtags.filter(Boolean).slice(0, 8).join(' ')}`)
-  if (card.cta)         textLines.push(`CTA 버튼 텍스트: ${card.cta}`)
-
-  return [
-    `[한국 부동산 인스타그램 카드뉴스 ${card.order ?? 1}/6 — 정사각형 1:1]`,
-    ``,
-    `## 사진 활용 방법 (가장 중요)`,
-    `- 제공된 매물 실제 사진을 ${guide.zone}`,
-    `- ${guide.overlay}`,
-    `- 사진 영역은 brightness 100%, contrast 105%, saturation 110% 수준으로 선명하고 생동감 있게.`,
-    `- 절대로 사진 전체를 어둡게 만들지 말 것. 사진이 카드의 핵심 시각 요소임.`,
-    ``,
-    `## 텍스트 배치`,
-    ...textLines,
-    ``,
-    `## 디자인 스타일`,
-    guide.style,
-    `- 전문적인 한국 부동산 마케팅 카드뉴스. 깔끔하고 고급스러운 레이아웃.`,
-    `- 텍스트 가독성 최우선. 흰색 또는 금색 텍스트, 그림자 처리.`,
-  ].join('\n')
-}
-
-async function fetchImageAsBase64(url: string): Promise<{ data: string; mimeType: string } | null> {
+async function downloadPhoto(url?: string): Promise<{ buffer?: Buffer; reason?: PhotoFallbackReason }> {
+  if (!url?.trim()) return { reason: 'no_assets' }
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) })
-    if (!res.ok) return null
-    const buf = await res.arrayBuffer()
-    const contentType = res.headers.get('content-type') ?? 'image/jpeg'
-    const mimeType = contentType.split(';')[0].trim()
-    return { data: Buffer.from(buf).toString('base64'), mimeType }
+    const parsed = new URL(url)
+    if (parsed.protocol !== 'https:') return { reason: 'fetch_failed' }
+    const response = await fetch(url, { signal: AbortSignal.timeout(8000), redirect: 'error' })
+    if (!response.ok) return { reason: 'fetch_failed' }
+    const contentType = response.headers.get('content-type')?.toLowerCase() ?? ''
+    const declaredLength = Number(response.headers.get('content-length') ?? 0)
+    if (!contentType.startsWith('image/') || declaredLength > MAX_PHOTO_BYTES) return { reason: 'fetch_failed' }
+    const buffer = Buffer.from(await response.arrayBuffer())
+    if (buffer.byteLength > MAX_PHOTO_BYTES) return { reason: 'fetch_failed' }
+    return { buffer }
   } catch {
-    return null
+    return { reason: 'fetch_failed' }
   }
 }
 
@@ -92,107 +40,92 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: '인증되지 않은 요청입니다' }, { status: 401 })
 
-    const body = await req.json()
-    const { card, photo_url, project_id } = body as {
-      card: Record<string, any>
-      photo_url?: string
-      project_id?: string
+    const body = await req.json() as CardImageRequest
+    if (!body.card) return NextResponse.json({ error: 'card 데이터가 필요합니다' }, { status: 400 })
+    if (!body.project_id?.trim()) return NextResponse.json({ error: 'project_id가 필요합니다' }, { status: 400 })
+    if (body.platform !== undefined && body.platform !== 'instagram' && body.platform !== 'kakao') {
+      return NextResponse.json({ error: 'platform은 instagram 또는 kakao 이어야 합니다' }, { status: 400 })
     }
+    const platform: CardPlatform = body.platform ?? 'instagram'
 
-    if (!card) return NextResponse.json({ error: 'card 데이터가 필요합니다' }, { status: 400 })
-
-    const apiKey = process.env.GOOGLE_AI_API_KEY
-    if (!apiKey) return NextResponse.json({ error: 'GOOGLE_AI_API_KEY가 설정되지 않았습니다' }, { status: 500 })
-
-    const prompt = buildCardPrompt(card.layout ?? 'cover', card)
-
-    // 멀티모달 파츠 구성 (사진 + 텍스트)
-    //
-    // 사진 없이 프롬프트만 보내면 생성 모델이 매물과 무관한 건물 사진을 만들어낸다.
-    // 중개사가 그 카드를 그대로 올리면 실제 매물이 아닌 사진으로 광고하는 셈이 되므로
-    // 모델을 부르기 전에 막는다. 사진 없는 매물은 텍스트 중심 카드로 처리해야 한다.
-    if (!photo_url) {
-      return NextResponse.json(
-        {
-          error:
-            '실제 매물 사진이 없어 사진형 카드를 만들 수 없습니다. 사진을 먼저 올려주세요.',
-          reason: 'photo_required',
-        },
-        { status: 400 },
-      )
-    }
-
-    const img = await fetchImageAsBase64(photo_url)
-    if (!img) {
-      // 내려받기 실패를 '사진 없음'과 같게 취급한다. 그냥 진행하면
-      // 실제 매물 사진이 아닌 이미지가 생성된다.
-      return NextResponse.json(
-        {
-          error:
-            '실제 매물 사진을 불러오지 못했습니다. 사진을 다시 올리거나 잠시 후 시도해 주세요.',
-          reason: 'photo_fetch_failed',
-        },
-        { status: 400 },
-      )
-    }
-
-    const parts: unknown[] = [
-      { inlineData: { mimeType: img.mimeType, data: img.data } },
-      { text: prompt },
-    ]
-
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts }],
-          generationConfig: { responseModalities: ['IMAGE', 'TEXT'] },
-        }),
+    let project: (PriceSourceMeta & { address?: string | null; org_id?: string | null }) | null = null
+    let contact: { officeName?: string; phone?: string; registrationNumber?: string } | undefined
+    let approvedPhotoUrl: string | undefined
+    if (body.project_id) {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('address,org_id,value_type,source_name,source_date,source_channel')
+        .eq('id', body.project_id)
+        .single()
+      if (error || !data) return NextResponse.json({ error: '프로젝트를 찾을 수 없습니다' }, { status: 404 })
+      project = data
+      if (data.org_id) {
+        const { data: organization } = await supabase
+          .from('organizations')
+          .select('name,phone,business_number')
+          .eq('id', data.org_id)
+          .single()
+        if (organization) {
+          contact = {
+            officeName: organization.name ?? undefined,
+            phone: organization.phone ?? undefined,
+            registrationNumber: organization.business_number ?? undefined,
+          }
+        }
       }
-    )
-
-    const data = await res.json()
-    if (!res.ok) {
-      console.error('[nano-banana] error:', JSON.stringify(data).slice(0, 300))
-      return NextResponse.json({ error: data.error?.message ?? 'Nano Banana 호출 실패' }, { status: 500 })
+      if (body.photo_url?.trim()) {
+        const { data: asset } = await supabase
+          .from('assets')
+          .select('file_url')
+          .eq('project_id', body.project_id)
+          .eq('file_url', body.photo_url)
+          .maybeSingle()
+        approvedPhotoUrl = asset?.file_url
+      }
     }
 
-    const responseParts: any[] = data.candidates?.[0]?.content?.parts ?? []
-    const imagePart = responseParts.find((p: any) => p.inlineData?.mimeType?.startsWith('image/'))
-    if (!imagePart) {
-      const textPart = responseParts.find((p: any) => p.text)
-      console.error('[nano-banana] no image in response. text:', textPart?.text?.slice(0, 200))
-      return NextResponse.json({ error: '이미지를 생성하지 못했습니다' }, { status: 500 })
-    }
+    const card = normalizeCardSlide(body.card, Number(body.card.order ?? body.card.card_number ?? 1) - 1, platform)
+    // 클라이언트가 임의 URL을 주입할 수 없도록 이 프로젝트에 실제 업로드된 asset URL만 내려받는다.
+    const photo = card.layout === 'cta' ? {} : await downloadPhoto(approvedPhotoUrl)
+    const priceSource = project ?? {}
+    const region = body.region ?? project?.address?.split(' ').slice(0, 3).join(' ') ?? ''
+    const rendered = await renderCardImage({
+      card,
+      platform,
+      priceSource,
+      region,
+      contact,
+      photoBuffer: photo.buffer,
+      photoFallbackReason: photo.reason,
+    })
 
-    const { mimeType, data: b64 } = imagePart.inlineData
-
-    // Supabase Storage 업로드
-    let stored_url = `data:${mimeType};base64,${b64}`
+    let storedUrl = `data:image/png;base64,${rendered.png.toString('base64')}`
     try {
-      const buf = Buffer.from(b64, 'base64')
-      const ext = mimeType === 'image/png' ? 'png' : 'jpg'
-      const path = `card-news/${project_id ?? user.id}/${Date.now()}-card${card.order ?? 1}.${ext}`
-      const { createClient: createSupa } = await import('@supabase/supabase-js')
-      const admin = createSupa(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
-      const { error: upErr } = await admin.storage
+      const { createClient: createAdminClient } = await import('@supabase/supabase-js')
+      const admin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+      const objectPath = `card-news/${body.project_id ?? user.id}/${Date.now()}-card${card.order}.png`
+      const { error: uploadError } = await admin.storage
         .from('project-assets')
-        .upload(path, buf, { contentType: mimeType, upsert: true })
-      if (!upErr) {
-        const { data: pub } = admin.storage.from('project-assets').getPublicUrl(path)
-        if (pub?.publicUrl) stored_url = pub.publicUrl
+        .upload(objectPath, rendered.png, { contentType: 'image/png', upsert: true })
+      if (!uploadError) {
+        const { data } = admin.storage.from('project-assets').getPublicUrl(objectPath)
+        if (data.publicUrl) storedUrl = data.publicUrl
       } else {
-        console.error('[nano-banana] storage upload failed, falling back to data URL:', upErr.message)
+        console.error('[card-image] storage upload failed, falling back to data URL:', uploadError.message)
       }
-    } catch (e) {
-      console.error('[nano-banana] storage upload threw, falling back to data URL:', e)
+    } catch (error) {
+      console.error('[card-image] storage upload threw, falling back to data URL:', error)
     }
 
-    return NextResponse.json({ success: true, image_url: stored_url, card_number: card.order })
-  } catch (e) {
-    const message = e instanceof Error ? e.message : 'Nano Banana 이미지 생성 실패'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({
+      success: true,
+      image_url: storedUrl,
+      card_number: card.order,
+      layout_used: rendered.layoutUsed,
+      photo_fallback_reason: rendered.photoFallbackReason,
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '카드 이미지 생성 실패'
+    return NextResponse.json({ error: message }, { status: error instanceof PriceSourceError ? 400 : 500 })
   }
 }

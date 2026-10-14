@@ -46,7 +46,7 @@ ${REGION_PRICE_CLAIM_BAN_RULES}
 
 [카드 6장 구성]
 1장(cover): 후킹 제목(2줄, 줄당 8자 이내) + 가격뱃지 + 핵심강점 체크포인트 3개
-2장(location): 위치 + 주소 + 교통·생활 인프라 체크포인트 3개(구체적 거리/시간 포함)
+2장(location): 위치 + 주소 + 교통·생활 인프라 체크포인트 4개(구체적 거리/시간 포함)
 3장(composition): 층별 구성 스펙그리드 2칸 (실제 업종/용도 명시) + 추가포인트 2개
 4장(investment): 임대현황 하이라이트 + 투자수익 관련 포인트 2개
 5장(interior): 사진 분석 기반 내부 특징 4개 (가장 눈에 띄는 것부터)
@@ -65,7 +65,7 @@ ${REGION_PRICE_CLAIM_BAN_RULES}
   {
     "card_number":2,"layout":"location",
     "title":"입지 분석","address":"전체 주소",
-    "checkpoints":["교통: 구체적 내용","생활: 구체적 내용","환경: 구체적 내용"],
+    "checkpoints":["교통: 구체적 내용","생활: 구체적 내용","환경: 구체적 내용","접근: 구체적 내용"],
     "body":"한줄 입지 요약 (20자 이내)",
     "image_prompt":"[지역영문] street view, [건물주변환경], sunny day, Korean neighborhood, photorealistic, no text"
   },
