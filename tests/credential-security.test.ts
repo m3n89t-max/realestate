@@ -51,9 +51,9 @@ test('Electron renderer는 격리되고 preload의 제한된 API만 사용한다
   assert.match(main, /preload:/)
   assert.match(main, /assertTrustedSender/)
   assert.doesNotMatch(setup, /require\(['"]electron['"]\)/)
-  assert.match(setup, /window\.jipporter/)
-  assert.match(setup, /instagram_id/)
-  assert.match(setup, /instagram_pw/)
+  assert.match(setup, /id="agent_key"[^>]*type="password"/)
+  assert.doesNotMatch(setup, /naver_pw|google_pw|instagram_pw/)
+  assert.doesNotMatch(setup, /onclick=/)
 })
 
 test('로컬 자격증명 저장소는 Electron safeStorage로 암호화한다', () => {

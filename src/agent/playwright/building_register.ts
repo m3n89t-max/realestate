@@ -1,6 +1,5 @@
 import { AgentConfig } from '../config';
-import { sendTaskProgress } from '../webhook-client';
-import { createClient } from '@supabase/supabase-js';
+import { saveDocument, sendTaskProgress } from '../webhook-client';
 
 /**
  * 건축물대장 다운로드 — 공공데이터포털 건축HUB API
@@ -19,6 +18,9 @@ export async function downloadBuildingRegister(
 
     if (!sigunguCd || !bjdongCd) {
         throw new Error('[SEARCH_NOT_FOUND] 지번 코드 정보가 없습니다. 주소 정규화를 먼저 실행하세요.')
+    }
+    if (!projectId || !config.agent_key) {
+        throw new Error('[CONFIG_MISSING] 문서 저장에 필요한 작업 연결 정보가 없습니다.')
     }
 
     const apiKey = (config as any).building_api_key
@@ -42,27 +44,20 @@ export async function downloadBuildingRegister(
 
     const results = { title: titleItems, floors: floorItems, exclusive: exclItems }
 
-    // ── Supabase documents 저장 ───────────────────────────────
-    await progress(config, task.id, 'Supabase에 저장 중...', 85)
-    const supabase = createClient(config.supabase_url, config.supabase_anon_key)
-
-    const { data: proj } = await supabase.from('projects').select('org_id').eq('id', projectId).single()
-
-    if (proj) {
-        await supabase.from('documents').upsert({
-            project_id: projectId,
-            org_id:     proj.org_id,
-            type:       'building_register',
-            status:     'completed',
-            raw_data:   results,
-            summary:    formatSummary(titleItems),
-            fetched_at: new Date().toISOString(),
-        }, { onConflict: 'project_id,type' })
-    }
+    // ── 서버 검증 후 documents 저장 ───────────────────────────
+    await progress(config, task.id, '서버에 저장 중...', 85)
+    const saved = await saveDocument(config, {
+        taskId: task.id,
+        projectId,
+        documentType: 'building_register',
+        rawData: results,
+        summary: formatSummary(titleItems),
+    })
 
     await progress(config, task.id, '건축물대장 조회 완료! ✅', 100)
 
     return {
+        document_id: saved.document_id,
         title_count: titleItems.length,
         floor_count: floorItems.length,
         summary:     formatSummary(titleItems),

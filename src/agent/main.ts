@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, type IpcMainInvokeEvent } from 'electron';
+import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, dialog, type IpcMainInvokeEvent } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
@@ -6,14 +6,12 @@ import zlib from 'zlib';
 import { pathToFileURL } from 'url';
 import { AGENT_BRAND } from './brand';
 import {
-    deletePlatformCredential,
-    getCredentialStatus,
+    getAgentKey,
+    getLegacyCredentialPath,
     migrateLegacyCredentials,
     saveAgentKey,
-    savePlatformCredentials,
-    type PlatformCredential,
-    type PlatformKey,
 } from './credential-store';
+import { loadBootstrapConfig } from './config';
 
 // Node.js 내장 zlib로 16x16 파란색 PNG 버퍼 생성 (외부 파일 불필요)
 function createIconBuffer(): Buffer {
@@ -56,27 +54,7 @@ let agentStarted = false;
 const CONFIG_DIR = path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'RealEstateAIOS');
 const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
 
-interface BootstrapConfig {
-    supabase_url: string;
-    supabase_anon_key: string;
-}
-
-function loadBootstrapConfig(): BootstrapConfig {
-    const bootstrapPath = path.join(__dirname, 'bootstrap.json');
-    const raw = fs.existsSync(bootstrapPath)
-        ? JSON.parse(fs.readFileSync(bootstrapPath, 'utf8'))
-        : {
-            supabase_url: process.env.AGENT_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL,
-            supabase_anon_key: process.env.AGENT_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-        };
-    const url = typeof raw.supabase_url === 'string' ? raw.supabase_url : '';
-    const anonKey = typeof raw.supabase_anon_key === 'string' ? raw.supabase_anon_key : '';
-    if (!url || !anonKey || anonKey.length < 20 || anonKey.includes('...')) {
-        throw new Error('설치파일의 서버 연결 설정이 유효하지 않습니다.');
-    }
-    if (new URL(url).protocol !== 'https:') throw new Error('서버 주소는 HTTPS만 사용할 수 있습니다.');
-    return { supabase_url: url, supabase_anon_key: anonKey };
-}
+let securityBlockMessage = ''
 
 function assertTrustedSender(event: IpcMainInvokeEvent): void {
     const expectedUrl = pathToFileURL(path.join(__dirname, 'setup.html')).toString();
@@ -86,59 +64,24 @@ function assertTrustedSender(event: IpcMainInvokeEvent): void {
 }
 
 function hasConfig(): boolean {
-    if (!fs.existsSync(CONFIG_PATH)) return false;
-    try {
-        const cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
-        return !!cfg.supabase_url;
-    } catch {
-        return false;
-    }
+    return Boolean(getAgentKey());
 }
 
 // ─── IPC: 설정 저장 ───────────────────────────────────────────
 ipcMain.handle('save-config', (event, data: { agent_name: string; agent_key: string }) => {
     try {
         assertTrustedSender(event);
+        if (securityBlockMessage) throw new Error(securityBlockMessage);
         if (!data.agent_key?.trim()) throw new Error('연결 정보가 필요합니다.');
-        const bootstrap = loadBootstrapConfig();
+        loadBootstrapConfig();
         if (!fs.existsSync(CONFIG_DIR)) fs.mkdirSync(CONFIG_DIR, { recursive: true });
-        const config = {
-            supabase_url: bootstrap.supabase_url,
-            supabase_anon_key: bootstrap.supabase_anon_key,
-            webhook_url: `${bootstrap.supabase_url}/functions/v1/webhook-agent`,
-            agent_name: data.agent_name || `Agent-${os.hostname()}`,
-            version: '1.0.0',
-        };
         saveAgentKey(data.agent_key);
+        if (getAgentKey() !== data.agent_key.trim()) throw new Error('연결키 암호화 저장 검증에 실패했습니다.');
+        const config = { agent_name: data.agent_name?.trim() || `Agent-${os.hostname()}` };
         fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), { encoding: 'utf8', mode: 0o600 });
         return { ok: true };
-    } catch (e: any) {
-        return { ok: false, error: e.message };
-    }
-});
-
-// ─── IPC: OS 암호화 자격증명 저장 ─────────────────────────────
-ipcMain.handle('save-credentials', (event, data: Partial<Record<PlatformKey, PlatformCredential>>) => {
-    try {
-        assertTrustedSender(event);
-        savePlatformCredentials(data);
-        return { ok: true };
-    } catch (e: any) {
-        return { ok: false, error: e.message };
-    }
-});
-
-ipcMain.handle('credential-status', (event) => {
-    assertTrustedSender(event);
-    return getCredentialStatus();
-});
-ipcMain.handle('delete-credential', (event, platform: PlatformKey) => {
-    try {
-        assertTrustedSender(event);
-        deletePlatformCredential(platform);
-        return { ok: true };
-    } catch (error) {
-        return { ok: false, error: error instanceof Error ? error.message : '삭제에 실패했습니다.' };
+    } catch (e: unknown) {
+        return { ok: false, error: e instanceof Error ? e.message : '설정을 저장하지 못했습니다.' };
     }
 });
 
@@ -160,6 +103,7 @@ ipcMain.handle('config-saved', async (event) => {
 
 async function startAgent(): Promise<{ ok: boolean; error?: string }> {
     if (agentStarted) return { ok: true };
+    if (securityBlockMessage) return { ok: false, error: securityBlockMessage };
     try {
         const { agent } = await import('./worker');
         await agent.start();
@@ -217,6 +161,7 @@ const showSetupWindow = () => {
         title: `${AGENT_BRAND.localAgentName} 초기 설정`,
     });
     mainWindow.loadFile(path.join(__dirname, 'setup.html'));
+    mainWindow.webContents.session.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
     mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     mainWindow.webContents.on('will-navigate', (event, url) => {
         const expectedUrl = pathToFileURL(path.join(__dirname, 'setup.html')).toString();
@@ -238,21 +183,34 @@ if (!gotLock) {
 
 function migrateLegacySecrets() {
     if (fs.existsSync(CONFIG_PATH)) {
-        const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
-        if (typeof config.agent_key === 'string' && config.agent_key) {
-            saveAgentKey(config.agent_key);
-            delete config.agent_key;
-            fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), { encoding: 'utf8', mode: 0o600 });
+        const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')) as Record<string, unknown>;
+        if ('agent_key' in config && (typeof config.agent_key !== 'string' || !config.agent_key.trim())) {
+            throw new Error('config.json의 평문 연결키가 불완전합니다.');
         }
+        if (typeof config.agent_key === 'string') {
+            saveAgentKey(config.agent_key);
+            if (getAgentKey() !== config.agent_key.trim()) throw new Error('평문 연결키 암호화 저장 검증에 실패했습니다.');
+            delete config.agent_key;
+        }
+        delete config.supabase_url;
+        delete config.supabase_anon_key;
+        delete config.webhook_url;
+        delete config.version;
+        const preferences = typeof config.agent_name === 'string' ? { agent_name: config.agent_name } : {};
+        fs.writeFileSync(CONFIG_PATH, JSON.stringify(preferences, null, 2), { encoding: 'utf8', mode: 0o600 });
     }
     migrateLegacyCredentials();
 }
 
 app.on('ready', async () => {
     try {
+        loadBootstrapConfig();
         migrateLegacySecrets();
-    } catch {
-        console.error('[Security] 기존 로그인정보를 안전하게 이전하지 못했습니다. 설정 화면에서 다시 저장해 주세요.');
+    } catch (error) {
+        const legacyPath = getLegacyCredentialPath();
+        securityBlockMessage = `보안을 위해 에이전트 실행을 차단했습니다. 평문 파일을 확인해 삭제한 뒤 설정 화면에서 비밀값을 다시 입력하세요. 경로: ${legacyPath}`;
+        console.error('[Security] 레거시 평문 이전 실패. 비밀값은 로그에 출력하지 않습니다.');
+        dialog.showErrorBox('집포터 보안 확인 필요', `${securityBlockMessage}\n\n원인: ${error instanceof Error ? error.message : '알 수 없는 마이그레이션 오류'}`);
         showSetupWindow();
         return;
     }

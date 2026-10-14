@@ -10,6 +10,7 @@ import {
 import StatusBadge from '@/components/ui/StatusBadge'
 import { formatPrice, formatArea, getPropertyTypeLabel } from '@/lib/utils'
 import { PRICE_UNKNOWN_TEXT, formatKeyMoney } from '@/lib/price-source'
+import { makeSupabaseSignedUrlCreator, resolveDocumentFileUrls } from '@/lib/document-url'
 import BlogTab from './components/BlogTab'
 import CardNewsTab from './components/CardNewsTab'
 import DocsTab from './components/DocsTab'
@@ -77,11 +78,16 @@ export default async function ProjectDetailPage({
     .order('created_at', { ascending: true })
     .order('id', { ascending: true })
 
-  const { data: documents } = await supabase
+  const { data: documentRows } = await supabase
     .from('documents')
     .select('*')
     .eq('project_id', id)
     .order('created_at', { ascending: false })
+
+  const documents = await resolveDocumentFileUrls(
+    documentRows ?? [],
+    makeSupabaseSignedUrlCreator(supabase.storage),
+  )
 
   const blogContents = contents?.filter(c => c.type === 'blog') ?? []
   const cardNewsContents = contents?.filter(c => c.type === 'card_news') ?? []

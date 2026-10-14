@@ -11,6 +11,10 @@
         "rootDir": "src/agent"
     },
     "include": [
-        "src/agent/**/*"
+        "src/agent/**/*.ts"
+    ],
+    "exclude": [
+        "src/agent/playwright/*_upload.ts",
+        "src/agent/ui/**/*"
     ]
 }

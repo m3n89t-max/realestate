@@ -88,7 +88,8 @@ export type {
     WebhookTaskProgressRequest,
     WebhookTaskCompletedRequest,
     WebhookTaskFailedRequest,
-    WebhookDocumentUploadedRequest,
+    WebhookSaveDocumentRequest,
+    WebhookSaveDocumentResponse,
     WebhookAgentRequest,
     WebhookAgentResponse,
 } from './types/api';
