@@ -1,7 +1,6 @@
 import { chromium } from 'playwright';
 import { AgentConfig } from '../config';
-import { sendTaskProgress, sendDocumentUploaded } from '../webhook-client';
-import { createClient } from '@supabase/supabase-js';
+import { saveDocument, sendTaskProgress } from '../webhook-client';
 
 // ============================================================
 // 지적도 다운로드 — 토지이음 (eum.go.kr)
@@ -16,6 +15,9 @@ export async function downloadCadastralMap(
 
     if (!address) {
         throw new Error('[SEARCH_NOT_FOUND] 주소 정보가 없습니다.');
+    }
+    if (!projectId || !config.agent_key) {
+        throw new Error('[CONFIG_MISSING] 문서 저장에 필요한 작업 연결 정보가 없습니다.');
     }
 
     const browser = await chromium.launch({
@@ -75,44 +77,21 @@ export async function downloadCadastralMap(
         const fileName = `cadastral_map_${Date.now()}.png`;
         await progress(config, task.id, '스크린샷 캡처 완료', 70);
 
-        // ---- Step 5: Supabase Storage 업로드 ----
-        await progress(config, task.id, 'Supabase Storage 업로드 중...', 80);
-
-        const supabase = createClient(config.supabase_url, config.supabase_anon_key);
-        const storagePath = `${task.org_id}/${projectId}/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-            .from('documents')
-            .upload(storagePath, screenshotBuffer, {
-                contentType: 'image/png',
-                upsert: true,
-            });
-
-        if (uploadError) {
-            throw new Error(`[UPLOAD_FAILED] Storage 업로드 실패: ${uploadError.message}`);
-        }
-
-        const { data: urlData } = supabase.storage
-            .from('documents')
-            .getPublicUrl(storagePath);
-        const fileUrl = urlData.publicUrl;
-
-        // ---- Step 6: document_uploaded 웹훅 ----
-        await progress(config, task.id, '지적도 등록 완료 처리 중...', 90);
-        if (config.agent_key && fileUrl) {
-            await sendDocumentUploaded(
-                config,
-                projectId,
-                'cadastral_map',
-                fileUrl,
-                fileName
-            );
-        }
+        // ---- Step 5: 서버 검증 후 Storage + document 저장 ----
+        await progress(config, task.id, '서버에 지적도 저장 중...', 80);
+        const saved = await saveDocument(config, {
+            taskId: task.id,
+            projectId,
+            documentType: 'cadastral_map',
+            fileName,
+            contentType: 'image/png',
+            fileBase64: screenshotBuffer.toString('base64'),
+        });
 
         await progress(config, task.id, '지적도 다운로드 완료! ✅', 100);
 
         return {
-            file_url: fileUrl,
+            document_id: saved.document_id,
             file_name: fileName,
         };
 

@@ -138,20 +138,34 @@ export async function claimTaskViaWebhook(config: AgentConfig, taskId: string): 
     return res?.claimed === true;
 }
 
-export async function sendDocumentUploaded(
+export interface SaveDocumentInput {
+    taskId: string;
+    projectId: string;
+    documentType: 'building_register' | 'cadastral_map';
+    fileName?: string;
+    contentType?: 'image/png';
+    fileBase64?: string;
+    rawData?: Record<string, unknown>;
+    summary?: string;
+}
+
+export async function saveDocument(
     config: AgentConfig,
-    projectId: string,
-    documentType: string,
-    fileUrl: string,
-    fileName: string,
-    rawText?: string
-) {
-    return sendWebhook(config, {
-        event: 'document_uploaded',
-        project_id: projectId,
-        document_type: documentType,
-        file_url: fileUrl,
-        file_name: fileName,
-        raw_text: rawText || '',
+    input: SaveDocumentInput
+): Promise<{ document_id: string }> {
+    const response = await sendWebhook(config, {
+        event: 'save_document',
+        task_id: input.taskId,
+        project_id: input.projectId,
+        document_type: input.documentType,
+        file_name: input.fileName,
+        content_type: input.contentType,
+        file_base64: input.fileBase64,
+        raw_data: input.rawData,
+        summary: input.summary,
     });
+    if (typeof response?.document_id !== 'string' || !response.document_id) {
+        throw new Error('[UPLOAD_FAILED] 서버가 저장된 문서를 확인하지 못했습니다.');
+    }
+    return { document_id: response.document_id };
 }

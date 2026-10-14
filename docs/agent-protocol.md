@@ -177,10 +177,11 @@ Other tasks are handled by the Supabase Edge Functions / Content Engine.
 7. Download PDF (건축물대장 표제부 + 전유부)
    - webhook: task_progress { message: "PDF 다운로드 완료", progress_pct: 60 }
 8. Extract text via PDF.js or Playwright page.evaluate()
-9. Upload PDF to Supabase Storage: bucket=documents, path=<org_id>/<project_id>/building_register_<timestamp>.pdf
-   - webhook: document_uploaded { project_id, document_type: "building_register", file_url, file_name, raw_text }
-10. webhook: task_completed { result: { document_id, file_url, page_count } }
-    (Server auto-triggers analyze-document)
+9. Send the PDF/text to the server (the agent has no Storage or DB credentials)
+   - webhook: save_document { task_id, project_id, document_type: "building_register", raw_data, summary }
+   - server verifies agent↔task↔project ownership, writes `<org_id>/<project_id>/...` in the private `documents` bucket, returns `document_id`
+10. webhook: task_completed { result: { document_id } }
+    (Refused by the server if `document_id` is missing or not the one it saved for this task)
 ```
 
 #### `naver_upload` (네이버 블로그 자동 업로드)
@@ -249,9 +250,9 @@ No Authorization header is required. Authentication is via `agent_key` in the re
 | `heartbeat` | Every 30 seconds, always | `agent_key`, `status`, `version` |
 | `task_started` | Immediately after claiming the task | `agent_key`, `task_id` |
 | `task_progress` | At meaningful milestones (not more than every 5 seconds) | `agent_key`, `task_id`, `message`, `level`, `progress_pct` |
-| `task_completed` | When all work and uploads are done | `agent_key`, `task_id`, `result` |
+| `task_completed` | When all work is done AND the server confirmed the saved document | `agent_key`, `task_id`, `result` (document tasks must carry the server-returned `document_id`) |
 | `task_failed` | On unrecoverable error or exception | `agent_key`, `task_id`, `error_code`, `error_message`, `retry` |
-| `document_uploaded` | After Supabase Storage upload succeeds | `agent_key`, `project_id`, `document_type`, `file_url`, `file_name`, `raw_text` |
+| `save_document` | Instead of writing Storage/DB directly — the server verifies ownership, stores the file and returns `document_id` | `agent_key`, `task_id`, `project_id`, `document_type` (+ `file_base64`/`content_type`/`file_name` for images, `raw_data`/`summary` for 건축물대장) |
 
 ### Retry on Webhook Failure
 

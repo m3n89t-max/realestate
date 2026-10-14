@@ -574,18 +574,22 @@ Side effect: if `task.type === 'building_register'` and `result.document_id` is 
 ```
 If `retry: true` and `task.retry_count < task.max_retries`, status becomes `retrying` and `scheduled_at` is set 60 seconds in the future.
 
-**`document_uploaded`** — Agent uploaded a file to Supabase Storage
+**`save_document`** — Agent hands the document to the server, which verifies ownership, writes Storage and the `documents` row, and returns the saved id. The agent never writes Storage or the DB itself.
 ```json
 {
-  "event": "document_uploaded",
+  "event": "save_document",
   "agent_key": "<string>",
+  "task_id": "<uuid of a task this agent claimed>",
   "project_id": "<uuid>",
-  "document_type": "building_register" | "floor_plan" | "permit_history",
-  "file_url": "https://...",
-  "file_name": "건축물대장_2026.pdf",
-  "raw_text": "<extracted OCR/Playwright text>"
+  "document_type": "building_register" | "cadastral_map",
+  "file_name": "지적도_2026.png",
+  "content_type": "image/png",
+  "file_base64": "<cadastral_map only: PNG bytes>",
+  "raw_data": { "...": "building_register only" },
+  "summary": "building_register only"
 }
 ```
+Response: `{ "success": true, "document_id": "<uuid>" }`. The server rejects the request unless the task is `running`, claimed by this agent, belongs to the agent's org, points at `project_id`, and its type matches `document_type`. The storage object path is server-generated (`<org_id>/<project_id>/<uuid>.png`) and never overwrites. Re-sending the same `task_id` returns the already-saved `document_id` instead of creating a duplicate. `task_completed` for a document task is refused unless `result.document_id` matches a row the server saved for that task.
 
 #### Response Data (`data` field)
 
