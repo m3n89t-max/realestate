@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
 import { PROPERTY_TYPE_LABELS } from '@/lib/types'
+import { makeSupabaseSignedUrlCreator, resolveDocumentFileUrls } from '@/lib/document-url'
 import { FileArchive, Plus, ArrowRight, Download } from 'lucide-react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
@@ -30,11 +31,16 @@ export default async function DocsPage() {
 
   const orgId = membership?.org_id
 
-  const { data: documents } = await supabase
+  const { data: documentRows } = await supabase
     .from('documents')
     .select('id, project_id, type, file_name, file_url, created_at')
     .eq('org_id', orgId)
     .order('created_at', { ascending: false })
+
+  const documents = await resolveDocumentFileUrls(
+    documentRows ?? [],
+    makeSupabaseSignedUrlCreator(supabase.storage),
+  )
 
   const projectIds = [...new Set((documents ?? []).map(d => d.project_id))]
 

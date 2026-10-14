@@ -286,13 +286,24 @@ export interface WebhookTaskFailedRequest extends WebhookAgentBaseRequest {
     retry: boolean;
 }
 
-export interface WebhookDocumentUploadedRequest extends WebhookAgentBaseRequest {
-    event: 'document_uploaded';
+export interface WebhookSaveDocumentRequest extends WebhookAgentBaseRequest {
+    event: 'save_document';
+    /** Must be a task this agent has already claimed; the server re-verifies ownership. */
+    task_id: string;
     project_id: string;
-    document_type: 'building_register' | 'floor_plan' | 'permit_history';
-    file_url: string;
-    file_name: string;
-    raw_text?: string;
+    document_type: 'building_register' | 'cadastral_map';
+    /** cadastral_map only: PNG bytes; the server picks the storage path. */
+    file_name?: string;
+    content_type?: 'image/png';
+    file_base64?: string;
+    /** building_register only. */
+    raw_data?: Record<string, unknown>;
+    summary?: string;
+}
+
+export interface WebhookSaveDocumentResponse {
+    success: true;
+    document_id: string;
 }
 
 export type WebhookAgentRequest =
@@ -301,7 +312,7 @@ export type WebhookAgentRequest =
     | WebhookTaskProgressRequest
     | WebhookTaskCompletedRequest
     | WebhookTaskFailedRequest
-    | WebhookDocumentUploadedRequest;
+    | WebhookSaveDocumentRequest;
 
 export interface WebhookAgentResponse {
     event: string;

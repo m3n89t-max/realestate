@@ -33,23 +33,24 @@ Deno.serve(async (req) => {
     )
 
     // 프로젝트 좌표 조회
-    const { data: project } = await supabaseClient
+    const { data: project, error: projectError } = await supabaseClient
       .from('projects')
       .select('lat, lng, address, org_id')
       .eq('id', project_id)
       .single()
 
-    if (!project) throw new Error('프로젝트를 찾을 수 없습니다')
+    if (projectError || !project) throw new Error('프로젝트를 찾을 수 없습니다')
     if (!project.lat || !project.lng) throw new Error('좌표 정보가 없습니다. 주소 정규화를 먼저 실행하세요.')
 
     const lat = Number(project.lat)
     const lng = Number(project.lng)
 
     if (task_id) {
-      await adminClient.from('tasks').update({
+      const { error: taskStartError } = await adminClient.from('tasks').update({
         status: 'running',
         started_at: new Date().toISOString(),
       }).eq('id', task_id).eq('org_id', project.org_id)
+      if (taskStartError) throw new Error('작업 상태를 갱신하지 못했습니다')
     }
 
     // ── BBox 계산 (중심 좌표 기준 ±반경) ──────────────────────
@@ -79,39 +80,38 @@ Deno.serve(async (req) => {
       KEY:         vworldKey,
     })
     const wmsUrl = `https://api.vworld.kr/req/wms?${wmsParams.toString()}`
-    console.log('[download-cadastral-map] WMS URL:', wmsUrl)
 
     const wmsRes = await fetch(wmsUrl)
     console.log('[download-cadastral-map] WMS status:', wmsRes.status, 'content-type:', wmsRes.headers.get('content-type'))
 
     if (wmsRes.ok && (wmsRes.headers.get('content-type') ?? '').includes('image')) {
       const buf = await wmsRes.arrayBuffer()
-      const fileName = `cadastral/${project_id}/cadastral_${Date.now()}.png`
+      const fileName = `${project.org_id}/${project_id}/cadastral_${crypto.randomUUID()}.png`
       const { error: uploadErr } = await adminClient.storage
         .from('documents')
-        .upload(fileName, buf, { contentType: 'image/png', upsert: true })
+        .upload(fileName, buf, { contentType: 'image/png', upsert: false })
+      if (uploadErr) throw new Error('지적도 파일을 저장하지 못했습니다')
 
-      if (!uploadErr) {
-        const { data: { publicUrl } } = adminClient.storage.from('documents').getPublicUrl(fileName)
-        savedDocs.push({ type: 'cadastral', url: publicUrl })
-
-        await adminClient.from('documents').upsert({
-          project_id,
-          org_id:     project.org_id,
-          type:       'cadastral_map',
-          status:     'completed',
-          file_url:   publicUrl,
-          file_name:  `지적도_${new Date().toLocaleDateString('ko-KR')}.png`,
-          raw_data:   { map_type: 'cadastral_wms', center: { lat, lng }, bbox: { minLat, maxLat, minLng, maxLng }, address: project.address },
-          summary:    `지적도 — ${project.address} 지번 경계`,
-          fetched_at: new Date().toISOString(),
-        }, { onConflict: 'project_id,type' })
-      } else {
-        console.error('[download-cadastral-map] Storage 업로드 실패:', uploadErr)
+      const { error: documentError } = await adminClient.from('documents').upsert({
+        project_id,
+        org_id:     project.org_id,
+        type:       'cadastral_map',
+        status:     'completed',
+        file_url:   fileName,
+        file_name:  `지적도_${new Date().toLocaleDateString('ko-KR')}.png`,
+        raw_data:   { map_type: 'cadastral_wms', center: { lat, lng }, bbox: { minLat, maxLat, minLng, maxLng }, address: project.address },
+        summary:    `지적도 — ${project.address} 지번 경계`,
+        fetched_at: new Date().toISOString(),
+      }, { onConflict: 'project_id,type' })
+      if (documentError) {
+        const { error: cleanupError } = await adminClient.storage.from('documents').remove([fileName])
+        if (cleanupError) console.error('[download-cadastral-map] orphan cleanup failed')
+        throw new Error('지적도 정보를 저장하지 못했습니다')
       }
+      savedDocs.push({ type: 'cadastral', url: fileName })
     } else {
-      const errText = await wmsRes.text().catch(() => '')
-      console.error('[download-cadastral-map] WMS 응답 오류:', wmsRes.status, errText.slice(0, 300))
+      console.error('[download-cadastral-map] WMS 응답 오류:', wmsRes.status)
+      throw new Error('지적도 이미지 생성에 실패했습니다')
     }
 
     // ── 2. 배경지도 StaticMap (white) ─────────────────────────
@@ -129,21 +129,21 @@ Deno.serve(async (req) => {
       key:     vworldKey,
     })
     const staticUrl = `https://api.vworld.kr/req/image?${staticParams.toString()}`
-    console.log('[download-cadastral-map] StaticMap URL:', staticUrl)
 
     const staticRes = await fetch(staticUrl)
     console.log('[download-cadastral-map] StaticMap status:', staticRes.status, 'content-type:', staticRes.headers.get('content-type'))
 
     if (staticRes.ok && (staticRes.headers.get('content-type') ?? '').includes('image')) {
       const buf = await staticRes.arrayBuffer()
-      const fileName = `cadastral/${project_id}/basemap_${Date.now()}.png`
+      const fileName = `${project.org_id}/${project_id}/basemap_${crypto.randomUUID()}.png`
       const { error: uploadErr } = await adminClient.storage
         .from('documents')
-        .upload(fileName, buf, { contentType: 'image/png', upsert: true })
+        .upload(fileName, buf, { contentType: 'image/png', upsert: false })
 
-      if (!uploadErr) {
-        const { data: { publicUrl } } = adminClient.storage.from('documents').getPublicUrl(fileName)
-        savedDocs.push({ type: 'basemap', url: publicUrl })
+      if (uploadErr) {
+        console.warn('[download-cadastral-map] optional basemap upload failed')
+      } else {
+        savedDocs.push({ type: 'basemap', url: fileName })
       }
     }
 
@@ -152,11 +152,12 @@ Deno.serve(async (req) => {
     }
 
     if (task_id) {
-      await adminClient.from('tasks').update({
+      const { error: taskCompleteError } = await adminClient.from('tasks').update({
         status: 'success',
         result: { maps: savedDocs },
         completed_at: new Date().toISOString(),
       }).eq('id', task_id).eq('org_id', project.org_id)
+      if (taskCompleteError) throw new Error('작업 완료 상태를 저장하지 못했습니다')
     }
 
     return new Response(JSON.stringify({ success: true, maps: savedDocs }), {
@@ -164,9 +165,8 @@ Deno.serve(async (req) => {
     })
 
   } catch (err) {
-    const msg = err instanceof Error ? err.message : '지적도 다운로드 실패'
-    console.error('[download-cadastral-map]', msg)
-    return new Response(JSON.stringify({ error: msg }), {
+    console.error('[download-cadastral-map]', err)
+    return new Response(JSON.stringify({ error: '지적도 다운로드를 처리하지 못했습니다' }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

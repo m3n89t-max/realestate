@@ -1,5 +1,19 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, handleCors } from '../_shared/cors.ts'
+import {
+  isAgentDocumentTask,
+  validateDocumentSaveContext,
+  type AgentDocumentType,
+} from '../_shared/agent-document.ts'
+
+const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024
+
+function decodeBase64(value: string): Uint8Array {
+  const binary = atob(value)
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index)
+  return bytes
+}
 
 // 로컬 에이전트에서 오는 웹훅 처리 (JWT 없이 agent_key로 인증)
 Deno.serve(async (req) => {
@@ -29,7 +43,7 @@ Deno.serve(async (req) => {
     const requireOwnedTask = async (taskId: string) => {
       const { data: task, error } = await adminClient
         .from('tasks')
-        .select('id, type, project_id, retry_count, max_retries')
+        .select('id, org_id, type, project_id, status, agent_id, retry_count, max_retries')
         .eq('id', taskId)
         .eq('org_id', agent.org_id)
         .maybeSingle()
@@ -46,6 +60,25 @@ Deno.serve(async (req) => {
         .maybeSingle()
       if (error || !project) throw new Error('프로젝트를 찾을 수 없습니다')
       return project
+    }
+
+    const requireOwnedDocument = async (
+      documentId: string,
+      taskId: string,
+      projectId: string,
+      documentType: string,
+    ) => {
+      const { data: document, error } = await adminClient
+        .from('documents')
+        .select('id')
+        .eq('id', documentId)
+        .eq('source_task_id', taskId)
+        .eq('org_id', agent.org_id)
+        .eq('project_id', projectId)
+        .eq('type', documentType)
+        .maybeSingle()
+      if (error || !document) throw new Error('저장된 문서를 확인할 수 없습니다')
+      return document
     }
 
     switch (event) {
@@ -125,6 +158,21 @@ Deno.serve(async (req) => {
         const { task_id, result } = data
         if (!task_id) throw new Error('task_id가 필요합니다')
         const task = await requireOwnedTask(task_id)
+
+        if (isAgentDocumentTask(task.type)) {
+          if (
+            task.status !== 'running' ||
+            task.agent_id !== agent.id ||
+            !task.project_id ||
+            typeof result?.document_id !== 'string'
+          ) {
+            throw new Error('저장된 문서 확인이 필요합니다')
+          }
+          const documentType = task.type === 'download_cadastral_map'
+            ? 'cadastral_map'
+            : 'building_register'
+          await requireOwnedDocument(result.document_id, task_id, task.project_id, documentType)
+        }
 
         const { error: updateError } = await adminClient
           .from('tasks')
@@ -211,21 +259,99 @@ Deno.serve(async (req) => {
         break
       }
 
-      case 'document_uploaded': {
-        const { project_id, document_type, file_url, file_name, raw_text } = data
-        if (!project_id) throw new Error('project_id가 필요합니다')
-        const project = await requireOwnedProject(project_id)
-
-        const { error: insertError } = await adminClient.from('documents').insert({
+      case 'save_document': {
+        const {
+          task_id,
           project_id,
-          org_id: project.org_id,
-          type: document_type,
-          file_url,
+          document_type,
           file_name,
-          raw_text,
+          content_type,
+          file_base64,
+          raw_data,
+          summary,
+        } = data
+        if (!task_id || !project_id || !document_type) throw new Error('문서 저장 정보가 부족합니다')
+
+        const task = await requireOwnedTask(task_id)
+        const project = await requireOwnedProject(project_id)
+        validateDocumentSaveContext({
+          agentId: agent.id,
+          agentOrgId: agent.org_id,
+          task,
+          project,
+          request: { task_id, project_id, document_type: document_type as AgentDocumentType },
         })
-        if (insertError) throw insertError
-        break
+
+        const { data: existingDocument, error: existingError } = await adminClient
+          .from('documents')
+          .select('id')
+          .eq('source_task_id', task_id)
+          .eq('org_id', agent.org_id)
+          .eq('project_id', project_id)
+          .eq('type', document_type)
+          .maybeSingle()
+        if (existingError) throw new Error('문서 저장 상태를 확인하지 못했습니다')
+        if (existingDocument?.id) {
+          return new Response(JSON.stringify({ success: true, document_id: existingDocument.id }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
+        }
+
+        let storagePath: string | null = null
+        if (document_type === 'cadastral_map') {
+          if (content_type !== 'image/png' || typeof file_base64 !== 'string' || !file_base64) {
+            throw new Error('지적도 파일 형식이 올바르지 않습니다')
+          }
+          const bytes = decodeBase64(file_base64)
+          if (bytes.byteLength === 0 || bytes.byteLength > MAX_DOCUMENT_BYTES) {
+            throw new Error('지적도 파일 크기가 허용 범위를 벗어났습니다')
+          }
+          storagePath = `${agent.org_id}/${project_id}/${crypto.randomUUID()}.png`
+          const { error: uploadError } = await adminClient.storage
+            .from('documents')
+            .upload(storagePath, bytes, { contentType: 'image/png', upsert: false })
+          if (uploadError) throw new Error('문서 파일을 저장하지 못했습니다')
+        }
+
+        const documentRow: Record<string, unknown> = document_type === 'building_register'
+          ? {
+              source_task_id: task_id,
+              project_id,
+              org_id: agent.org_id,
+              type: document_type,
+              status: 'completed',
+              // 서류 탭이 raw_data 로 건축물대장을 렌더링하고 summary.summary_text 를 읽는다.
+              raw_data: raw_data ?? {},
+              summary: { summary_text: typeof summary === 'string' ? summary : '' },
+              fetched_at: new Date().toISOString(),
+            }
+          : {
+              source_task_id: task_id,
+              project_id,
+              org_id: agent.org_id,
+              type: document_type,
+              status: 'completed',
+              file_url: storagePath,
+              file_name: typeof file_name === 'string' ? file_name.slice(0, 255) : 'cadastral_map.png',
+              fetched_at: new Date().toISOString(),
+            }
+
+        const { data: savedDocument, error: insertError } = await adminClient
+          .from('documents')
+          .upsert(documentRow, { onConflict: 'project_id,type' })
+          .select('id')
+          .single()
+        if (insertError || !savedDocument?.id) {
+          if (storagePath) {
+            const { error: cleanupError } = await adminClient.storage.from('documents').remove([storagePath])
+            if (cleanupError) console.error('[save_document] orphan cleanup failed')
+          }
+          throw new Error('문서 정보를 저장하지 못했습니다')
+        }
+
+        return new Response(JSON.stringify({ success: true, document_id: savedDocument.id }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
       }
 
       case 'update_content': {
@@ -350,8 +476,7 @@ Deno.serve(async (req) => {
 
   } catch (err) {
     console.error('[webhook-agent]', err)
-    const message = err instanceof Error ? err.message : '웹훅 처리에 실패했습니다'
-    return new Response(JSON.stringify({ error: message }), {
+    return new Response(JSON.stringify({ error: '요청을 처리하지 못했습니다' }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

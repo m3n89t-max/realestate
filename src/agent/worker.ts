@@ -10,6 +10,7 @@ import {
 } from './webhook-client';
 import { downloadBuildingRegister } from './playwright/building_register';
 import { downloadCadastralMap } from './playwright/cadastral_map';
+import { requireSavedDocumentResult } from './document-result-guard';
 
 
 import { AGENT_BRAND } from './brand';
@@ -355,6 +356,8 @@ class LocalAgent {
                 default:
                     throw new Error(`지원하지 않는 작업 유형: ${task.type}`);
             }
+
+            requireSavedDocumentResult(task.type, result);
 
             // webhook: task_completed 전송
             if (this.config.agent_key) {

@@ -63,10 +63,11 @@ Deno.serve(async (req) => {
 
     // task → running
     if (task_id) {
-      await adminClient.from('tasks').update({
+      const { error: taskStartError } = await adminClient.from('tasks').update({
         status: 'running',
         started_at: new Date().toISOString(),
       }).eq('id', task_id).eq('org_id', ownedProject.org_id)
+      if (taskStartError) throw new Error('작업 상태를 갱신하지 못했습니다')
     }
 
     // ── 건축HUB API 호출 ──────────────────────────────────────
@@ -102,7 +103,7 @@ Deno.serve(async (req) => {
     // ── documents 테이블에 저장 ───────────────────────────────
     let docId: string | null = null
     if (ownedProject) {
-      const { data: savedDoc } = await adminClient.from('documents').upsert({
+      const { data: savedDoc, error: saveError } = await adminClient.from('documents').upsert({
         project_id,
         org_id:    ownedProject.org_id,
         type:      'building_register',
@@ -112,7 +113,8 @@ Deno.serve(async (req) => {
         summary:   formatSummary(results.title),
         fetched_at: new Date().toISOString(),
       }, { onConflict: 'project_id,type' }).select('id').single()
-      docId = savedDoc?.id ?? null
+      if (saveError || !savedDoc?.id) throw new Error('건축물대장 정보를 저장하지 못했습니다')
+      docId = savedDoc.id
     }
 
     // ── AI 요약 자동 실행 ──────────────────────────────────────
@@ -135,11 +137,12 @@ Deno.serve(async (req) => {
 
     // task → success
     if (task_id) {
-      await adminClient.from('tasks').update({
+      const { error: taskCompleteError } = await adminClient.from('tasks').update({
         status:       'success',
         result:       { api_data: results, doc_id: docId },
         completed_at: new Date().toISOString(),
       }).eq('id', task_id).eq('org_id', ownedProject.org_id)
+      if (taskCompleteError) throw new Error('작업 완료 상태를 저장하지 못했습니다')
     }
 
     return new Response(JSON.stringify({ success: true, data: results, doc_id: docId }), {
@@ -147,10 +150,9 @@ Deno.serve(async (req) => {
     })
 
   } catch (err) {
-    const msg = err instanceof Error ? err.message : '건축물대장 조회 실패'
-    console.error('[download-building-register]', msg)
+    console.error('[download-building-register]', err)
 
-    return new Response(JSON.stringify({ error: msg }), {
+    return new Response(JSON.stringify({ error: '건축물대장 조회를 처리하지 못했습니다' }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
